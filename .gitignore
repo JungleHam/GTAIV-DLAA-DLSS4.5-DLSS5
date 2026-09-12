@@ -1,0 +1,13 @@
+# Locally cloned/build ReShade tree
+tools/reshade-bbridge-input/reshade-src/
+tools/reshade-bbridge-input/ReShade64-bbridge.dll
+
+# User-supplied/proprietary binaries
+input/*.dll
+input/*.7z
+input/*.zip
+
+# Logs and local game backups
+*.log
+_PRE_DFC_BACKUP_*/
+_DLAA_PREINSTALL_BACKUP_*/
