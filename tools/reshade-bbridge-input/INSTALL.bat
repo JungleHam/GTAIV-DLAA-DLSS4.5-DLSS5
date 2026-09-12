@@ -7,21 +7,8 @@ set "PATCHED=%~dp0ReShade64-bbridge.dll"
 set "RESHADESYS=C:\ProgramData\ReShade\ReShade64.dll"
 set "BACKUP=C:\ProgramData\ReShade\ReShade64.dll.pre-bbridge-input"
 
-rem Make this usable by double-clicking: request UAC automatically, then continue.
-net session >nul 2>nul
-if errorlevel 1 (
-  echo.
-  echo Administrator permission is required to install the patched ReShade Vulkan DLL.
-  echo Windows will now show a User Account Control prompt. Click Yes to continue.
-  echo.
-  powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath $env:BB_SELF -Verb RunAs" || (
-    echo ERROR: Could not request Administrator permission.
-    pause
-    exit /b 1
-  )
-  exit /b 0
-)
-
+rem Ask for the game first, while this window is still non-elevated.
+rem This also lets drag-and-drop from Explorer work normally.
 set "GAME=%~1"
 if not defined GAME (
   echo ============================================================
@@ -53,17 +40,8 @@ for %%I in ("%GAME%") do if /I "%%~nxI"=="GTAIV.exe" set "GAME=%%~dpI"
 rem Be forgiving if the user selected the outer "Grand Theft Auto IV" folder.
 if not exist "%GAME%\GTAIV.exe" if exist "%GAME%\GTAIV\GTAIV.exe" set "GAME=%GAME%\GTAIV"
 
-set "TREX=%GAME%\.trex"
-set "BB_TREX=%TREX%"
-set "POC=%TREX%\bridge-input.addon64"
-set "POCDISABLED=%TREX%\bridge-input.addon64.poc-disabled"
-
-echo.
-echo Using game folder:
-echo   %GAME%
-echo.
-
 if not exist "%GAME%\GTAIV.exe" (
+  echo.
   echo ERROR: GTAIV.exe was not found there.
   echo.
   echo Make sure you entered the folder that actually contains GTAIV.exe.
@@ -72,9 +50,36 @@ if not exist "%GAME%\GTAIV.exe" (
   pause
   exit /b 1
 )
+
+rem Request Administrator permission automatically and pass the chosen game folder on.
+net session >nul 2>nul
+if errorlevel 1 (
+  set "BB_GAME=%GAME%"
+  echo.
+  echo Windows will now ask for Administrator permission.
+  echo Click Yes to continue installing the patched ReShade Vulkan DLL.
+  echo.
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$arg='\"'+$env:BB_GAME+'\"'; Start-Process -FilePath $env:BB_SELF -ArgumentList $arg -Verb RunAs" || (
+    echo ERROR: Could not request Administrator permission.
+    pause
+    exit /b 1
+  )
+  exit /b 0
+)
+
+set "TREX=%GAME%\.trex"
+set "BB_TREX=%TREX%"
+set "POC=%TREX%\bridge-input.addon64"
+set "POCDISABLED=%TREX%\bridge-input.addon64.poc-disabled"
+
+echo.
+echo Using game folder:
+echo   "%GAME%"
+echo.
+
 if not exist "%TREX%\NvRemixBridge.exe" (
   echo ERROR: b-bridge server not found:
-  echo   %TREX%\NvRemixBridge.exe
+  echo   "%TREX%\NvRemixBridge.exe"
   echo.
   echo Complete Steps 1 and 2 of the main README first.
   pause
@@ -89,7 +94,7 @@ if not exist "%PATCHED%" (
 )
 if not exist "%RESHADESYS%" (
   echo ERROR: Existing global ReShade Vulkan DLL not found:
-  echo   %RESHADESYS%
+  echo   "%RESHADESYS%"
   echo.
   echo Install the ReShade Vulkan layer through Install-DLAA.bat first.
   pause
@@ -113,7 +118,7 @@ if not exist "%BACKUP%" (
   )
 ) else (
   echo Existing backup preserved:
-  echo   %BACKUP%
+  echo   "%BACKUP%"
 )
 
 if exist "%POC%" (
@@ -128,7 +133,7 @@ if exist "%POC%" (
 
 echo Installing patched global ReShade Vulkan DLL...
 copy /y "%PATCHED%" "%RESHADESYS%" >nul || (
-  echo ERROR: Could not replace %RESHADESYS%
+  echo ERROR: Could not replace "%RESHADESYS%"
   echo Another Vulkan/ReShade application may still have it loaded.
   pause
   exit /b 1
