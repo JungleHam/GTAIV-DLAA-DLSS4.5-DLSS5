@@ -93,6 +93,27 @@ PreprocessorDefinitions=DLSS5_MV_PROVIDER=3
 
 Do not append `\**` to the ReShade shader search paths in this stack; that previously produced invalid-path/shader-loading failures.
 
+## DLAA model / preset selector
+
+After the ReShade b-bridge input patch from **Step 3** of the main README is installed, the existing DLSS5-Feeder model selector becomes fully interactive.
+
+Launch GTA IV and press **Home**, then go to:
+
+```text
+Add-ons -> DLSS 5 Feed -> DLSS render preset -> Preset
+```
+
+The pinned Feeder 0.15.1 exposes these DLAA render presets:
+
+- **K (transformer)** — recommended for normal DLAA use; NVIDIA documents K as the default preset for DLAA / Quality / Balanced.
+- **J (transformer)** — alternative transformer model; may reduce ghosting a little at the cost of more flicker.
+- **Default** — leaves model choice to the NVIDIA runtime.
+- **E / F (legacy CNN)** — deprecated legacy models, mainly useful as troubleshooting alternatives for motion or transparency artifacts.
+
+Changing the preset in the Home menu causes Feeder to rebuild the DLSS feature and stores the selected value in `.trex\dlss5-feed.cfg`.
+
+This control changes the **DLAA model/preset only**. It does not turn GTA IV into DLSS Super Resolution Quality/Balanced/Performance; the game still renders at native resolution and the DLSS feature remains DLAA / 1:1.
+
 ## What the DLAA installer intentionally does not install
 
 The base install removes/avoids:
