@@ -152,6 +152,29 @@ See [`docs/RESHade-INPUT-PATCH.md`](docs/RESHade-INPUT-PATCH.md).
 
 > **DLAA setup is complete after Step 3.** At this point you can stop here and use GTA IV with DLAA only. Everything below is optional and is only for adding **DLSS 5 Neural Rendering** on top of the working DLAA setup.
 
+#### DLAA model / quality selector — available after Step 3
+
+The pinned **DLSS5-Feeder 0.15.1 already includes a live DLSS render-preset selector**. Step 3 makes it usable because the patched ReShade build restores mouse and keyboard input to the server-side overlay.
+
+Launch GTA IV, press **Home**, then open:
+
+```text
+Add-ons -> DLSS 5 Feed -> DLSS render preset -> Preset
+```
+
+Available presets in the pinned Feeder build:
+
+| Preset | What to use it for |
+|---|---|
+| **K (transformer)** | **Recommended for normal DLAA use.** NVIDIA documents K as the default transformer preset for DLAA / Quality / Balanced |
+| **J (transformer)** | Alternative transformer model; may show a little less ghosting but more flicker than K |
+| **Default** | Let the NVIDIA runtime choose its default behavior |
+| **E / F (legacy CNN)** | Deprecated legacy models; mainly useful as troubleshooting alternatives for motion / transparent-object artifacts |
+
+Changing the preset live causes Feeder to rebuild the DLSS feature and save the selected value to `.trex\dlss5-feed.cfg`.
+
+This is a **DLAA model/preset selector**, not DLSS Super Resolution Quality/Balanced/Performance. GTA IV still renders at native resolution and DLAA remains 1:1.
+
 ### 4. Optional: upgrade to DLSS 5 Neural Rendering
 
 Supply the two tested files described in [`input/README.md`](input/README.md):
