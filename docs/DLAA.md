@@ -15,7 +15,7 @@ The installer is deliberately strict about this clean baseline because its autom
 
 ## Install
 
-Copy `install/Install-DLAA.bat` into the same folder as `GTAIV.exe` and run it.
+Copy `install/Install-DLAA.bat` into the same folder as `GTAIV.exe` and double-click it.
 
 The BAT contains an embedded PowerShell installer and elevates itself once because ReShade's Vulkan global-layer registration needs Administrator rights.
 
@@ -103,14 +103,19 @@ Launch GTA IV and press **Home**, then go to:
 Add-ons -> DLSS 5 Feed -> DLSS render preset -> Preset
 ```
 
-The pinned Feeder 0.15.1 exposes these DLAA render presets:
+### What each preset means
 
-- **K (transformer)** — recommended for normal DLAA use; NVIDIA documents K as the default preset for DLAA / Quality / Balanced.
-- **J (transformer)** — alternative transformer model; may reduce ghosting a little at the cost of more flicker.
-- **Default** — leaves model choice to the NVIDIA runtime.
-- **E / F (legacy CNN)** — deprecated legacy models, mainly useful as troubleshooting alternatives for motion or transparency artifacts.
+| Preset | Model type | What it means / when to use it |
+|---|---|---|
+| **K** | Modern transformer | **Recommended.** NVIDIA defines K as the default preset for DLAA, Quality and Balanced. It targets the best image quality, with somewhat higher GPU cost than older models. Start here. |
+| **J** | Modern transformer | Very similar to K. NVIDIA notes that J can show a little less ghosting, but may introduce more flicker. Try it if K leaves visible trails or temporal smearing. |
+| **Default** | Runtime-selected | Does not force a specific model. The NVIDIA runtime chooses its default, which may change with runtime/OTA behavior. Use this if you want the runtime's normal policy instead of pinning a model. |
+| **E** | Legacy CNN | Deprecated by NVIDIA. Kept mainly as a troubleshooting option. In this Feeder setup, older CNN behavior can sometimes reduce motion/transparency warping around things like smoke, dust or flames. |
+| **F** | Legacy CNN | Also a deprecated legacy CNN preset. Treat it like E: not a normal quality upgrade, but another fallback to try if the transformer presets produce motion artifacts. |
 
-Changing the preset in the Home menu causes Feeder to rebuild the DLSS feature and stores the selected value in `.trex\dlss5-feed.cfg`.
+There is **no universal quality ladder** where E < F < J < K in every scene. K is the normal recommendation; J is the modern alternative; E/F are compatibility/troubleshooting choices.
+
+Changing the preset in the Home menu causes Feeder to rebuild the DLSS feature and stores the selected value in `.trex\dlss5-feed.cfg`. A short hitch while the feature rebuilds is normal.
 
 This control changes the **DLAA model/preset only**. It does not turn GTA IV into DLSS Super Resolution Quality/Balanced/Performance; the game still renders at native resolution and the DLSS feature remains DLAA / 1:1.
 
