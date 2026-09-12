@@ -52,6 +52,44 @@ GTA IV DirectInput
 
 With the patch installed, `Home` opens the normal ReShade overlay, mouse/keyboard input works, and the Deep Fried Chicken tab is interactive.
 
+## Bring your own / prerequisites
+
+The installers fetch **b-bridge, ReShade 6.8.0, DLSS5-Feeder, LumeniteFX and the pinned `nvngx_dlss.dll` automatically**. You do **not** need to download those manually.
+
+Before starting, provide the following:
+
+| Required for | You need to provide |
+|---|---|
+| Base DLAA install | A working Windows PC with an **NVIDIA RTX GPU**, internet access, and administrator rights |
+| Base DLAA install | A legitimate PC installation of **GTA IV** with `GTAIV.exe` present. The reference setup was GTA IV: Complete Edition |
+| Base DLAA install | A **clean, working FusionFix 5.0.1 installation**. Launch the game once and confirm FusionFix works before running this project's installer |
+| Base DLAA install | No previous `.trex` / b-bridge attempt in the GTA IV folder. The installer intentionally expects a clean FusionFix baseline |
+| Interactive ReShade/DFC UI patch | **Git**, **Python**, and **Visual Studio 2022 or Build Tools** with **Desktop development with C++ / MSVC x64 tools** installed |
+| Optional DLSS 5 Neural Rendering | `Deep-Fried-Chicken-v1.7.4-checkpoint-70-chicken-assist-reliability.7z` |
+| Optional DLSS 5 Neural Rendering | The tested **`nvngx_dlssnr.dll` 310.8.0** matching the SHA256 listed in [`input/README.md`](input/README.md) |
+
+### Driver notes
+
+The pinned `nvngx_dlss.dll` 310.9.1 used for DLAA reports a minimum NVIDIA driver of **512.15**. The tested `nvngx_dlssnr.dll` 310.8.0 used for Neural Rendering reports a minimum driver of **615.00**.
+
+For the optional DLSS 5 path, **615.00 or newer is therefore required by the tested NR DLL**. Neural Rendering compatibility has only been directly confirmed by this project on the tested RTX 4070 Ti SUPER setup, so other RTX generations should be treated as unverified until reported working.
+
+### You do not need to bring
+
+The scripts download or prepare these for you:
+
+```text
+b-bridge 0.1.0
+ReShade 6.8.0 Full Add-On Support
+DLSS5-Feeder 0.15.1
+LumeniteFX pinned commit
+ReShade shader headers pinned commit
+nvngx_dlss.dll 310.9.1
+7zr.exe if 7-Zip is not already installed (DFC upgrade only)
+```
+
+`curl.exe` is optional; the installers fall back to PowerShell downloads when it is unavailable.
+
 ## Installation overview
 
 ### 1. Install FusionFix first
