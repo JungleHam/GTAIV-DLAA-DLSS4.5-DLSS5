@@ -15,33 +15,23 @@ if ($norm.Contains($marker)) {
     exit 0
 }
 
-$oldGate = @'
-    if (!g_m2b_depth_valid)
-    {
-        if (g.dlfg_last_skip_frame == 0 || frame - g.dlfg_last_skip_frame >= 300)
-        {
-            g.dlfg_last_skip_frame = frame;
-            Log("[feed] M3B-1: waiting for valid non-flat depth from the existing 600-frame probe");
-        }
-        return true;
-    }
+# Patch by stable function anchors instead of matching a large formatting-sensitive block.
+$funcStart = $norm.IndexOf('static bool M3b1MaybeRecord(')
+$funcEnd = $norm.IndexOf('static void M2cFail(', $funcStart)
+if ($funcStart -lt 0 -or $funcEnd -lt 0) {
+    throw 'Could not locate M3b1MaybeRecord/M2cFail anchors; no changes made.'
+}
 
-    if (g.dlfg_feature == nullptr)
-'@
+$featureNeedle = "    if (g.dlfg_feature == nullptr)`n    {"
+$featurePos = $norm.IndexOf($featureNeedle, $funcStart)
+if ($featurePos -lt 0 -or $featurePos -ge $funcEnd) {
+    throw 'Could not locate the M3B-1 feature-create block; no changes made.'
+}
 
-$newGate = @'
-    if (!g_m2b_depth_valid)
-    {
-        if (g.dlfg_last_skip_frame == 0 || frame - g.dlfg_last_skip_frame >= 300)
-        {
-            g.dlfg_last_skip_frame = frame;
-            Log("[feed] M3B-1: waiting for valid non-flat depth from the existing 600-frame probe");
-        }
-        return true;
-    }
-
-    // Loading/menu transitions can expose valid depth before Lumenite's motion-vector
-    // probe reflects moving gameplay. Do not consume the one-shot A/B attempt there.
+$gate = @'
+    // GTA IV loading/menu transitions can expose valid depth before Lumenite's
+    // motion-vector probe reflects moving gameplay. Do not consume the one-shot
+    // A/B attempt until the latest guide probe shows meaningful motion.
     constexpr double kM3b1MinMovingMvMeanPx = 0.05;
     if (g_mv_probe_mean_px <= kM3b1MinMovingMvMeanPx)
     {
@@ -54,64 +44,48 @@ $newGate = @'
         return true;
     }
 
-    if (g.dlfg_feature == nullptr)
-    {
+'@
+
+$norm = $norm.Insert($featurePos, $gate)
+
+# Log exactly when the one-shot is finally allowed to arm.
+$funcEnd = $norm.IndexOf('static void M2cFail(', $funcStart)
+$featurePos = $norm.IndexOf($featureNeedle, $funcStart)
+$openBraceEnd = $featurePos + $featureNeedle.Length
+$armLog = @'
+
         Log("[feed] M3B-1: moving gameplay detected; arming on current guide probe (meanMV=%.6f px)",
             g_mv_probe_mean_px);
 '@
+$norm = $norm.Insert($openBraceEnd, $armLog)
 
-# newGate intentionally opens the existing feature-null block, so remove its original opening brace.
-$oldFeatureStart = @'
-    if (g.dlfg_feature == nullptr)
-    {
-'@
-
-if (-not $norm.Contains($oldGate)) {
-    throw 'Could not find the expected M3B-1 depth/arming block. Source differs from the hardware-tested checkpoint; no changes made.'
+# Make the final zero-MV/material-motion validation rejection retryable instead of terminal.
+$rejectNeedle = '        M2bFail("motion vectors were zero while frames A and B contained material motion");'
+$rejectPos = $norm.IndexOf($rejectNeedle)
+if ($rejectPos -lt 0) {
+    throw 'Could not find the M3B-1 zero-MV rejection line; no file written.'
 }
 
-# Replace through the feature-null line, then consume the original brace exactly once.
-$norm = $norm.Replace($oldGate, $newGate)
-$featureBraceNeedle = "`n    {`n        if (!M3b1CheckCapabilities())"
-if (-not $norm.Contains($featureBraceNeedle)) {
-    throw 'Could not align the M3B-1 feature-create block after arming edit; no file written.'
-}
-$norm = $norm.Replace($featureBraceNeedle, "`n        if (!M3b1CheckCapabilities())")
-
-$oldReject = @'
-    if (g.dlfg_owner == 2 && g_mv_probe_mean_px <= 0.0001 && diff_ab >= material)
-    {
-        M2bFail("motion vectors were zero while frames A and B contained material motion");
-        return;
-    }
-'@
-
-$newReject = @'
-    if (g.dlfg_owner == 2 && g_mv_probe_mean_px <= 0.0001 && diff_ab >= material)
-    {
-        // This is a bad temporal pair, not a terminal M3B-1 failure. It commonly
-        // happens at the end of GTA IV loading before the MV probe catches up.
+$retry = @'
+        // Bad temporal pair, not a terminal M3B-1 failure. This commonly occurs
+        // at the end of GTA IV loading before the periodic MV probe catches up.
         Log("[feed] M3B-1: temporal pair rejected: motion vectors were zero while A/B contained material motion; retrying when moving gameplay is detected");
         g.dlfg_state = kM2bIdle;
         g.dlfg_history_frame = 0;
         g.dlfg_readback_fence = 0;
         g.dlfg_last_skip_frame = 0;
+        // The image has not been published to Vulkan on a rejected pair, so it is
+        // safe to reuse it for the next one-shot attempt.
         g.m3b1a_copy_queued = false;
         g.m3b1a_source_frame = 0;
         g.m3b1_ready_value = 0;
-        return;
-    }
 '@
-
-if (-not $norm.Contains($oldReject)) {
-    throw 'Could not find the expected terminal zero-MV rejection block. Source differs from the hardware-tested checkpoint; no file written.'
-}
-$norm = $norm.Replace($oldReject, $newReject)
+$norm = $norm.Remove($rejectPos, $rejectNeedle.Length).Insert($rejectPos, $retry)
 
 if ($hadCrLf) { $norm = $norm.Replace("`n", "`r`n") }
 [IO.File]::WriteAllText($source, $norm, [Text.UTF8Encoding]::new($false))
 
 Write-Host 'Applied M3B-1 loading/MV retry fix:'
-Write-Host '  - waits for depth + mean MV > 0.05 px before the one-shot A/B sequence'
+Write-Host '  - waits for valid depth plus mean MV > 0.05 px before arming'
 Write-Host '  - zero-MV/material-motion validation rejection is retryable, not terminal'
 Write-Host "Updated: $source"
