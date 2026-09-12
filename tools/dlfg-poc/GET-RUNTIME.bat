@@ -22,12 +22,24 @@ if exist "nvngx_dlssg.dll" (
   exit /b 0
 )
 
-echo Downloading official NVIDIA RTX Remix package...
-where curl.exe >nul 2>nul
-if not errorlevel 1 (
-  curl.exe -L --fail --retry 3 -o "%ZIP%" "%URL%" || goto :fail
+rem Reuse a previously downloaded archive when it is already complete and valid.
+set "GOT="
+if exist "%ZIP%" (
+  echo Checking existing downloaded archive...
+  for /f "usebackq tokens=*" %%H in (`powershell.exe -NoProfile -Command "(Get-FileHash -Algorithm SHA256 -LiteralPath '%ZIP%').Hash.ToLowerInvariant()"`) do set "GOT=%%H"
+)
+
+if /I "%GOT%"=="%EXPECTED%" (
+  echo Existing archive is valid - skipping the 230 MB download.
 ) else (
-  powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Invoke-WebRequest -UseBasicParsing -Uri '%URL%' -OutFile '%ZIP%'" || goto :fail
+  if exist "%ZIP%" del /q "%ZIP%" 2>nul
+  echo Downloading official NVIDIA RTX Remix package...
+  where curl.exe >nul 2>nul
+  if not errorlevel 1 (
+    curl.exe -L --fail --retry 3 -o "%ZIP%" "%URL%" || goto :fail
+  ) else (
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Invoke-WebRequest -UseBasicParsing -Uri '%URL%' -OutFile '%ZIP%'" || goto :fail
+  )
 )
 
 echo Verifying SHA256...
@@ -45,8 +57,7 @@ if exist "%OUT%" rmdir /s /q "%OUT%"
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Expand-Archive -LiteralPath '%ZIP%' -DestinationPath '%OUT%' -Force" || goto :fail
 
 echo Locating 64-bit nvngx_dlssg.dll...
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
-  "$f=Get-ChildItem -LiteralPath '%OUT%' -Recurse -File -Filter 'nvngx_dlssg.dll' ^| Sort-Object Length -Descending ^| Select-Object -First 1; if(!$f){exit 3}; Copy-Item -LiteralPath $f.FullName -Destination '%CD%\nvngx_dlssg.dll' -Force; Write-Host ('Source: '+$f.FullName); Write-Host ('Size: '+$f.Length)" || goto :fail
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$f=Get-ChildItem -LiteralPath '%OUT%' -Recurse -File -Filter 'nvngx_dlssg.dll' | Sort-Object Length -Descending | Select-Object -First 1; if(!$f){exit 3}; Copy-Item -LiteralPath $f.FullName -Destination '%CD%\nvngx_dlssg.dll' -Force; Write-Host ('Source: '+$f.FullName); Write-Host ('Size: '+$f.Length)" || goto :fail
 
 if not exist "nvngx_dlssg.dll" goto :fail
 
