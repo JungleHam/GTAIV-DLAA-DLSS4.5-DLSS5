@@ -104,7 +104,7 @@ nvngx_dlss.dll 310.9.1
 
 ### 1. Install FusionFix first
 
-Start from a **clean FusionFix 5.0.1** setup. Launch GTA IV once and verify FusionFix itself works.
+Start from a **clean FusionFix 5.0.1** setup. You HAVE TO Launch GTA IV once and verify FusionFix itself works, and so it finishes its own install.
 
 The project does not redistribute FusionFix. The tested upstream package and hash are recorded in [`manifests/versions.json`](manifests/versions.json).
 
