@@ -8,13 +8,23 @@ echo ============================================================
 echo.
 
 where git >nul 2>nul || (
-  echo ERROR: Git is not installed or is not in PATH.
+  echo ERROR: Git for Windows is not installed, or Windows cannot find it.
+  echo.
+  echo Download it here:
+  echo   https://git-scm.com/install/windows
+  echo.
+  echo Install Git, then double-click BUILD.bat again.
   pause
   exit /b 1
 )
 where python >nul 2>nul || (
   where py >nul 2>nul || (
-    echo ERROR: Python is required by ReShade's glad dependency.
+    echo ERROR: Python 3 is not installed, or Windows cannot find it.
+    echo.
+    echo Download it here:
+    echo   https://www.python.org/downloads/windows/
+    echo.
+    echo During setup, enable the option to add Python to PATH, then double-click BUILD.bat again.
     pause
     exit /b 1
   )
@@ -34,20 +44,36 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0apply_patch.ps1" "
 echo [3/4] Finding Visual Studio / MSBuild...
 set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
 if not exist "%VSWHERE%" (
-  echo ERROR: Visual Studio 2022 or Build Tools with Desktop development with C++ is required.
+  echo ERROR: Visual Studio 2022 Build Tools are required.
+  echo.
+  echo Download them here:
+  echo   https://aka.ms/vs/17/release/vs_BuildTools.exe
+  echo.
+  echo In the installer, select:
+  echo   Desktop development with C++
+  echo.
+  echo Then double-click BUILD.bat again.
   pause
   exit /b 1
 )
 set "VSROOT="
 for /f "usebackq tokens=*" %%I in (`"%VSWHERE%" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VSROOT=%%I"
 if not defined VSROOT (
-  echo ERROR: MSVC C++ build tools were not found.
+  echo ERROR: Visual Studio is installed, but the C++ build tools are missing.
+  echo.
+  echo Open Visual Studio Installer and add:
+  echo   Desktop development with C++
+  echo.
+  echo Then double-click BUILD.bat again.
   pause
   exit /b 1
 )
 set "MSBUILD=%VSROOT%\MSBuild\Current\Bin\MSBuild.exe"
 if not exist "%MSBUILD%" (
-  echo ERROR: MSBuild not found at "%MSBUILD%"
+  echo ERROR: MSBuild was not found at:
+  echo   "%MSBUILD%"
+  echo.
+  echo Repair or modify Visual Studio Build Tools, making sure Desktop development with C++ is installed.
   pause
   exit /b 1
 )
@@ -67,7 +93,7 @@ echo SUCCESS:
 echo   %~dp0ReShade64-bbridge.dll
 echo.
 echo Next: close this window and DOUBLE-CLICK INSTALL.bat.
-echo INSTALL.bat requests Administrator permission itself and then asks for your GTA IV folder.
+echo INSTALL.bat asks for your GTA IV folder and requests Administrator permission itself.
 echo No terminal commands are required.
 echo.
 pause
@@ -76,5 +102,6 @@ exit /b 0
 :fail
 echo.
 echo BUILD FAILED. Scroll up for the first error.
+echo If you are unsure what it means, copy the error text when asking for help.
 pause
 exit /b 1
