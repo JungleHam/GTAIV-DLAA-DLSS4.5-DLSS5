@@ -58,19 +58,29 @@ The installers fetch **b-bridge, ReShade 6.8.0, DLSS5-Feeder, LumeniteFX and the
 
 Before starting, provide the following:
 
-| Required for | You need to provide |
-|---|---|
-| Base DLAA install | A working Windows PC with an **NVIDIA RTX GPU**, internet access, and administrator rights |
-| Base DLAA install | A legitimate PC installation of **GTA IV** with `GTAIV.exe` present. The reference setup was GTA IV: Complete Edition |
-| Base DLAA install | A **clean, working FusionFix 5.0.1 installation**. Launch the game once and confirm FusionFix works before running this project's installer |
-| Base DLAA install | No previous `.trex` / b-bridge attempt in the GTA IV folder. The installer intentionally expects a clean FusionFix baseline |
-| Interactive ReShade/DFC UI patch | **Git**, **Python**, and **Visual Studio 2022 or Build Tools** with **Desktop development with C++ / MSVC x64 tools** installed |
-| Optional DLSS 5 Neural Rendering | `Deep-Fried-Chicken-v1.7.4-checkpoint-70-chicken-assist-reliability.7z` |
-| Optional DLSS 5 Neural Rendering | The tested **`nvngx_dlssnr.dll` 310.8.0** matching the SHA256 listed in [`input/README.md`](input/README.md) |
+| Required for | You need to provide | Link |
+|---|---|---|
+| Base DLAA install | A working Windows PC with an **NVIDIA RTX GPU**, internet access, administrator rights, and a suitable NVIDIA driver | [NVIDIA drivers](https://www.nvidia.com/en-us/drivers/) |
+| Base DLAA install | A legitimate PC installation of **GTA IV** with `GTAIV.exe` present. The reference setup was GTA IV: Complete Edition | [GTA IV: Complete Edition on Steam](https://store.steampowered.com/app/12210/Grand_Theft_Auto_IV_The_Complete_Edition/) |
+| Base DLAA install | A **clean, working FusionFix 5.0.1 installation**. Launch the game once and confirm FusionFix works before running this project's installer | [FusionFix v5.0.1](https://github.com/ThirteenAG/GTAIV.EFLC.FusionFix/releases/tag/v5.0.1) |
+| Base DLAA install | No previous `.trex` / b-bridge attempt in the GTA IV folder. The installer intentionally expects a clean FusionFix baseline | — |
+| Interactive ReShade/DFC UI patch | **Git for Windows** | [Git for Windows](https://git-scm.com/install/windows) |
+| Interactive ReShade/DFC UI patch | **Python 3** available in `PATH` | [Python for Windows](https://www.python.org/downloads/windows/) |
+| Interactive ReShade/DFC UI patch | **Visual Studio 2022 Build Tools** with **Desktop development with C++ / MSVC x64 tools** | [Visual Studio 2022 Build Tools](https://aka.ms/vs/17/release/vs_BuildTools.exe) |
+| Optional DLSS 5 Neural Rendering | `Deep-Fried-Chicken-v1.7.4-checkpoint-70-chicken-assist-reliability.7z` | [Deep Fried Chicken community / Discord](https://discord.gg/g2v2XGqvR) |
+| Optional DLSS 5 Neural Rendering | The tested **RTX 40-compatible `nvngx_dlssnr.dll` 310.8.0** matching the SHA256 listed in [`input/README.md`](input/README.md) | [DLSS5 Autopilot](https://github.com/Kizzuwatnaa/DLSS5-Autopilot) · [releases](https://github.com/Kizzuwatnaa/DLSS5-Autopilot/releases) |
+
+### About the tested `nvngx_dlssnr.dll`
+
+The `nvngx_dlssnr.dll` used for the successful reference setup was obtained through **DLSS5 Autopilot** and was the **RTX 40-series-compatible community build**, intended for Ada / `sm_89` cards such as the RTX 4070 family. DLSS5 Autopilot identifies this branch as **`310.8.0-RTX40`**.
+
+This matters because the Neural Rendering DLL is architecture-specific. The tested file is **not the stock RTX 50 FP8 build**. Our successful reference machine used an **RTX 4070 Ti SUPER**, and the installer identifies the known-good DLL by SHA256 rather than trusting its filename.
+
+See [`input/README.md`](input/README.md) for the exact hash and placement instructions.
 
 ### Driver notes
 
-The pinned `nvngx_dlss.dll` 310.9.1 used for DLAA reports a minimum NVIDIA driver of **512.15**. The tested `nvngx_dlssnr.dll` 310.8.0 used for Neural Rendering reports a minimum driver of **615.00**.
+The pinned `nvngx_dlss.dll` 310.9.1 used for DLAA reports a minimum NVIDIA driver of **512.15**. The tested RTX 40-compatible `nvngx_dlssnr.dll` 310.8.0 used for Neural Rendering reports a minimum driver of **615.00**.
 
 For the optional DLSS 5 path, **615.00 or newer is therefore required by the tested NR DLL**. Neural Rendering compatibility has only been directly confirmed by this project on the tested RTX 4070 Ti SUPER setup, so other RTX generations should be treated as unverified until reported working.
 
@@ -192,7 +202,7 @@ DFC Enabled ON  = DLAA -> DLSS 5 Neural Rendering
 | ReShade shader headers | `6db142b4b1a05c764222e5b0bd9a644b7ccfe1dc` |
 | `nvngx_dlss.dll` | 310.9.1 |
 | Deep Fried Chicken | 1.7.4 checkpoint 70 |
-| `nvngx_dlssnr.dll` | 310.8.0 |
+| `nvngx_dlssnr.dll` | 310.8.0 RTX 40-compatible community build (`sm_89`), sourced through DLSS5 Autopilot |
 
 Exact package URLs and hashes are in [`manifests/versions.json`](manifests/versions.json).
 
