@@ -149,10 +149,18 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
 
 echo.
 echo ============================================================
-echo INSTALLED SUCCESSFULLY
+echo FILES INSTALLED - IN-GAME VERIFICATION STILL REQUIRED
 echo ============================================================
 echo.
-echo Launch GTA IV normally and press HOME to test the ReShade interface.
+echo 1. Fully launch GTA IV again.
+echo 2. Wait until the game reaches a rendered menu or gameplay scene.
+echo 3. Press HOME.
+echo.
+echo Step 3 is ONLY VERIFIED if the ReShade overlay opens and accepts mouse/keyboard input.
+echo If HOME does nothing, do NOT continue to the DLSS 5 step yet.
+echo Please keep these files for troubleshooting:
+echo   "%TREX%\bridge.conf"
+echo   "%TREX%\ReShade.log"
 echo.
 echo To undo this patch later, simply double-click RESTORE_ORIGINAL.bat.
 echo It will ask for the same GTA IV folder and request Administrator permission itself.
