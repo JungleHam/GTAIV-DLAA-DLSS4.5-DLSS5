@@ -1,0 +1,28 @@
+name: Build DLFG milestone-1 POC
+
+on:
+  push:
+    branches:
+      - framegen-experimental
+    paths:
+      - 'tools/dlfg-poc/**'
+      - '.github/workflows/build-dlfg-poc.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build x64 ReShade add-on
+        shell: cmd
+        run: tools\dlfg-poc\BUILD-CI.bat
+
+      - name: Upload probe add-on
+        uses: actions/upload-artifact@v4
+        with:
+          name: dlfg-milestone1-poc
+          path: tools/dlfg-poc/dlfg-probe.addon64
+          if-no-files-found: error
