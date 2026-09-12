@@ -39,7 +39,7 @@ cl /nologo /std:c++20 /EHsc /O2 /MD /LD ^
   /I"deps\vulkan\include" ^
   "dlfg_probe_addon.cpp" ^
   /link /LIBPATH:"deps\dlss\lib\Windows_x86_64\x64" nvsdk_ngx_d.lib ^
-  user32.lib advapi32.lib version.lib ^
+  user32.lib advapi32.lib version.lib gdi32.lib ^
   /OUT:"dlfg-probe.addon64"
 if errorlevel 1 exit /b 50
 if not exist "dlfg-probe.addon64" exit /b 51
