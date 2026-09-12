@@ -1,0 +1,59 @@
+{
+  "project_status": "tested-working-stack-2026-09-12",
+  "components": {
+    "fusionfix": {
+      "version": "5.0.1",
+      "url": "https://github.com/ThirteenAG/GTAIV.EFLC.FusionFix/releases/download/v5.0.1/GTAIV.EFLC.FusionFix.zip",
+      "sha256": "3c202398c133392be985854654f169514e055812cc302ef24e6aa97495975b41",
+      "installed_by_project": false,
+      "notes": "Install first; the DLAA installer expects a clean FusionFix baseline."
+    },
+    "b-bridge": {
+      "version": "0.1.0",
+      "url": "https://github.com/gutbash/b-bridge/releases/download/v0.1.0/b-bridge-0.1.0.zip",
+      "sha256": "d5691ad68cca6e731bbe12b34b14b6a8288e2e7e319e8ef0e13e0f3a59c31c55"
+    },
+    "reshade": {
+      "version": "6.8.0",
+      "tag_commit": "18deaa52de0c425a78b329e9cb3c497281cd00ec",
+      "setup_url_primary": "https://reshade.me/downloads/ReShade_Setup_6.8.0_Addon.exe",
+      "setup_url_fallback": "https://www.reshade.me/releases/ReShade-6.8.0-Addon-setup.exe",
+      "notes": "Full Add-On Support, Vulkan global layer. The cross-process input patch is built from the exact v6.8.0 source tag."
+    },
+    "dlss5-feeder": {
+      "version": "0.15.1",
+      "url": "https://github.com/jlrouzies-fr/DLSS5-Feeder/releases/download/v0.15.1/DLSS5-Feeder-0.15.1.zip",
+      "sha256": "2e44e81e691e75e532b9b7babc278a12615cb7f0fd9ef854da50e6ef17b272f4"
+    },
+    "lumenitefx": {
+      "commit": "f8cbbb4eccfcb7adf0d74bb358ba349272e3c1e9",
+      "url": "https://codeload.github.com/umar-afzaal/LumeniteFX/zip/f8cbbb4eccfcb7adf0d74bb358ba349272e3c1e9"
+    },
+    "reshade-shaders-headers": {
+      "commit": "6db142b4b1a05c764222e5b0bd9a644b7ccfe1dc",
+      "files": [
+        "ReShade.fxh",
+        "ReShadeUI.fxh",
+        "DrawText.fxh"
+      ]
+    },
+    "nvngx_dlss": {
+      "version": "310.9.1",
+      "package_url": "https://github.com/RankFTW/rhi-repo/releases/download/dlss-310.9.1/nvngx_dlss_310.9.1.zip",
+      "package_sha256": "aaba83b288bd145c3808e8d7a0ba03cc8c8676d18ad984b1bfa6563046a3ba37",
+      "dll_sha256": "3975567b8943c53acce397f2b72380092f84f162d00b0d2c7d08a1025c563983"
+    },
+    "deep-fried-chicken": {
+      "version": "1.7.4 checkpoint 70",
+      "archive_sha256": "91dc4137b1f2d7cdbd7f9eb4de9d33848b59e3af7a747d5d798271ee262eab09",
+      "archive_password": "chicken",
+      "redistributed": false
+    },
+    "nvngx_dlssnr": {
+      "version": "310.8.0",
+      "dll_sha256": "4b8d19bc3eff58a084f5eca7489c921501c203450169fb82ff4f649a4482ba05",
+      "redistributed": false,
+      "notes": "Known-good Neural Rendering runtime used in the successful RTX 4070 Ti SUPER test."
+    }
+  }
+}
