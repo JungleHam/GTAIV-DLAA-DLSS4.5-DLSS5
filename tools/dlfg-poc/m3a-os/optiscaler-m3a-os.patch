@@ -1,0 +1,870 @@
+diff --git a/OptiScaler.ini b/OptiScaler.ini
+index 56e4cd19..7c84ca99 100644
+--- a/OptiScaler.ini
++++ b/OptiScaler.ini
+@@ -1285,6 +1285,21 @@ LogAsyncThreads=auto
+ 
+ 
+ 
++; -------------------------------------------------------
++[Debug]
++; -------------------------------------------------------
++; GTA IV M3A-OS: read-only Vulkan swapchain/present diagnostics.
++; It resolves pointers and logs only; it never acquires, submits, or presents frames.
++; true or false - Default is false
++GtaivVulkanPresentInstrumentation=false
++
++; GTA IV M3B-0: submit and present exactly one copied swapchain frame after 300 normal presents.
++; This is a duplicate-frame timing experiment, not DLSS-G. Default is false.
++GtaivVulkanOneShotDuplicatePresent=false
++GtaivVulkanOneShotExternalPresent=false
++
++
++
+ ; -------------------------------------------------------
+ [InitFlags]
+ ; -------------------------------------------------------
+diff --git a/OptiScaler/Config.cpp b/OptiScaler/Config.cpp
+index a16587a4..1ad88df0 100644
+--- a/OptiScaler/Config.cpp
++++ b/OptiScaler/Config.cpp
+@@ -462,6 +462,9 @@ bool Config::Reload(std::filesystem::path iniPath)
+             LogSingleFile.set_from_config(readBool("Log", "SingleFile"));
+             LogAsync.set_from_config(readBool("Log", "LogAsync"));
+             LogAsyncThreads.set_from_config(readInt("Log", "LogAsyncThreads"));
++            GtaivVulkanPresentInstrumentation.set_from_config(readBool("Debug", "GtaivVulkanPresentInstrumentation"));
++            GtaivVulkanOneShotDuplicatePresent.set_from_config(readBool("Debug", "GtaivVulkanOneShotDuplicatePresent"));
++            GtaivVulkanOneShotExternalPresent.set_from_config(readBool("Debug", "GtaivVulkanOneShotExternalPresent"));
+ 
+             {
+                 auto setting = readString("Log", "LogFileName", false);
+@@ -1550,6 +1553,12 @@ bool Config::SaveIni()
+                      wstring_to_string(Instance()->LogFileName.value_for_config_or(L"auto")).c_str());
+         ini.SetValue("Log", "LogAsync", GetBoolValue(Instance()->LogAsync.value_for_config()).c_str());
+         ini.SetValue("Log", "LogAsyncThreads", GetIntValue(Instance()->LogAsyncThreads.value_for_config()).c_str());
++        ini.SetValue("Debug", "GtaivVulkanPresentInstrumentation",
++                     GetBoolValue(Instance()->GtaivVulkanPresentInstrumentation.value_for_config()).c_str());
++        ini.SetValue("Debug", "GtaivVulkanOneShotDuplicatePresent",
++                     GetBoolValue(Instance()->GtaivVulkanOneShotDuplicatePresent.value_for_config()).c_str());
++        ini.SetValue("Debug", "GtaivVulkanOneShotExternalPresent",
++                     GetBoolValue(Instance()->GtaivVulkanOneShotExternalPresent.value_for_config()).c_str());
+     }
+ 
+     // NvApi
+diff --git a/OptiScaler/Config.h b/OptiScaler/Config.h
+index 8f432923..6b406859 100644
+--- a/OptiScaler/Config.h
++++ b/OptiScaler/Config.h
+@@ -248,6 +248,14 @@ class Config
+     CustomOptional<bool> LogAsync { false };
+     CustomOptional<int> LogAsyncThreads { 4 };
+ 
++    // GTA IV M3A-OS: Vulkan swapchain/present observation only. This never acquires,
++    // submits, changes queue ownership, or alters OptiFG/Streamline behavior.
++    CustomOptional<bool> GtaivVulkanPresentInstrumentation { false };
++    // GTA IV M3B-0: one guarded duplicate swapchain-image present. Never enables FG.
++    CustomOptional<bool> GtaivVulkanOneShotDuplicatePresent { false };
++    // GTA IV M3B-1A: one guarded Feeder D3D12 external-image present. Never enables FG.
++    CustomOptional<bool> GtaivVulkanOneShotExternalPresent { false };
++
+     // XeSS
+     CustomOptional<bool> BuildPipelines { true };
+     CustomOptional<int32_t> NetworkModel { 0 };
+diff --git a/OptiScaler/OptiScaler.vcxproj b/OptiScaler/OptiScaler.vcxproj
+index 53da0663..e73fed65 100644
+--- a/OptiScaler/OptiScaler.vcxproj
++++ b/OptiScaler/OptiScaler.vcxproj
+@@ -245,27 +245,28 @@
+       <AdditionalOptions>/ignore:4099</AdditionalOptions>
+     </Link>
+     <PostBuildEvent>
+-      <Command>md $(SolutionDir)x64\Release\a\
+-move $(SolutionDir)x64\Release\$(TargetFileName) $(SolutionDir)x64\Release\a\
+-md $(SolutionDir)x64\Release\a\Licenses
+-del /Q $(SolutionDir)x64\Release\a\Licenses\*.*
+-copy $(SolutionDir)external\xess\LICENSE.txt $(SolutionDir)x64\Release\a\Licenses\XeSS_LICENSE.txt /Y
+-copy "$(SolutionDir)READ ME - DLSS Neural Rendering.txt" $(SolutionDir)x64\Release\a\ /Y
+-copy "$(SolutionDir)Licenses\RenoDX_ATTRIBUTION.txt" $(SolutionDir)x64\Release\a\Licenses\ /Y
+-md $(SolutionDir)x64\Release\a\OptiScaler
+-copy $(SolutionDir)external\xess\bin\*.dll $(SolutionDir)x64\Release\a\OptiScaler\ /Y
+-copy $(SolutionDir)external\FidelityFX-SDK\docs\license.md $(SolutionDir)x64\Release\a\OptiScaler\Licenses\FidelityFX_v1_LICENSE.md /Y
+-copy $(SolutionDir)external\FidelityFX-SDK\PrebuiltSignedDLL\amd_fidelityfx_vk.dll $(SolutionDir)x64\Release\a\OptiScaler\ /Y
+-copy $(SolutionDir)external\FidelityFX-SDK-v2\Kits\FidelityFX\signedbin\amd_fidelityfx_loader_dx12.dll $(SolutionDir)x64\Release\a\OptiScaler\ /Y
+-copy $(SolutionDir)external\FidelityFX-SDK-v2\Kits\FidelityFX\signedbin\amd_fidelityfx_upscaler_dx12.dll $(SolutionDir)x64\Release\a\OptiScaler\ /Y
+-copy $(SolutionDir)external\FidelityFX-SDK-v2\Kits\FidelityFX\signedbin\amd_fidelityfx_framegeneration_dx12.dll $(SolutionDir)x64\Release\a\OptiScaler\ /Y
+-copy $(SolutionDir)external\FidelityFX-SDK-v2\docs\license.md $(SolutionDir)x64\Release\a\Licenses\FidelityFX_v2_LICENSE.md /Y
+-copy $(SolutionDir)OptiScaler.ini $(SolutionDir)x64\Release\a\ /Y
+-copy $(SolutionDir)setup_windows.bat $(SolutionDir)x64\Release\a\ /Y
+-copy $(SolutionDir)setup_linux.sh $(SolutionDir)x64\Release\a\ /Y
+-md $(SolutionDir)x64\Release\a\OptiScaler\D3D12_OptiScaler\
+-copy "$(SolutionDir)external\directx_agility_sdk\lib\*.dll" $(SolutionDir)x64\Release\a\OptiScaler\D3D12_OptiScaler\ /Y
+-copy "$(SolutionDir)external\directx_agility_sdk\LICENSE.txt" $(SolutionDir)x64\Release\a\Licenses\DirectX_LICENSE.txt /Y
++      <Command>md "$(SolutionDir)x64\Release\a\"
++move "$(SolutionDir)x64\Release\$(TargetFileName)" "$(SolutionDir)x64\Release\a\"
++md "$(SolutionDir)x64\Release\a\Licenses"
++del /Q "$(SolutionDir)x64\Release\a\Licenses\*.*"
++copy "$(SolutionDir)external\xess\LICENSE.txt" "$(SolutionDir)x64\Release\a\Licenses\XeSS_LICENSE.txt" /Y
++if exist "$(SolutionDir)READ ME - DLSS Neural Rendering.txt" copy "$(SolutionDir)READ ME - DLSS Neural Rendering.txt" "$(SolutionDir)x64\Release\a\" /Y
++copy "$(SolutionDir)Licenses\RenoDX_ATTRIBUTION.txt" "$(SolutionDir)x64\Release\a\Licenses\" /Y
++md "$(SolutionDir)x64\Release\a\OptiScaler"
++md "$(SolutionDir)x64\Release\a\OptiScaler\Licenses"
++copy "$(SolutionDir)external\xess\bin\*.dll" "$(SolutionDir)x64\Release\a\OptiScaler\" /Y
++copy "$(SolutionDir)external\FidelityFX-SDK\docs\license.md" "$(SolutionDir)x64\Release\a\OptiScaler\Licenses\FidelityFX_v1_LICENSE.md" /Y
++copy "$(SolutionDir)external\FidelityFX-SDK\PrebuiltSignedDLL\amd_fidelityfx_vk.dll" "$(SolutionDir)x64\Release\a\OptiScaler\" /Y
++copy "$(SolutionDir)external\FidelityFX-SDK-v2\Kits\FidelityFX\signedbin\amd_fidelityfx_loader_dx12.dll" "$(SolutionDir)x64\Release\a\OptiScaler\" /Y
++copy "$(SolutionDir)external\FidelityFX-SDK-v2\Kits\FidelityFX\signedbin\amd_fidelityfx_upscaler_dx12.dll" "$(SolutionDir)x64\Release\a\OptiScaler\" /Y
++copy "$(SolutionDir)external\FidelityFX-SDK-v2\Kits\FidelityFX\signedbin\amd_fidelityfx_framegeneration_dx12.dll" "$(SolutionDir)x64\Release\a\OptiScaler\" /Y
++copy "$(SolutionDir)external\FidelityFX-SDK-v2\docs\license.md" "$(SolutionDir)x64\Release\a\Licenses\FidelityFX_v2_LICENSE.md" /Y
++copy "$(SolutionDir)OptiScaler.ini" "$(SolutionDir)x64\Release\a\" /Y
++copy "$(SolutionDir)setup_windows.bat" "$(SolutionDir)x64\Release\a\" /Y
++copy "$(SolutionDir)setup_linux.sh" "$(SolutionDir)x64\Release\a\" /Y
++md "$(SolutionDir)x64\Release\a\OptiScaler\D3D12_OptiScaler\"
++copy "$(SolutionDir)external\directx_agility_sdk\lib\*.dll" "$(SolutionDir)x64\Release\a\OptiScaler\D3D12_OptiScaler\" /Y
++copy "$(SolutionDir)external\directx_agility_sdk\LICENSE.txt" "$(SolutionDir)x64\Release\a\Licenses\DirectX_LICENSE.txt" /Y
+ copy NUL "$(SolutionDir)x64\Release\a\!! EXTRACT ALL FILES TO GAME FOLDER !!" /Y</Command>
+     </PostBuildEvent>
+     <PreBuildEvent>
+@@ -866,4 +867,4 @@ copy NUL "$(SolutionDir)x64\Release\a\!! EXTRACT ALL FILES TO GAME FOLDER !!" /Y
+   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+   <ImportGroup Label="ExtensionTargets">
+   </ImportGroup>
+-</Project>
+\ No newline at end of file
++</Project>
+diff --git a/OptiScaler/hooks/Vulkan_Hooks.cpp b/OptiScaler/hooks/Vulkan_Hooks.cpp
+index fec2e3eb..13899a7f 100644
+--- a/OptiScaler/hooks/Vulkan_Hooks.cpp
++++ b/OptiScaler/hooks/Vulkan_Hooks.cpp
+@@ -24,6 +24,9 @@
+ 
+ #include "Hook_Utils.h"
+ 
++#include <atomic>
++#include <vector>
++
+ // for menu rendering
+ static VkDevice _device = VK_NULL_HANDLE;
+ static VkInstance _instance = VK_NULL_HANDLE;
+@@ -40,6 +43,65 @@ PFN_vkCreateSwapchainKHR o_CreateSwapchainKHR = nullptr;
+ static PFN_vkGetInstanceProcAddr o_vkGetInstanceProcAddr = nullptr;
+ static PFN_vkGetDeviceProcAddr o_vkGetDeviceProcAddr = nullptr;
+ 
++// M3A-OS resolves these pointers only. It must not acquire an image or submit work:
++// this milestone observes the final GTA IV presentation contract before designing any
++// generated-frame insertion sequence.
++static PFN_vkAcquireNextImageKHR _m3aAcquireNextImageKHR = nullptr;
++static PFN_vkGetSwapchainImagesKHR _m3aGetSwapchainImagesKHR = nullptr;
++static PFN_vkQueueSubmit _m3aQueueSubmit = nullptr;
++static PFN_vkQueueSubmit2 _m3aQueueSubmit2 = nullptr;
++static std::atomic<uint64_t> _m3aPresentSerial { 0 };
++static std::mutex _m3aMutex;
++
++// M3B-0 owns no game image. It only borrows two acquired swapchain images for one
++// copy/present sequence, then keeps its synchronization objects until recreation.
++struct M3bDuplicateState
++{
++    VkDevice device = VK_NULL_HANDLE;
++    VkSwapchainKHR swapchain = VK_NULL_HANDLE;
++    VkExtent2D extent {};
++    VkFormat format = VK_FORMAT_UNDEFINED;
++    VkImageUsageFlags usage = 0;
++    uint32_t imageCount = 0;
++    std::vector<VkImage> images;
++    VkCommandPool commandPool = VK_NULL_HANDLE;
++    VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
++    VkSemaphore acquireReady = VK_NULL_HANDLE;
++    VkSemaphore duplicateReady = VK_NULL_HANDLE;
++    VkSemaphore originalReady = VK_NULL_HANDLE;
++    uint32_t queueFamily = UINT32_MAX;
++};
++static M3bDuplicateState _m3b;
++static bool _m3bAttempted = false;
++static std::atomic<uint64_t> _m3bNormalPresents { 0 };
++static std::mutex _m3bMutex;
++
++struct Dlss5M3b1aPublishedFrame
++{
++    uint32_t abiVersion;
++    uint32_t structSize;
++    uint64_t serial;
++    uint32_t ready;
++    uint32_t reserved;
++    VkDevice device;
++    VkImage image;
++    VkFormat format;
++    uint32_t width;
++    uint32_t height;
++    VkSemaphore producerTimeline;
++    uint64_t producerReadyValue;
++    VkImageLayout externalRestingLayout;
++    uint64_t sourceFrame;
++};
++using PFN_DLSS5_QueryM3B1AExternalFrame = BOOL(WINAPI*)(Dlss5M3b1aPublishedFrame*);
++using PFN_DLSS5_ConsumeM3B1AExternalFrame = BOOL(WINAPI*)(uint64_t);
++using PFN_DLSS5_IsM3B1GeneratedFrame = BOOL(WINAPI*)(uint64_t);
++static PFN_DLSS5_QueryM3B1AExternalFrame _m3b1aQuery = nullptr;
++static PFN_DLSS5_ConsumeM3B1AExternalFrame _m3b1aConsume = nullptr;
++static PFN_DLSS5_IsM3B1GeneratedFrame _m3b1IsGenerated = nullptr;
++static bool _m3b1aAttempted = false;
++static uint64_t _m3b1aLastSerial = 0;
++
+ // Those aren't hooked, just grabbed for use
+ static PFN_vkGetPhysicalDeviceFeatures2 o_vkGetPhysicalDeviceFeatures2 = nullptr;
+ PFN_vkCreateSemaphore VulkanHooks::o_vkCreateSemaphore = nullptr;
+@@ -51,6 +113,560 @@ static VkResult hkvkQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR* pPres
+ static VkResult hkvkCreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR* pCreateInfo,
+                                        const VkAllocationCallbacks* pAllocator, VkSwapchainKHR* pSwapchain);
+ 
++static bool M3aEnabled()
++{
++    return Config::Instance()->GtaivVulkanPresentInstrumentation.value_or_default();
++}
++
++static bool M3bEnabled()
++{
++    return Config::Instance()->GtaivVulkanOneShotDuplicatePresent.value_or_default();
++}
++
++static bool M3b1aEnabled()
++{
++    return Config::Instance()->GtaivVulkanOneShotExternalPresent.value_or_default();
++}
++
++static void M3aResolveDeviceFunctions(VkDevice device)
++{
++    if ((!M3aEnabled() && !M3bEnabled() && !M3b1aEnabled()) || device == VK_NULL_HANDLE) return;
++    const auto gdpa = o_vkGetDeviceProcAddr != nullptr ? o_vkGetDeviceProcAddr : vkGetDeviceProcAddr;
++    if (gdpa == nullptr) return;
++    _m3aAcquireNextImageKHR = (PFN_vkAcquireNextImageKHR) gdpa(device, "vkAcquireNextImageKHR");
++    _m3aGetSwapchainImagesKHR = (PFN_vkGetSwapchainImagesKHR) gdpa(device, "vkGetSwapchainImagesKHR");
++    _m3aQueueSubmit = (PFN_vkQueueSubmit) gdpa(device, "vkQueueSubmit");
++    _m3aQueueSubmit2 = (PFN_vkQueueSubmit2) gdpa(device, "vkQueueSubmit2");
++    LOG_INFO("M3A-OS: resolved Vulkan pointers AcquireNextImageKHR={:X} GetSwapchainImagesKHR={:X} "
++             "QueueSubmit={:X} QueueSubmit2={:X} (resolved only; none called by M3A-OS)",
++             (UINT64) _m3aAcquireNextImageKHR, (UINT64) _m3aGetSwapchainImagesKHR,
++             (UINT64) _m3aQueueSubmit, (UINT64) _m3aQueueSubmit2);
++}
++
++static std::string M3aQueueFamilyIndices(const VkSwapchainCreateInfoKHR* createInfo)
++{
++    if (createInfo == nullptr || createInfo->queueFamilyIndexCount == 0 || createInfo->pQueueFamilyIndices == nullptr)
++        return "none";
++    std::string result;
++    for (uint32_t i = 0; i < createInfo->queueFamilyIndexCount; ++i)
++    {
++        if (!result.empty()) result += ",";
++        result += std::to_string(createInfo->pQueueFamilyIndices[i]);
++    }
++    return result;
++}
++
++static void M3aLogSwapchain(VkDevice device, const VkSwapchainCreateInfoKHR* createInfo, VkSwapchainKHR swapchain)
++{
++    if (!M3aEnabled() || createInfo == nullptr || swapchain == VK_NULL_HANDLE) return;
++    std::lock_guard lock(_m3aMutex);
++
++    M3aResolveDeviceFunctions(device);
++    uint32_t imageCount = 0;
++    VkResult imageResult = VK_ERROR_INITIALIZATION_FAILED;
++    if (_m3aGetSwapchainImagesKHR != nullptr)
++        imageResult = _m3aGetSwapchainImagesKHR(device, swapchain, &imageCount, nullptr);
++
++    LOG_INFO("M3A-OS: swapchain created sc={:X} dev={:X} phys={:X} hwnd={:X} extent={}x{} format={} colourSpace={} "
++             "usage=0x{:X} minImages={} actualImages={} vkGetSwapchainImagesKHR={} presentMode={} sharingMode={} "
++             "queueFamilies=[{}] oldSwapchain={:X}",
++             (UINT64) swapchain, (UINT64) device, (UINT64) _PD, (UINT64) _hwnd,
++             createInfo->imageExtent.width, createInfo->imageExtent.height, (int) createInfo->imageFormat,
++             (int) createInfo->imageColorSpace, (uint32_t) createInfo->imageUsage, createInfo->minImageCount,
++             imageCount, (int) imageResult, (int) createInfo->presentMode, (int) createInfo->imageSharingMode,
++             M3aQueueFamilyIndices(createInfo), (UINT64) createInfo->oldSwapchain);
++}
++
++static bool M3aShouldLogPresent(uint64_t serial, const VkPresentInfoKHR& info)
++{
++    return serial <= 16 || (serial % 300) == 0 || info.swapchainCount != 1 || info.waitSemaphoreCount != 1;
++}
++
++static std::string M3aWaitSemaphores(const VkPresentInfoKHR& info)
++{
++    if (info.waitSemaphoreCount == 0 || info.pWaitSemaphores == nullptr) return "none";
++    std::string result;
++    for (uint32_t i = 0; i < info.waitSemaphoreCount; ++i)
++    {
++        if (!result.empty()) result += ",";
++        char handle[24] = {};
++        _snprintf_s(handle, sizeof(handle), _TRUNCATE, "%llX",
++                    (unsigned long long) (UINT64) info.pWaitSemaphores[i]);
++        result += handle;
++    }
++    return result;
++}
++
++static void M3bDestroyResourcesLocked()
++{
++    if (_m3b.device != VK_NULL_HANDLE)
++    {
++        if (_m3b.commandPool != VK_NULL_HANDLE)
++            vkDestroyCommandPool(_m3b.device, _m3b.commandPool, nullptr);
++        if (_m3b.acquireReady != VK_NULL_HANDLE)
++            vkDestroySemaphore(_m3b.device, _m3b.acquireReady, nullptr);
++        if (_m3b.duplicateReady != VK_NULL_HANDLE)
++            vkDestroySemaphore(_m3b.device, _m3b.duplicateReady, nullptr);
++        if (_m3b.originalReady != VK_NULL_HANDLE)
++            vkDestroySemaphore(_m3b.device, _m3b.originalReady, nullptr);
++    }
++    _m3b = {};
++}
++
++static void M3bCaptureSwapchain(VkDevice device, const VkSwapchainCreateInfoKHR* createInfo, VkSwapchainKHR swapchain)
++{
++    if ((!M3bEnabled() && !M3b1aEnabled()) || createInfo == nullptr || swapchain == VK_NULL_HANDLE) return;
++    std::lock_guard lock(_m3bMutex);
++    if (M3b1aEnabled() && _m3b1aAttempted && _m3b.device != VK_NULL_HANDLE)
++        vkDeviceWaitIdle(_m3b.device);
++    M3bDestroyResourcesLocked();
++    M3aResolveDeviceFunctions(device);
++    if (_m3aGetSwapchainImagesKHR == nullptr)
++    {
++        LOG_ERROR("M3B-0: skipped: vkGetSwapchainImagesKHR pointer unavailable");
++        return;
++    }
++    uint32_t count = 0;
++    const VkResult countResult = _m3aGetSwapchainImagesKHR(device, swapchain, &count, nullptr);
++    if (countResult != VK_SUCCESS || count == 0)
++    {
++        LOG_ERROR("M3B-0: skipped: vkGetSwapchainImagesKHR count -> {} count={}", (int) countResult, count);
++        return;
++    }
++    std::vector<VkImage> images(count);
++    const VkResult imagesResult = _m3aGetSwapchainImagesKHR(device, swapchain, &count, images.data());
++    if (imagesResult != VK_SUCCESS || count != images.size())
++    {
++        LOG_ERROR("M3B-0: skipped: vkGetSwapchainImagesKHR images -> {} count={}", (int) imagesResult, count);
++        return;
++    }
++    _m3b.device = device;
++    _m3b.swapchain = swapchain;
++    _m3b.extent = createInfo->imageExtent;
++    _m3b.format = createInfo->imageFormat;
++    _m3b.usage = createInfo->imageUsage;
++    _m3b.imageCount = count;
++    _m3b.images = std::move(images);
++    _m3bNormalPresents = 0;
++    _m3bAttempted = false;
++    _m3b1aAttempted = false;
++    LOG_INFO("M3B: captured swapchain sc={:X} images={} usage=0x{:X}; duplicate={} external={}",
++             (UINT64) swapchain, count, (uint32_t) _m3b.usage, M3bEnabled(), M3b1aEnabled());
++}
++
++static bool M3bCreateResourcesLocked(uint32_t queueFamily)
++{
++    if (_m3b.commandBuffer != VK_NULL_HANDLE) return _m3b.queueFamily == queueFamily;
++    VkCommandPoolCreateInfo poolInfo { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
++    poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
++    poolInfo.queueFamilyIndex = queueFamily;
++    VkResult result = vkCreateCommandPool(_m3b.device, &poolInfo, nullptr, &_m3b.commandPool);
++    if (result != VK_SUCCESS) { LOG_ERROR("M3B-0: vkCreateCommandPool -> {}", (int) result); return false; }
++    VkCommandBufferAllocateInfo allocInfo { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
++    allocInfo.commandPool = _m3b.commandPool;
++    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
++    allocInfo.commandBufferCount = 1;
++    result = vkAllocateCommandBuffers(_m3b.device, &allocInfo, &_m3b.commandBuffer);
++    if (result != VK_SUCCESS) { LOG_ERROR("M3B-0: vkAllocateCommandBuffers -> {}", (int) result); M3bDestroyResourcesLocked(); return false; }
++    VkSemaphoreCreateInfo semaphoreInfo { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
++    result = vkCreateSemaphore(_m3b.device, &semaphoreInfo, nullptr, &_m3b.acquireReady);
++    if (result == VK_SUCCESS) result = vkCreateSemaphore(_m3b.device, &semaphoreInfo, nullptr, &_m3b.duplicateReady);
++    if (result == VK_SUCCESS) result = vkCreateSemaphore(_m3b.device, &semaphoreInfo, nullptr, &_m3b.originalReady);
++    if (result != VK_SUCCESS) { LOG_ERROR("M3B-0: vkCreateSemaphore -> {}", (int) result); M3bDestroyResourcesLocked(); return false; }
++    _m3b.queueFamily = queueFamily;
++    return true;
++}
++
++static VkResult M3bSubmitCopyLocked(VkQueue queue, uint32_t sourceIndex, uint32_t extraIndex, VkSemaphore gameReady)
++{
++    const VkResult resetResult = vkResetCommandBuffer(_m3b.commandBuffer, 0);
++    if (resetResult != VK_SUCCESS) return resetResult;
++    VkCommandBufferBeginInfo beginInfo { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
++    VkResult result = vkBeginCommandBuffer(_m3b.commandBuffer, &beginInfo);
++    if (result != VK_SUCCESS) return result;
++    VkImageMemoryBarrier toTransfer[2] {};
++    for (auto& barrier : toTransfer)
++    {
++        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
++        barrier.oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
++        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
++        barrier.subresourceRange.levelCount = 1;
++        barrier.subresourceRange.layerCount = 1;
++        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
++        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
++    }
++    toTransfer[0].image = _m3b.images[sourceIndex];
++    toTransfer[0].newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
++    toTransfer[0].dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
++    toTransfer[1].image = _m3b.images[extraIndex];
++    toTransfer[1].newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
++    toTransfer[1].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
++    vkCmdPipelineBarrier(_m3b.commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
++                         0, nullptr, 0, nullptr, 2, toTransfer);
++    VkImageCopy copy {};
++    copy.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
++    copy.srcSubresource.layerCount = 1;
++    copy.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
++    copy.dstSubresource.layerCount = 1;
++    copy.extent = { _m3b.extent.width, _m3b.extent.height, 1 };
++    vkCmdCopyImage(_m3b.commandBuffer, _m3b.images[sourceIndex], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
++                   _m3b.images[extraIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
++    VkImageMemoryBarrier toPresent[2] = { toTransfer[0], toTransfer[1] };
++    for (auto& barrier : toPresent)
++    {
++        barrier.oldLayout = barrier.newLayout;
++        barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
++        barrier.srcAccessMask = barrier.dstAccessMask;
++        barrier.dstAccessMask = 0;
++    }
++    vkCmdPipelineBarrier(_m3b.commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0,
++                         0, nullptr, 0, nullptr, 2, toPresent);
++    result = vkEndCommandBuffer(_m3b.commandBuffer);
++    if (result != VK_SUCCESS) return result;
++    const VkSemaphore waits[] = { gameReady, _m3b.acquireReady };
++    const VkPipelineStageFlags stages[] = { VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT };
++    const VkSemaphore signals[] = { _m3b.duplicateReady, _m3b.originalReady };
++    VkSubmitInfo submit { VK_STRUCTURE_TYPE_SUBMIT_INFO };
++    submit.waitSemaphoreCount = 2;
++    submit.pWaitSemaphores = waits;
++    submit.pWaitDstStageMask = stages;
++    submit.commandBufferCount = 1;
++    submit.pCommandBuffers = &_m3b.commandBuffer;
++    submit.signalSemaphoreCount = 2;
++    submit.pSignalSemaphores = signals;
++    return _m3aQueueSubmit(queue, 1, &submit, VK_NULL_HANDLE);
++}
++
++static void M3bReleaseAcquiredImage(VkQueue queue, VkSwapchainKHR swapchain, uint32_t imageIndex)
++{
++    // An acquired image must be returned even on an unexpected local failure. It has
++    // not been modified in these paths, and this uses no wait semaphore.
++    VkPresentInfoKHR release { VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
++    release.swapchainCount = 1;
++    release.pSwapchains = &swapchain;
++    release.pImageIndices = &imageIndex;
++    const VkResult releaseResult = o_QueuePresentKHR(queue, &release);
++    LOG_WARN("M3B-0: released acquired image {} after local failure -> {}", imageIndex, (int) releaseResult);
++}
++
++// Returns true only when the original game present has been forwarded with originalReady.
++static bool M3bTryDuplicatePresent(VkQueue queue, VkPresentInfoKHR& gamePresent, bool queueFamilyKnown,
++                                   uint32_t queueFamily, VkResult* originalResult)
++{
++    if (!M3bEnabled() || originalResult == nullptr || !queueFamilyKnown) return false;
++    if (gamePresent.swapchainCount != 1 || gamePresent.pSwapchains == nullptr || gamePresent.pImageIndices == nullptr ||
++        gamePresent.waitSemaphoreCount != 1 || gamePresent.pWaitSemaphores == nullptr)
++        return false;
++    if (_m3bNormalPresents.load() < 300) return false;
++
++    std::lock_guard lock(_m3bMutex);
++    if (_m3bAttempted) return false;
++    _m3bAttempted = true; // One acquire attempt per process/swapchain, including a non-blocking miss.
++    const VkSwapchainKHR swapchain = gamePresent.pSwapchains[0];
++    const uint32_t sourceIndex = gamePresent.pImageIndices[0];
++    const bool transferSupported = (_m3b.usage & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) != 0 &&
++                                   (_m3b.usage & VK_IMAGE_USAGE_TRANSFER_DST_BIT) != 0;
++    if (_m3b.device == VK_NULL_HANDLE || _m3b.swapchain != swapchain || _m3b.imageCount < 3 ||
++        sourceIndex >= _m3b.images.size() || !transferSupported || _m3aAcquireNextImageKHR == nullptr ||
++        _m3aQueueSubmit == nullptr)
++    {
++        LOG_ERROR("M3B-0: skipped: prerequisites failed sc={:X} source={} images={} transfer={} acquire={} submit={}",
++                  (UINT64) swapchain, sourceIndex, _m3b.imageCount, transferSupported,
++                  _m3aAcquireNextImageKHR != nullptr, _m3aQueueSubmit != nullptr);
++        return false;
++    }
++    if (!M3bCreateResourcesLocked(queueFamily))
++    {
++        LOG_ERROR("M3B-0: skipped: could not create same-family command resources family={}", queueFamily);
++        return false;
++    }
++    uint32_t extraIndex = UINT32_MAX;
++    const VkResult acquireResult = _m3aAcquireNextImageKHR(_m3b.device, swapchain, 0, _m3b.acquireReady,
++                                                            VK_NULL_HANDLE, &extraIndex);
++    LOG_INFO("M3B-0: source image index={} extra acquired image index={} acquire result={}",
++             sourceIndex, extraIndex, (int) acquireResult);
++    if (acquireResult != VK_SUCCESS)
++    {
++        LOG_WARN("M3B-0: no extra image available without waiting; duplicate present skipped");
++        return false;
++    }
++    if (extraIndex >= _m3b.images.size())
++    {
++        LOG_ERROR("M3B-0: skipped: invalid extra acquired image index={}", extraIndex);
++        return false;
++    }
++    if (extraIndex == sourceIndex)
++    {
++        LOG_ERROR("M3B-0: skipped: acquired image unexpectedly equals source index={}", extraIndex);
++        M3bReleaseAcquiredImage(queue, swapchain, extraIndex);
++        return false;
++    }
++    const VkResult submitResult = M3bSubmitCopyLocked(queue, sourceIndex, extraIndex, gamePresent.pWaitSemaphores[0]);
++    LOG_INFO("M3B-0: submit result={}", (int) submitResult);
++    if (submitResult != VK_SUCCESS)
++    {
++        M3bReleaseAcquiredImage(queue, swapchain, extraIndex);
++        return false; // The unsuccessful submit did not consume the game's semaphore; caller forwards unchanged.
++    }
++
++    VkPresentInfoKHR duplicatePresent { VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
++    duplicatePresent.waitSemaphoreCount = 1;
++    duplicatePresent.pWaitSemaphores = &_m3b.duplicateReady;
++    duplicatePresent.swapchainCount = 1;
++    duplicatePresent.pSwapchains = &swapchain;
++    duplicatePresent.pImageIndices = &extraIndex;
++    const VkResult duplicateResult = o_QueuePresentKHR(queue, &duplicatePresent);
++    LOG_INFO("M3B-0: duplicate present result={}", (int) duplicateResult);
++
++    // The game's render-finished semaphore was consumed by the submit; it must not be waited twice.
++    gamePresent.pWaitSemaphores = &_m3b.originalReady;
++    *originalResult = o_QueuePresentKHR(queue, &gamePresent);
++    LOG_INFO("M3B-0: original present result={}", (int) *originalResult);
++    if (duplicateResult == VK_SUCCESS && *originalResult == VK_SUCCESS)
++        LOG_INFO("MILESTONE M3B-0 PASSED");
++    else
++        LOG_ERROR("M3B-0: duplicate/original present did not both succeed");
++    return true;
++}
++
++static bool M3b1aResolveFeederAbi()
++{
++    if (_m3b1aQuery != nullptr && _m3b1aConsume != nullptr) return true;
++    HMODULE feeder = GetModuleHandleW(L"dlss5-feed.addon64");
++    if (feeder == nullptr) return false;
++    _m3b1aQuery = reinterpret_cast<PFN_DLSS5_QueryM3B1AExternalFrame>(
++        GetProcAddress(feeder, "DLSS5_QueryM3B1AExternalFrame"));
++    _m3b1aConsume = reinterpret_cast<PFN_DLSS5_ConsumeM3B1AExternalFrame>(
++        GetProcAddress(feeder, "DLSS5_ConsumeM3B1AExternalFrame"));
++    _m3b1IsGenerated = reinterpret_cast<PFN_DLSS5_IsM3B1GeneratedFrame>(
++        GetProcAddress(feeder, "DLSS5_IsM3B1GeneratedFrame"));
++    if (_m3b1aQuery == nullptr || _m3b1aConsume == nullptr)
++    {
++        _m3b1aQuery = nullptr;
++        _m3b1aConsume = nullptr;
++        _m3b1IsGenerated = nullptr;
++        return false;
++    }
++    LOG_INFO("M3B-1A: resolved Feeder external-frame ABI; genuine M3B-1 provenance={}",
++             _m3b1IsGenerated != nullptr);
++    return true;
++}
++
++static VkResult M3b1aSubmitExternalCopyLocked(VkQueue queue, uint32_t extraIndex, VkSemaphore gameReady,
++                                               const Dlss5M3b1aPublishedFrame& frame)
++{
++    VkResult result = vkResetCommandBuffer(_m3b.commandBuffer, 0);
++    if (result != VK_SUCCESS) return result;
++    VkCommandBufferBeginInfo beginInfo { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
++    result = vkBeginCommandBuffer(_m3b.commandBuffer, &beginInfo);
++    if (result != VK_SUCCESS) return result;
++
++    VkImageMemoryBarrier toTransfer[2] {};
++    toTransfer[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
++    toTransfer[0].srcAccessMask = 0; // ignored on external ownership acquire
++    toTransfer[0].dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
++    toTransfer[0].oldLayout = frame.externalRestingLayout;
++    toTransfer[0].newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
++    toTransfer[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_EXTERNAL;
++    toTransfer[0].dstQueueFamilyIndex = _m3b.queueFamily;
++    toTransfer[0].image = frame.image;
++    toTransfer[0].subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
++    toTransfer[1].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
++    toTransfer[1].srcAccessMask = 0;
++    toTransfer[1].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
++    toTransfer[1].oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
++    toTransfer[1].newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
++    toTransfer[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
++    toTransfer[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
++    toTransfer[1].image = _m3b.images[extraIndex];
++    toTransfer[1].subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
++    vkCmdPipelineBarrier(_m3b.commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
++                         VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 2, toTransfer);
++
++    VkImageCopy copy {};
++    copy.srcSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
++    copy.dstSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
++    copy.extent = { _m3b.extent.width, _m3b.extent.height, 1 };
++    vkCmdCopyImage(_m3b.commandBuffer, frame.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
++                   _m3b.images[extraIndex], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
++
++    VkImageMemoryBarrier restore[2] {};
++    restore[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
++    restore[0].srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
++    restore[0].dstAccessMask = 0; // ignored on external ownership release
++    restore[0].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
++    restore[0].newLayout = frame.externalRestingLayout;
++    restore[0].srcQueueFamilyIndex = _m3b.queueFamily;
++    restore[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_EXTERNAL;
++    restore[0].image = frame.image;
++    restore[0].subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
++    restore[1].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
++    restore[1].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
++    restore[1].dstAccessMask = 0;
++    restore[1].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
++    restore[1].newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
++    restore[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
++    restore[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
++    restore[1].image = _m3b.images[extraIndex];
++    restore[1].subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
++    vkCmdPipelineBarrier(_m3b.commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
++                         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 2, restore);
++    result = vkEndCommandBuffer(_m3b.commandBuffer);
++    if (result != VK_SUCCESS) return result;
++
++    const VkSemaphore waits[] = { gameReady, _m3b.acquireReady, frame.producerTimeline };
++    const VkSemaphore signals[] = { _m3b.duplicateReady, _m3b.originalReady };
++    if (_m3aQueueSubmit2 != nullptr)
++    {
++        VkSemaphoreSubmitInfo waitInfos[3] {};
++        for (uint32_t i = 0; i < 3; ++i)
++        {
++            waitInfos[i].sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
++            waitInfos[i].semaphore = waits[i];
++            waitInfos[i].value = i == 2 ? frame.producerReadyValue : 0;
++            waitInfos[i].stageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
++        }
++        VkSemaphoreSubmitInfo signalInfos[2] {};
++        for (uint32_t i = 0; i < 2; ++i)
++        {
++            signalInfos[i].sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
++            signalInfos[i].semaphore = signals[i];
++            signalInfos[i].stageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
++        }
++        VkCommandBufferSubmitInfo commandInfo { VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO };
++        commandInfo.commandBuffer = _m3b.commandBuffer;
++        VkSubmitInfo2 submit { VK_STRUCTURE_TYPE_SUBMIT_INFO_2 };
++        submit.waitSemaphoreInfoCount = 3;
++        submit.pWaitSemaphoreInfos = waitInfos;
++        submit.commandBufferInfoCount = 1;
++        submit.pCommandBufferInfos = &commandInfo;
++        submit.signalSemaphoreInfoCount = 2;
++        submit.pSignalSemaphoreInfos = signalInfos;
++        LOG_INFO("M3B-1A: submitting with vkQueueSubmit2, producer timeline value={}", frame.producerReadyValue);
++        return _m3aQueueSubmit2(queue, 1, &submit, VK_NULL_HANDLE);
++    }
++
++    const uint64_t waitValues[] = { 0, 0, frame.producerReadyValue };
++    const uint64_t signalValues[] = { 0, 0 };
++    VkTimelineSemaphoreSubmitInfo timeline { VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO };
++    timeline.waitSemaphoreValueCount = 3;
++    timeline.pWaitSemaphoreValues = waitValues;
++    timeline.signalSemaphoreValueCount = 2;
++    timeline.pSignalSemaphoreValues = signalValues;
++    const VkPipelineStageFlags stages[] = { VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
++                                            VK_PIPELINE_STAGE_TRANSFER_BIT };
++    VkSubmitInfo submit { VK_STRUCTURE_TYPE_SUBMIT_INFO };
++    submit.pNext = &timeline;
++    submit.waitSemaphoreCount = 3;
++    submit.pWaitSemaphores = waits;
++    submit.pWaitDstStageMask = stages;
++    submit.commandBufferCount = 1;
++    submit.pCommandBuffers = &_m3b.commandBuffer;
++    submit.signalSemaphoreCount = 2;
++    submit.pSignalSemaphores = signals;
++    LOG_INFO("M3B-1A: submitting with VkTimelineSemaphoreSubmitInfo fallback, producer timeline value={}",
++             frame.producerReadyValue);
++    return _m3aQueueSubmit(queue, 1, &submit, VK_NULL_HANDLE);
++}
++
++// Returns true only after this function has consumed the game's wait semaphore and
++// therefore forwarded the original present with the replacement semaphore.
++static bool M3b1aTryExternalPresent(VkQueue queue, VkPresentInfoKHR& gamePresent, bool queueFamilyKnown,
++                                    uint32_t queueFamily, VkResult* originalResult)
++{
++    if (!M3b1aEnabled() || originalResult == nullptr || !queueFamilyKnown || _m3b1aAttempted) return false;
++    if (gamePresent.swapchainCount != 1 || gamePresent.pSwapchains == nullptr || gamePresent.pImageIndices == nullptr ||
++        gamePresent.waitSemaphoreCount != 1 || gamePresent.pWaitSemaphores == nullptr || !M3b1aResolveFeederAbi())
++        return false;
++
++    Dlss5M3b1aPublishedFrame frame {};
++    if (!_m3b1aQuery(&frame) || frame.serial == _m3b1aLastSerial) return false;
++    const bool genuineM3b1 = _m3b1IsGenerated != nullptr && _m3b1IsGenerated(frame.serial) != FALSE;
++
++    std::lock_guard lock(_m3bMutex);
++    _m3b1aAttempted = true;
++    _m3b1aLastSerial = frame.serial;
++    const VkSwapchainKHR swapchain = gamePresent.pSwapchains[0];
++    const bool transferSupported = (_m3b.usage & VK_IMAGE_USAGE_TRANSFER_DST_BIT) != 0;
++    const bool valid = frame.abiVersion == 1 && frame.structSize == sizeof(frame) && frame.ready != 0 &&
++                       frame.device == _m3b.device && frame.image != VK_NULL_HANDLE &&
++                       frame.producerTimeline != VK_NULL_HANDLE && frame.producerReadyValue != 0 &&
++                       frame.format == _m3b.format && frame.width == _m3b.extent.width &&
++                       frame.height == _m3b.extent.height && frame.externalRestingLayout == VK_IMAGE_LAYOUT_GENERAL &&
++                       _m3b.swapchain == swapchain && _m3b.imageCount >= 3 && transferSupported &&
++                       _m3aAcquireNextImageKHR != nullptr && _m3aQueueSubmit != nullptr;
++    LOG_INFO("M3B-1A: Feeder serial={} sourceFrame={} image={:X} producerTimeline={:X} readyValue={} "
++             "source={} {}x{} swapchain={} {}x{} family={}",
++             frame.serial, frame.sourceFrame, (UINT64) frame.image, (UINT64) frame.producerTimeline,
++             frame.producerReadyValue, (int) frame.format, frame.width, frame.height,
++             (int) _m3b.format, _m3b.extent.width, _m3b.extent.height, queueFamily);
++    if (genuineM3b1)
++        LOG_INFO("M3B-1: Feeder generation serial={} sourceFrame={} generated VkImage={:X} "
++                 "source/generated format={} swapchain format={} extent={}x{} readyValue={}",
++                 frame.serial, frame.sourceFrame, (UINT64) frame.image, (int) frame.format,
++                 (int) _m3b.format, frame.width, frame.height, frame.producerReadyValue);
++    if (!valid)
++    {
++        LOG_ERROR("M3B-1A: publication/swapchain prerequisites failed; one-shot withheld");
++        return false;
++    }
++    if (!M3bCreateResourcesLocked(queueFamily))
++    {
++        LOG_ERROR("M3B-1A: same-family command resources unavailable");
++        return false;
++    }
++
++    uint32_t extraIndex = UINT32_MAX;
++    const VkResult acquireResult = _m3aAcquireNextImageKHR(_m3b.device, swapchain, 0, _m3b.acquireReady,
++                                                            VK_NULL_HANDLE, &extraIndex);
++    if (genuineM3b1)
++        LOG_INFO("M3B-1: consumer acquired image={} acquire result={}", extraIndex, (int) acquireResult);
++    else
++        LOG_INFO("M3B-1A consumer acquired image={} acquire result={}", extraIndex, (int) acquireResult);
++    if (acquireResult != VK_SUCCESS) return false;
++    if (extraIndex >= _m3b.images.size())
++    {
++        LOG_ERROR("M3B-1A: acquired invalid swapchain index={}", extraIndex);
++        return false;
++    }
++
++    const VkResult submitResult = M3b1aSubmitExternalCopyLocked(
++        queue, extraIndex, gamePresent.pWaitSemaphores[0], frame);
++    if (genuineM3b1) LOG_INFO("M3B-1: submit result={}", (int) submitResult);
++    else LOG_INFO("M3B-1A submit result={}", (int) submitResult);
++    if (submitResult != VK_SUCCESS)
++    {
++        M3bReleaseAcquiredImage(queue, swapchain, extraIndex);
++        return false;
++    }
++
++    VkPresentInfoKHR externalPresent { VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
++    externalPresent.waitSemaphoreCount = 1;
++    externalPresent.pWaitSemaphores = &_m3b.duplicateReady;
++    externalPresent.swapchainCount = 1;
++    externalPresent.pSwapchains = &swapchain;
++    externalPresent.pImageIndices = &extraIndex;
++    const VkResult externalResult = o_QueuePresentKHR(queue, &externalPresent);
++    if (genuineM3b1) LOG_INFO("M3B-1: generated present result={}", (int) externalResult);
++    else LOG_INFO("M3B-1A external-image present result={}", (int) externalResult);
++
++    gamePresent.pWaitSemaphores = &_m3b.originalReady;
++    *originalResult = o_QueuePresentKHR(queue, &gamePresent);
++    if (genuineM3b1) LOG_INFO("M3B-1: original present result={}", (int) *originalResult);
++    else LOG_INFO("M3B-1A original present result={}", (int) *originalResult);
++    if (externalResult == VK_SUCCESS) _m3b1aConsume(frame.serial);
++    if (externalResult == VK_SUCCESS && *originalResult == VK_SUCCESS)
++    {
++        if (genuineM3b1)
++            LOG_INFO("MILESTONE M3B-1 PASSED: genuine NVIDIA DLSS-G generated frame presented to GTA IV live Vulkan swapchain");
++        else
++            LOG_INFO("MILESTONE M3B-1A PASSED");
++    }
++    else
++        LOG_ERROR("M3B-1A: inserted/original present did not both succeed");
++    return true;
++}
++
+ static void HookDevice(VkDevice InDevice)
+ {
+     if (o_CreateSwapchainKHR != nullptr || State::Instance().vulkanSkipHooks)
+@@ -327,9 +943,49 @@ static VkResult hkvkQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR* pPres
+ 
+     ReflexHooks::update(false, true);
+ 
+-    // original call
++    // M3A-OS observes the final, post-overlay PresentInfo passed to the genuine
++    // queue-present call. It does not acquire images, submit work, or alter any field.
++    const bool m3aEnabled = M3aEnabled();
++    const bool m3bEnabled = M3bEnabled();
++    const bool m3b1aEnabled = M3b1aEnabled();
++    const uint64_t m3aSerial = m3aEnabled ? ++_m3aPresentSerial : 0;
++    const bool m3aLogBeforeCall = m3aEnabled && M3aShouldLogPresent(m3aSerial, localPresentInfo);
++    const std::string m3aWaits = m3aLogBeforeCall ? M3aWaitSemaphores(localPresentInfo) : "";
++    uint32_t m3aQueueFamily = 0;
++    const bool m3aQueueFamilyKnown = (m3aEnabled || m3bEnabled || m3b1aEnabled) &&
++                                     MenuOverlayVk::TryGetQueueFamily(queue, &m3aQueueFamily);
++    const bool m3bNormalPresent = m3bEnabled && localPresentInfo.swapchainCount == 1 &&
++                                  localPresentInfo.waitSemaphoreCount == 1 && localPresentInfo.pSwapchains != nullptr &&
++                                  localPresentInfo.pImageIndices != nullptr && localPresentInfo.pWaitSemaphores != nullptr;
++
++    // M3B-0 either forwards the original unchanged or replaces its consumed game
++    // semaphore with originalReady after the duplicate has been presented first.
+     ScopedVulkanCreatingSC scopedVulkanCreatingSC {};
+-    auto result = o_QueuePresentKHR(queue, &localPresentInfo);
++    VkResult result = VK_SUCCESS;
++    // M3B-1A takes precedence when explicitly enabled; M3B-0 remains unchanged and
++    // cannot accidentally insert a duplicate during the external-image experiment.
++    const bool m3b1aForwarded = M3b1aTryExternalPresent(queue, localPresentInfo, m3aQueueFamilyKnown,
++                                                        m3aQueueFamily, &result);
++    const bool m3bForwarded = !m3b1aEnabled && M3bTryDuplicatePresent(
++        queue, localPresentInfo, m3aQueueFamilyKnown, m3aQueueFamily, &result);
++    if (!m3b1aForwarded && !m3bForwarded)
++        result = o_QueuePresentKHR(queue, &localPresentInfo);
++    if (m3bNormalPresent && result == VK_SUCCESS && !m3bForwarded && !m3b1aForwarded)
++        ++_m3bNormalPresents;
++
++    if (m3aLogBeforeCall || (m3aEnabled && result != VK_SUCCESS))
++    {
++        const VkSwapchainKHR swapchain = localPresentInfo.swapchainCount > 0 && localPresentInfo.pSwapchains != nullptr
++            ? localPresentInfo.pSwapchains[0] : VK_NULL_HANDLE;
++        const uint32_t imageIndex = localPresentInfo.swapchainCount > 0 && localPresentInfo.pImageIndices != nullptr
++            ? localPresentInfo.pImageIndices[0] : UINT32_MAX;
++        LOG_INFO("M3A-OS: present serial={} thread={} queue={:X} queueFamily={} swapchain={:X} imageIndex={} "
++                 "waitSemaphoreCount={} waits=[{}] result={}",
++                 m3aSerial, GetCurrentThreadId(), (UINT64) queue,
++                 m3aQueueFamilyKnown ? std::to_string(m3aQueueFamily) : "unknown",
++                 (UINT64) swapchain, imageIndex, localPresentInfo.waitSemaphoreCount,
++                 m3aLogBeforeCall ? m3aWaits : M3aWaitSemaphores(localPresentInfo), (int) result);
++    }
+ 
+     // Unsure about Vulkan Reflex fps limit and if that could be causing an issue here
+     if (!State::Instance().reflexLimitsFps)
+@@ -405,6 +1061,11 @@ static VkResult hkvkCreateSwapchainKHR(VkDevice device, const VkSwapchainCreateI
+         _device = device;
+         LOG_DEBUG("_device captured: {0:X}", (UINT64) _device);
+ 
++        // Read-only M3A-OS capture. vkGetSwapchainImagesKHR is queried only when
++        // explicitly enabled; vkAcquireNextImageKHR and both submit pointers are not called.
++        M3aLogSwapchain(device, pCreateInfo, *pSwapchain);
++        M3bCaptureSwapchain(device, pCreateInfo, *pSwapchain);
++
+         MenuOverlayVk::CreateSwapchain(device, _PD, _instance, _hwnd, pCreateInfo, pAllocator, pSwapchain);
+     }
+ 
+diff --git a/OptiScaler/menu/menu_overlay_vk.cpp b/OptiScaler/menu/menu_overlay_vk.cpp
+index 24fdd288..f9efc998 100644
+--- a/OptiScaler/menu/menu_overlay_vk.cpp
++++ b/OptiScaler/menu/menu_overlay_vk.cpp
+@@ -603,6 +603,14 @@ bool MenuOverlayVk::QueuePresent(VkQueue queue, VkPresentInfoKHR* pPresentInfo)
+     return true;
+ }
+ 
++bool MenuOverlayVk::TryGetQueueFamily(VkQueue queue, uint32_t* queueFamily)
++{
++    if (queueFamily == nullptr || _ImVulkan_Info.Queue == VK_NULL_HANDLE || queue != _ImVulkan_Info.Queue)
++        return false;
++    *queueFamily = _ImVulkan_Info.QueueFamily;
++    return true;
++}
++
+ void MenuOverlayVk::CreateSwapchain(VkDevice device, VkPhysicalDevice pd, VkInstance instance, HWND hwnd,
+                                     const VkSwapchainCreateInfoKHR* pCreateInfo,
+                                     const VkAllocationCallbacks* pAllocator, VkSwapchainKHR* pSwapchain)
+diff --git a/OptiScaler/menu/menu_overlay_vk.h b/OptiScaler/menu/menu_overlay_vk.h
+index 1778dbb4..ad08ac43 100644
+--- a/OptiScaler/menu/menu_overlay_vk.h
++++ b/OptiScaler/menu/menu_overlay_vk.h
+@@ -9,5 +9,8 @@ void CreateSwapchain(VkDevice device, VkPhysicalDevice pd, VkInstance instance,
+                      const VkSwapchainCreateInfoKHR* pCreateInfo, const VkAllocationCallbacks* pAllocator,
+                      VkSwapchainKHR* pSwapchain);
+ bool QueuePresent(VkQueue queue, VkPresentInfoKHR* pPresentInfo);
++    // Observation helper for M3A-OS. It exposes no queue operation and reports a
++    // family only for the existing overlay queue, never by guessing from VkQueue.
++bool TryGetQueueFamily(VkQueue queue, uint32_t* queueFamily);
+ void DestroyVulkanObjects(bool shutdown);
+ } // namespace MenuOverlayVk

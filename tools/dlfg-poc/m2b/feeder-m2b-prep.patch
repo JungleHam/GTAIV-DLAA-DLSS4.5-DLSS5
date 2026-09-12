@@ -1,0 +1,1491 @@
+diff --git a/src/dlss5-feed.cpp b/src/dlss5-feed.cpp
+index d8d5bfc..789b6e2 100644
+--- a/src/dlss5-feed.cpp
++++ b/src/dlss5-feed.cpp
+@@ -43,6 +43,7 @@
+ #include <cstring>
+ #include <cstdlib>
+ #include <cmath>
++#include <algorithm>
+ #include <string>
+ 
+ #define ImTextureID ImU64   // required by reshade_overlay.hpp before including imgui.h
+@@ -51,6 +52,7 @@
+ 
+ #include <nvsdk_ngx.h>
+ #include <nvsdk_ngx_helpers.h>
++#include <nvsdk_ngx_helpers_dlssg_d3d.h>
+ #include <nvsdk_ngx_defs_dlssd.h>   // SuperSamplingDenoising.Available (DLSS Ray Reconstruction, nvngx_dlssd.dll)
+ 
+ #include "feed_ngx.h"  // NGX result names and DLL identity, shared with host64
+@@ -65,6 +67,7 @@
+ 
+ #define FEED_VERSION "0.15.1"
+ 
++
+ extern "C" __declspec(dllexport) const char *NAME = "DLSS 5 Feed " FEED_VERSION;
+ extern "C" __declspec(dllexport) const char *DESCRIPTION =
+     "Feeds DLSS 5 neural rendering with ReShade's depth and estimated motion vectors in D3D11, "
+@@ -73,6 +76,7 @@ extern "C" __declspec(dllexport) const char *DESCRIPTION =
+     "D3D12) and writes the result back into the frame.Needs DLSS5_Feed.fx and a motion-vector provider (DRME, qUINT, Launchpad, VORT or LumeniteFX; pick it with the DLSS5_MV_PROVIDER definition). "
+     "Settings in dlss5-feed.cfg.";
+ 
++
+ // ---------------------------------------------------------------------------
+ // Logging
+ // ---------------------------------------------------------------------------
+@@ -986,6 +990,11 @@ struct Cfg
+                            // (8 * (native/work)^2, NVIDIA's guidance). Parse-only.
+     int   vk_present_sync; // 1: order early Vulkan submits against the game's present waits
+     int   vk_trace;        // per-frame identities + six-stage readbacks (diagnostic only)
++    int   dlfg_m2b_probe;  // 1: M2B-PREP only: log real Vulkan/D3D12 resource identities every 300 frames
++    int   dlfg_m2b_eval;   // 1: M2B one-shot off-screen DLSS-G evaluation (never presents or writes the game backbuffer)
++    int   dlfg_m2c_prearm_create; // 1: M2C-A only: pre-arm DLSS-G while DFC is CLAIMING, then evaluate after ARMED
++    int   dlfg_m3b1a_publish; // 1: publish one post-NR external image for OptiScaler (no DLSS-G)
++    int   dlfg_m3b1_present; // 1: generate one native DLSS-G frame into that external image and publish it
+     int   hdr_bridge;      // HDR10 colour bridge: -1 auto (on when the swapchain is PQ BT.2020
+                            // and the backbuffer is a 10-bit UNORM), 0 off, 1 force on.
+                            //
+@@ -1006,6 +1015,8 @@ struct Cfg
+ };
+ 
+ static Cfg g_cfg = { 1, 2, -1, -1, -1, 0, 180, 0, 3, 60, 0, 100, 0, 0.3f, 2000, 1, 0, 0, 0, 0, 1.0f, 1.0f, 50, 1, 0, 1, 0,
++                     /* dlfg_m2b_probe */ 0, /* dlfg_m2b_eval */ 0, /* dlfg_m2c_prearm_create */ 0,
++                     /* dlfg_m3b1a_publish */ 0, /* dlfg_m3b1_present */ 0,
+                      /* hdr_bridge */ -1, /* hdr_paper_white */ 203.0f };
+ static int       g_work_resolution_ui = 100;
+ static int       g_pending_work_resolution = 0;
+@@ -1047,6 +1058,11 @@ static void CfgWriteDefault()
+             "mv_scale_x=%.3f\n"
+             "mv_scale_y=%.3f\n"
+             "stall_log_ms=%d\n"
++            "dlfg_m2b_probe=%d\n"
++            "dlfg_m2b_eval=%d\n"
++            "dlfg_m2c_prearm_create=%d\n"
++            "dlfg_m3b1a_publish=%d\n"
++            "dlfg_m3b1_present=%d\n"
+             "hdr_bridge=%d\n"
+             "hdr_paper_white=%.0f\n",
+             g_cfg.enabled, g_cfg.mode, g_cfg.hdr, g_cfg.depth_inverted, g_cfg.flags, g_cfg.reset_every,
+@@ -1054,6 +1070,8 @@ static void CfgWriteDefault()
+             g_cfg.work_resolution, g_cfg.work_upscale, g_cfg.work_sharpness,
+             g_cfg.gpu_timeout_ms, g_cfg.buffer_home, g_cfg.async_home,
+             g_cfg.sync_home, g_cfg.mv_scale_x, g_cfg.mv_scale_y, g_cfg.stall_log_ms,
++            g_cfg.dlfg_m2b_probe, g_cfg.dlfg_m2b_eval, g_cfg.dlfg_m2c_prearm_create, g_cfg.dlfg_m3b1a_publish,
++            g_cfg.dlfg_m3b1_present,
+             g_cfg.hdr_bridge, g_cfg.hdr_paper_white);
+     fclose(f);
+     Log("[feed] wrote default config to %s", path);
+@@ -1104,6 +1122,11 @@ static bool CfgReload()
+         else if (_stricmp(key, "stall_log_ms")   == 0) next.stall_log_ms   = iv;
+         else if (_stricmp(key, "jitter_sign")    == 0) next.jitter_sign    = iv;
+         else if (_stricmp(key, "jitter_phases")  == 0) next.jitter_phases  = iv;
++        else if (_stricmp(key, "dlfg_m2b_probe") == 0) next.dlfg_m2b_probe = iv;
++        else if (_stricmp(key, "dlfg_m2b_eval")  == 0) next.dlfg_m2b_eval  = iv;
++        else if (_stricmp(key, "dlfg_m2c_prearm_create") == 0) next.dlfg_m2c_prearm_create = iv;
++        else if (_stricmp(key, "dlfg_m3b1a_publish") == 0) next.dlfg_m3b1a_publish = iv;
++        else if (_stricmp(key, "dlfg_m3b1_present") == 0) next.dlfg_m3b1_present = iv;
+     }
+     fclose(f);
+     if (next.mode < 0 || next.mode > 2) next.mode = g_cfg.mode;
+@@ -1112,6 +1135,11 @@ static bool CfgReload()
+     if (next.work_sharpness < 0.0f || next.work_sharpness > 1.0f) next.work_sharpness = g_cfg.work_sharpness;
+     if (next.jitter_sign != 1 && next.jitter_sign != -1) next.jitter_sign = g_cfg.jitter_sign;
+     if (next.jitter_phases < 0 || next.jitter_phases > 128) next.jitter_phases = g_cfg.jitter_phases;
++    next.dlfg_m2b_probe = next.dlfg_m2b_probe != 0 ? 1 : 0;
++    next.dlfg_m2b_eval  = next.dlfg_m2b_eval  != 0 ? 1 : 0;
++    next.dlfg_m2c_prearm_create = next.dlfg_m2c_prearm_create != 0 ? 1 : 0;
++    next.dlfg_m3b1a_publish = next.dlfg_m3b1a_publish != 0 ? 1 : 0;
++    next.dlfg_m3b1_present = next.dlfg_m3b1_present != 0 ? 1 : 0;
+     // 0 would mean "give up instantly"; an unbounded wait would hang the game on a
+     // genuinely dead GPU. Clamp to something a contended machine can still live with.
+     if (next.gpu_timeout_ms < 100 || next.gpu_timeout_ms > 60000) next.gpu_timeout_ms = g_cfg.gpu_timeout_ms;
+@@ -1128,18 +1156,21 @@ static bool CfgReload()
+                          // Both of these decide what format the shared textures are made in,
+                          // so neither can be picked up without rebuilding them.
+                          next.hdr_bridge != g_cfg.hdr_bridge ||
+-                         next.hdr_paper_white != g_cfg.hdr_paper_white;
++                         next.hdr_paper_white != g_cfg.hdr_paper_white ||
++                         next.dlfg_m3b1a_publish != g_cfg.dlfg_m3b1a_publish ||
++                         next.dlfg_m3b1_present != g_cfg.dlfg_m3b1_present;
+     const bool changed = rebuild || memcmp(&next, &g_cfg, sizeof(Cfg)) != 0;
+     if (!changed) return false;
+     g_cfg = next;
+     Log("[feed] config: hdr_bridge=%d hdr_paper_white=%.0f", g_cfg.hdr_bridge, g_cfg.hdr_paper_white);
+     Log("[feed] config: enabled=%d mode=%d hdr=%d depth_inverted=%d flags=%d reset_every=%d warmup_rebuild=%d "
+-        "rebuild=%d log_frames=%d create_delay=%d work_resolution=%d%% work_upscale=%d work_sharpness=%.2f gpu_timeout_ms=%d buffer_home=%d async_home=%d sync_home=%d mv_scale=%.3f,%.3f stall_log_ms=%d",
++        "rebuild=%d log_frames=%d create_delay=%d work_resolution=%d%% work_upscale=%d work_sharpness=%.2f gpu_timeout_ms=%d buffer_home=%d async_home=%d sync_home=%d mv_scale=%.3f,%.3f stall_log_ms=%d dlfg_m2b_probe=%d dlfg_m2b_eval=%d dlfg_m2c_prearm_create=%d dlfg_m3b1a_publish=%d dlfg_m3b1_present=%d",
+         g_cfg.enabled, g_cfg.mode, g_cfg.hdr, g_cfg.depth_inverted, g_cfg.flags, g_cfg.reset_every,
+         g_cfg.warmup_rebuild, g_cfg.rebuild, g_cfg.log_frames, g_cfg.create_delay,
+         g_cfg.work_resolution, g_cfg.work_upscale, g_cfg.work_sharpness,
+         g_cfg.gpu_timeout_ms, g_cfg.buffer_home, g_cfg.async_home,
+-        g_cfg.sync_home, g_cfg.mv_scale_x, g_cfg.mv_scale_y, g_cfg.stall_log_ms);
++        g_cfg.sync_home, g_cfg.mv_scale_x, g_cfg.mv_scale_y, g_cfg.stall_log_ms, g_cfg.dlfg_m2b_probe, g_cfg.dlfg_m2b_eval,
++        g_cfg.dlfg_m2c_prearm_create, g_cfg.dlfg_m3b1a_publish, g_cfg.dlfg_m3b1_present);
+     return rebuild;
+ }
+ 
+@@ -1150,7 +1181,7 @@ static const char *const kCfgSavedKeys[] = {
+     "enabled", "mode", "hdr", "depth_inverted", "flags", "reset_every", "warmup_rebuild",
+     "rebuild", "log_frames", "create_delay", "preset", "work_resolution", "work_upscale",
+     "work_sharpness", "gpu_timeout_ms", "buffer_home", "async_home", "sync_home",
+-    "mv_scale_x", "mv_scale_y", "stall_log_ms", "hdr_bridge", "hdr_paper_white",
++    "mv_scale_x", "mv_scale_y", "stall_log_ms", "dlfg_m2b_probe", "dlfg_m2b_eval", "dlfg_m2c_prearm_create", "dlfg_m3b1a_publish", "dlfg_m3b1_present", "hdr_bridge", "hdr_paper_white",
+ };
+ 
+ static bool CfgKeyIsSaved(const char *key)
+@@ -1204,12 +1235,13 @@ static void CfgSave()
+     fprintf(f,
+         "enabled=%d\nmode=%d\nhdr=%d\ndepth_inverted=%d\nflags=%d\nreset_every=%d\nwarmup_rebuild=%d\n"
+             "rebuild=%d\nlog_frames=%d\ncreate_delay=%d\npreset=%d\nwork_resolution=%d\nwork_upscale=%d\nwork_sharpness=%.2f\ngpu_timeout_ms=%d\n"
+-            "buffer_home=%d\nasync_home=%d\nsync_home=%d\nmv_scale_x=%.3f\nmv_scale_y=%.3f\nstall_log_ms=%d\nhdr_bridge=%d\nhdr_paper_white=%.0f\n",
++            "buffer_home=%d\nasync_home=%d\nsync_home=%d\nmv_scale_x=%.3f\nmv_scale_y=%.3f\nstall_log_ms=%d\ndlfg_m2b_probe=%d\ndlfg_m2b_eval=%d\ndlfg_m2c_prearm_create=%d\ndlfg_m3b1a_publish=%d\ndlfg_m3b1_present=%d\nhdr_bridge=%d\nhdr_paper_white=%.0f\n",
+             g_cfg.enabled, g_cfg.mode, g_cfg.hdr, g_cfg.depth_inverted, g_cfg.flags, g_cfg.reset_every,
+             g_cfg.warmup_rebuild, g_cfg.rebuild, g_cfg.log_frames, g_cfg.create_delay, g_cfg.preset,
+             g_cfg.work_resolution, g_cfg.work_upscale, g_cfg.work_sharpness,
+             g_cfg.gpu_timeout_ms, g_cfg.buffer_home, g_cfg.async_home,
+-            g_cfg.sync_home, g_cfg.mv_scale_x, g_cfg.mv_scale_y, g_cfg.stall_log_ms,
++            g_cfg.sync_home, g_cfg.mv_scale_x, g_cfg.mv_scale_y, g_cfg.stall_log_ms, g_cfg.dlfg_m2b_probe, g_cfg.dlfg_m2b_eval,
++            g_cfg.dlfg_m2c_prearm_create, g_cfg.dlfg_m3b1a_publish, g_cfg.dlfg_m3b1_present,
+             g_cfg.hdr_bridge, g_cfg.hdr_paper_white);
+     if (!carried.empty()) fputs(carried.c_str(), f);
+     fclose(f);
+@@ -1441,6 +1473,20 @@ struct Feed
+                                              // (the D3D12 device owns them until the next acquire)
+     UINT64                 vk_frame;
+ 
++    // M3B-1A: one immutable post-NR image shared to OptiScaler. This deliberately
++    // uses the existing output timeline and never starts another NGX session.
++    ID3D12Resource        *m3b1a_tex12;
++    HANDLE                 m3b1a_shared;
++    VkImage                m3b1a_vk_img;
++    VkDeviceMemory         m3b1a_vk_mem;
++    bool                   m3b1a_vk_released;
++    bool                   m3b1a_copy_queued;
++    bool                   m3b1a_published;
++    UINT64                 m3b1a_serial;
++    UINT64                 m3b1a_source_frame;
++    UINT64                 m3b1_ready_value;
++    UINT64                 m3b1_genuine_serial;
++
+     // OpenGL transport: raw-GL imports of the very same D3D12 shared objects. Nothing
+     // is handed back to ReShade here -- an api::fence on GL is an opaque value, not a
+     // GL semaphore name, so the whole per-frame GL side is raw (see feed_gl.h).
+@@ -1456,6 +1502,28 @@ struct Feed
+     NVSDK_NGX_Parameter *params;
+     NVSDK_NGX_Handle    *feature;
+ 
++    // M2B/M2C: deliberately separate from the existing DLAA handle, but allocated in the
++    // same already-initialized D3D12 NGX session. The output is private and never aliases
++    // the game's backbuffer or the Feeder's copy-home target.
++    NVSDK_NGX_Parameter *dlfg_params;
++    NVSDK_NGX_Handle    *dlfg_feature;
++    ID3D12Resource      *dlfg_output;
++    ID3D12Resource      *dlfg_prev_readback;
++    ID3D12Resource      *dlfg_curr_readback;
++    ID3D12Resource      *dlfg_output_readback;
++    D3D12_PLACED_SUBRESOURCE_FOOTPRINT dlfg_footprint;
++    UINT64               dlfg_readback_bytes;
++    UINT64               dlfg_readback_fence;
++    UINT64               dlfg_history_frame;
++    UINT64               dlfg_last_skip_frame;
++    int                  dlfg_state; // 0 idle, 1 history recorded, 2 readback pending, 3 passed, 4 failed
++    int                  dlfg_owner; // 0 M2B/default, 1 M2C pre-arm coexistence probe
++    int                  m2c_state;  // 0 idle, 1 pre-armed, 2 waiting for DFC ARMED, 3 evaluating, 4 passed, 5 failed
++    LONG                 m2c_prearm_dfc_state;
++    bool                 m2c_dfc_detected;
++    bool                 m2c_armed_seen;
++    bool                 m2c_evaluation_attempted; // one two-frame coexistence attempt per process
++
+     // shared textures
+     ID3D12Resource  *tex12[SLOT_COUNT];
+     ID3D11Texture2D *tex11[SLOT_COUNT];
+@@ -1534,6 +1602,87 @@ struct Feed
+ 
+ static Feed g;
+ 
++// C ABI shared with the independently-built OptiScaler fork. Handles are 64-bit
++// Vulkan non-dispatchable values except VkDevice, but all are naturally ABI-safe
++// in this x64 process. Version and size permit append-only evolution.
++struct Dlss5M3b1aPublishedFrame
++{
++    uint32_t abiVersion;
++    uint32_t structSize;
++    uint64_t serial;
++    uint32_t ready;
++    uint32_t reserved;
++    VkDevice device;
++    VkImage image;
++    VkFormat format;
++    uint32_t width;
++    uint32_t height;
++    VkSemaphore producerTimeline;
++    uint64_t producerReadyValue;
++    VkImageLayout externalRestingLayout;
++    uint64_t sourceFrame;
++};
++
++static SRWLOCK g_m3b1a_lock = SRWLOCK_INIT;
++static Dlss5M3b1aPublishedFrame g_m3b1a_publication = {};
++
++extern "C" __declspec(dllexport) BOOL WINAPI DLSS5_QueryM3B1AExternalFrame(Dlss5M3b1aPublishedFrame *out)
++{
++    if (out == nullptr) return FALSE;
++    AcquireSRWLockShared(&g_m3b1a_lock);
++    *out = g_m3b1a_publication;
++    const BOOL ready = out->abiVersion == 1 && out->structSize == sizeof(*out) && out->ready != 0;
++    ReleaseSRWLockShared(&g_m3b1a_lock);
++    return ready;
++}
++
++extern "C" __declspec(dllexport) BOOL WINAPI DLSS5_ConsumeM3B1AExternalFrame(uint64_t serial)
++{
++    AcquireSRWLockExclusive(&g_m3b1a_lock);
++    const BOOL matched = g_m3b1a_publication.ready != 0 && g_m3b1a_publication.serial == serial;
++    if (matched) g_m3b1a_publication.ready = 0;
++    ReleaseSRWLockExclusive(&g_m3b1a_lock);
++    if (matched) Log("[feed] M3B-1A consumer acknowledged serial=%llu", static_cast<unsigned long long>(serial));
++    return matched;
++}
++
++// Leaves the proven frame ABI unchanged while letting the consumer distinguish
++// the M3B-1 native feature-11 producer from the M3B-1A copy producer. This is
++// queried before Consume clears ready and is never accepted as proof by itself.
++extern "C" __declspec(dllexport) BOOL WINAPI DLSS5_IsM3B1GeneratedFrame(uint64_t serial)
++{
++    AcquireSRWLockShared(&g_m3b1a_lock);
++    const BOOL genuine = g_m3b1a_publication.ready != 0 &&
++                         g_m3b1a_publication.serial == serial &&
++                         g.m3b1_genuine_serial == serial;
++    ReleaseSRWLockShared(&g_m3b1a_lock);
++    return genuine;
++}
++
++static uint64_t PublishM3bExternalFrame(UINT64 source_frame, UINT64 ready_value, bool genuine)
++{
++    Dlss5M3b1aPublishedFrame publication = {};
++    publication.abiVersion = 1;
++    publication.structSize = sizeof(publication);
++    publication.serial = ++g.m3b1a_serial;
++    publication.ready = 1;
++    publication.device = g.vk.dev;
++    publication.image = g.m3b1a_vk_img;
++    publication.format = VK_FORMAT_B8G8R8A8_UNORM;
++    publication.width = g.width;
++    publication.height = g.height;
++    publication.producerTimeline = g.vk_sem_out;
++    publication.producerReadyValue = ready_value;
++    publication.externalRestingLayout = VK_IMAGE_LAYOUT_GENERAL;
++    publication.sourceFrame = source_frame;
++    AcquireSRWLockExclusive(&g_m3b1a_lock);
++    g.m3b1_genuine_serial = genuine ? publication.serial : 0;
++    g_m3b1a_publication = publication;
++    ReleaseSRWLockExclusive(&g_m3b1a_lock);
++    g.m3b1a_published = true;
++    return publication.serial;
++}
++
+ // ---------------------------------------------------------------------------
+ // Helpers
+ // ---------------------------------------------------------------------------
+@@ -1596,6 +1745,45 @@ static const char *FormatName(DXGI_FORMAT f)
+     }
+ }
+ 
++// M2B-PREP deliberately observes only the already-running Vulkan -> D3D12 DLSS
++// transport.  It creates no feature, records no GPU work, changes no resource state,
++// and does not call any DLSS-G API.  Keeping the future experiment beside the existing
++// D3D12 NGX call is intentional: another NGX Init/Shutdown lifecycle in NvRemixBridge
++// previously destabilized the game.
++static void LogM2bProbeVk(UINT64 frame, VkCommandBuffer cb, VkImage game_color,
++                          VkImage game_depth, VkImage game_mv)
++{
++    if (g_cfg.dlfg_m2b_probe == 0 || frame == 0 || (frame % 300) != 0) return;
++
++    const VkQueue game_queue = g.rs_queue != nullptr
++        ? FeedVkDispatch<VkQueue>(g.rs_queue->get_native()) : VK_NULL_HANDLE;
++    Log("[feed] M2B-PREP resource tap: real frame %llu (observation only; DLSS-G is NOT invoked)",
++        static_cast<unsigned long long>(frame));
++    Log("[feed] M2B-PREP API/session: game=Vulkan vk_device=0x%llX vk_physical_device=0x%llX vk_queue=0x%llX "
++        "vk_command_buffer=0x%llX | existing_NGX=D3D12 dev12=%p queue=%p list=%p params=%p DLAA_feature=%p",
++        static_cast<unsigned long long>(FeedVkValue(g.vk.dev)),
++        static_cast<unsigned long long>(FeedVkValue(g.vk.phys)),
++        static_cast<unsigned long long>(FeedVkValue(game_queue)),
++        static_cast<unsigned long long>(FeedVkValue(cb)),
++        (void *)g.dev12, (void *)g.queue, (void *)g.list, (void *)g.params, (void *)g.feature);
++    Log("[feed] M2B-PREP Color: game VkImage=0x%llX | shared VkImage=0x%llX D3D12Resource=%p | %s %ux%u",
++        static_cast<unsigned long long>(FeedVkValue(game_color)),
++        static_cast<unsigned long long>(FeedVkValue(g.vk_img[SLOT_COLOR])), (void *)g.tex12[SLOT_COLOR],
++        FormatName(g.color_fmt), g.width, g.height);
++    Log("[feed] M2B-PREP Depth: game VkImage=0x%llX | shared VkImage=0x%llX D3D12Resource=%p | %s %ux%u",
++        static_cast<unsigned long long>(FeedVkValue(game_depth)),
++        static_cast<unsigned long long>(FeedVkValue(g.vk_img[SLOT_DEPTH])), (void *)g.tex12[SLOT_DEPTH],
++        FormatName(DXGI_FORMAT_R32_FLOAT), g.width, g.height);
++    Log("[feed] M2B-PREP MV: game VkImage=0x%llX | shared VkImage=0x%llX D3D12Resource=%p | %s %ux%u",
++        static_cast<unsigned long long>(FeedVkValue(game_mv)),
++        static_cast<unsigned long long>(FeedVkValue(g.vk_img[SLOT_MV])), (void *)g.tex12[SLOT_MV],
++        FormatName(DXGI_FORMAT_R16G16_FLOAT), g.width, g.height);
++    Log("[feed] M2B-PREP Output: game target/backbuffer VkImage=0x%llX | shared VkImage=0x%llX D3D12Resource=%p | %s %ux%u",
++        static_cast<unsigned long long>(FeedVkValue(game_color)),
++        static_cast<unsigned long long>(FeedVkValue(g.vk_img[SLOT_OUTPUT])), (void *)g.tex12[SLOT_OUTPUT],
++        FormatName(g.output_fmt), g.width, g.height);
++}
++
+ // The shared Color copy must be typed (the DLSS 5 add-on samples it) and in the same
+ // typeless family as the backbuffer so CopyResource can move the frame across.
+ static DXGI_FORMAT TypedColorFormat(DXGI_FORMAT f)
+@@ -2683,6 +2871,9 @@ static float HalfToFloat(uint16_t h)
+ // Generic Depth is bound to the wrong buffer (The Surge 2, 2026-09-02: three minutes of
+ // gameplay at 0.249981 while the vectors showed up to 37 px of motion).
+ static double g_mv_probe_mean_px;
++// M2B may only arm after the existing asynchronous guide probe has observed
++// non-flat finite depth from the real game. Startup/menu depth is commonly flat.
++static bool   g_m2b_depth_valid;
+ 
+ static void MvProbeAnalyse()
+ {
+@@ -2747,6 +2938,7 @@ static void DepthProbeAnalyse()
+     const double mean = finite > 0 ? sum / finite : 0.0;
+     const double variance = finite > 0 ? (std::max)(0.0, sum2 / finite - mean * mean) : 0.0;
+     const bool flat = finite == 0 || max_depth - min_depth < 1e-6;
++    g_m2b_depth_valid = finite > 0 && !flat;
+     // Flat depth on a still image says nothing. Flat depth while the vectors show the
+     // scene moving is a bound-to-the-wrong-buffer diagnosis, so say that instead.
+     const bool flat_moving = flat && g_mv_probe_mean_px > 1.0;
+@@ -3056,6 +3248,864 @@ static void Barrier(ID3D12Resource *res, D3D12_RESOURCE_STATES from, D3D12_RESOU
+     g.list->ResourceBarrier(1, &b);
+ }
+ 
++// ---------------------------------------------------------------------------
++// M2B: one off-screen DLSS-G evaluation on the Feeder's existing D3D12 session.
++//
++// This is deliberately in the Vulkan transport's D3D12 middle, immediately after the
++// existing DLAA/DFC evaluation. g.tex12[SLOT_OUTPUT] is therefore the final resolved
++// real frame, not the original Colour input. The generated frame remains in dlfg_output:
++// it is copied only to CPU readback and is never presented or copied to GTA's backbuffer.
++// ---------------------------------------------------------------------------
++
++static const int kM2bIdle = 0, kM2bHistory = 1, kM2bReadbackPending = 2,
++                 kM2bPassed = 3, kM2bFailed = 4;
++static const int kM2cIdle = 0, kM2cPrearmed = 1, kM2cWaitingArmed = 2,
++                 kM2cEvaluating = 3, kM2cPassed = 4, kM2cFailed = 5;
++
++static const char *DlfgOwnerTag()
++{
++    return g.dlfg_owner == 2 ? "M3B-1" : g.dlfg_owner == 1 ? "M2C" : "M2B";
++}
++
++static void M2bFail(const char *why)
++{
++    if (g.dlfg_state == kM2bFailed || g.dlfg_state == kM2bPassed) return;
++    g.dlfg_state = kM2bFailed;
++    if (g.dlfg_owner == 1) g.m2c_state = kM2cFailed;
++    Log("[feed] %s: FAILED: %s", DlfgOwnerTag(), why);
++}
++
++static void M2bReleaseFeature()
++{
++    if (g.dlfg_feature == nullptr) return;
++    __try
++    {
++        const NVSDK_NGX_Result r = NVSDK_NGX_D3D12_ReleaseFeature(g.dlfg_feature);
++        if (NVSDK_NGX_FAILED(r)) Log("[feed] M2B: ReleaseFeature -> 0x%08X (%s)", r, NgxResultName(r));
++    }
++    __except (EXCEPTION_EXECUTE_HANDLER)
++    { Log("[feed] M2B: ReleaseFeature raised exception 0x%08X (ignored during teardown)", GetExceptionCode()); }
++    g.dlfg_feature = nullptr;
++}
++
++static void M2bRelease()
++{
++    // Release before the per-build shared resources: the feature's parameter bindings
++    // point into tex12. This never calls NGX Init/Shutdown; that lifecycle remains the
++    // Feeder's one established by SafeNgxInit12.
++    if (g.dlfg_feature != nullptr)
++    {
++        if (!g_ngx_dying) M2bReleaseFeature();
++        else g.dlfg_feature = nullptr;
++    }
++    if (g.dlfg_params != nullptr)
++    {
++        if (!g_ngx_dying)
++        {
++            const NVSDK_NGX_Result r = NVSDK_NGX_D3D12_DestroyParameters(g.dlfg_params);
++            if (NVSDK_NGX_FAILED(r)) Log("[feed] M2B: DestroyParameters -> 0x%08X (%s)", r, NgxResultName(r));
++        }
++        g.dlfg_params = nullptr;
++    }
++    SafeRelease(g.dlfg_output);
++    SafeRelease(g.dlfg_prev_readback);
++    SafeRelease(g.dlfg_curr_readback);
++    SafeRelease(g.dlfg_output_readback);
++    g.dlfg_footprint = {};
++    g.dlfg_readback_bytes = 0;
++    g.dlfg_readback_fence = 0;
++    g.dlfg_history_frame = 0;
++    g.dlfg_last_skip_frame = 0;
++    g.dlfg_state = kM2bIdle;
++    g.dlfg_owner = 0;
++    if (!g.m2c_evaluation_attempted)
++    {
++        // A resource rebuild releases the retained feature/history. A later M2C create
++        // is permitted only through the same pre-ARMED policy, never after DFC is ARMED.
++        g.m2c_state = kM2cIdle;
++        g.m2c_prearm_dfc_state = DFC_STATE_UNKNOWN;
++        g.m2c_dfc_detected = false;
++        g.m2c_armed_seen = false;
++    }
++    g_m2b_depth_valid = false;
++}
++
++static bool M2bCreateReadback(ID3D12Resource **out)
++{
++    D3D12_HEAP_PROPERTIES hp = {}; hp.Type = D3D12_HEAP_TYPE_READBACK;
++    D3D12_RESOURCE_DESC rd = {};
++    rd.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
++    rd.Width = g.dlfg_readback_bytes;
++    rd.Height = 1;
++    rd.DepthOrArraySize = 1;
++    rd.MipLevels = 1;
++    rd.SampleDesc.Count = 1;
++    rd.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
++    const HRESULT hr = g.dev12->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd,
++        D3D12_RESOURCE_STATE_COPY_DEST, nullptr, __uuidof(ID3D12Resource),
++        reinterpret_cast<void **>(out));
++    if (FAILED(hr))
++    {
++        Log("[feed] M2B: CreateCommittedResource(readback) failed 0x%08X (%s)", hr, FeedHrName(hr));
++        return false;
++    }
++    return true;
++}
++
++static bool M2bCreateResources()
++{
++    D3D12_HEAP_PROPERTIES hp = {}; hp.Type = D3D12_HEAP_TYPE_DEFAULT;
++    D3D12_RESOURCE_DESC rd = {};
++    rd.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
++    rd.Width = g.width;
++    rd.Height = g.height;
++    rd.DepthOrArraySize = 1;
++    rd.MipLevels = 1;
++    rd.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
++    rd.SampleDesc.Count = 1;
++    rd.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
++    rd.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
++    HRESULT hr = g.dev12->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_NONE, &rd,
++        D3D12_RESOURCE_STATE_COMMON, nullptr, __uuidof(ID3D12Resource),
++        reinterpret_cast<void **>(&g.dlfg_output));
++    if (FAILED(hr))
++    {
++        Log("[feed] M2B: CreateCommittedResource(private interpolated output) failed 0x%08X (%s)",
++            hr, FeedHrName(hr));
++        return false;
++    }
++    UINT rows = 0; UINT64 row_bytes = 0;
++    g.dev12->GetCopyableFootprints(&rd, 0, 1, 0, &g.dlfg_footprint, &rows, &row_bytes, &g.dlfg_readback_bytes);
++    if (g.dlfg_readback_bytes == 0 || g.dlfg_footprint.Footprint.RowPitch < g.width * 4u ||
++        !M2bCreateReadback(&g.dlfg_prev_readback) || !M2bCreateReadback(&g.dlfg_curr_readback) ||
++        !M2bCreateReadback(&g.dlfg_output_readback))
++        return false;
++    Log("[feed] M2B: private output/readback created: %ux%u B8G8R8A8, row pitch %u, %llu bytes",
++        g.width, g.height, g.dlfg_footprint.Footprint.RowPitch,
++        static_cast<unsigned long long>(g.dlfg_readback_bytes));
++    return true;
++}
++
++static bool M3b1CreateReadbacks()
++{
++    if (g.m3b1a_tex12 == nullptr) return false;
++    const D3D12_RESOURCE_DESC rd = g.m3b1a_tex12->GetDesc();
++    UINT rows = 0; UINT64 row_bytes = 0;
++    g.dev12->GetCopyableFootprints(&rd, 0, 1, 0, &g.dlfg_footprint, &rows, &row_bytes,
++                                   &g.dlfg_readback_bytes);
++    if (g.dlfg_readback_bytes == 0 || g.dlfg_footprint.Footprint.RowPitch < g.width * 4u ||
++        !M2bCreateReadback(&g.dlfg_prev_readback) || !M2bCreateReadback(&g.dlfg_curr_readback) ||
++        !M2bCreateReadback(&g.dlfg_output_readback))
++        return false;
++    Log("[feed] M3B-1: validation readbacks created: %ux%u B8G8R8A8 rowPitch=%u bytes=%llu",
++        g.width, g.height, g.dlfg_footprint.Footprint.RowPitch,
++        static_cast<unsigned long long>(g.dlfg_readback_bytes));
++    return true;
++}
++
++static bool M2bCheckCapabilities()
++{
++    NVSDK_NGX_Parameter *caps = nullptr;
++    const NVSDK_NGX_Result r = NVSDK_NGX_D3D12_GetCapabilityParameters(&caps);
++    if (NVSDK_NGX_FAILED(r) || caps == nullptr)
++    {
++        Log("[feed] M2B: GetCapabilityParameters(FrameGeneration) -> 0x%08X (%s)", r, NgxResultName(r));
++        return false;
++    }
++    int available = 0, needs_driver = 1;
++    unsigned int max_count = 0;
++    const NVSDK_NGX_Result ra = caps->Get(NVSDK_NGX_Parameter_FrameGeneration_Available, &available);
++    const NVSDK_NGX_Result rd = caps->Get(NVSDK_NGX_Parameter_FrameGeneration_NeedsUpdatedDriver, &needs_driver);
++    const NVSDK_NGX_Result rm = caps->Get(NVSDK_NGX_DLSSG_Parameter_MultiFrameCountMax, &max_count);
++    Log("[feed] M2B: FrameGeneration.Available=%d (0x%08X), NeedsUpdatedDriver=%d (0x%08X), "
++        "DLSSG.MultiFrameCountMax=%u (0x%08X)", available, ra, needs_driver, rd, max_count, rm);
++    const NVSDK_NGX_Result rx = NVSDK_NGX_D3D12_DestroyParameters(caps);
++    if (NVSDK_NGX_FAILED(rx))
++        Log("[feed] M2B: DestroyParameters(capabilities) -> 0x%08X (%s)", rx, NgxResultName(rx));
++    return NVSDK_NGX_SUCCEED(ra) && NVSDK_NGX_SUCCEED(rd) && NVSDK_NGX_SUCCEED(rm) &&
++           NVSDK_NGX_SUCCEED(rx) && available != 0 && needs_driver == 0 && max_count >= 1;
++}
++
++static bool M3b1CheckCapabilities()
++{
++    NVSDK_NGX_Parameter *caps = nullptr;
++    const NVSDK_NGX_Result r = NVSDK_NGX_D3D12_GetCapabilityParameters(&caps);
++    if (NVSDK_NGX_FAILED(r) || caps == nullptr)
++    {
++        Log("[feed] M3B-1: GetCapabilityParameters -> 0x%08X (%s)", r, NgxResultName(r));
++        return false;
++    }
++    int available = 0, needs_driver = 1;
++    unsigned int max_count = 0;
++    const NVSDK_NGX_Result ra = caps->Get(NVSDK_NGX_Parameter_FrameGeneration_Available, &available);
++    const NVSDK_NGX_Result rd = caps->Get(NVSDK_NGX_Parameter_FrameGeneration_NeedsUpdatedDriver, &needs_driver);
++    const NVSDK_NGX_Result rm = caps->Get(NVSDK_NGX_DLSSG_Parameter_MultiFrameCountMax, &max_count);
++    Log("[feed] M3B-1: DLSS-G capability Available=%d NeedsUpdatedDriver=%d MultiFrameCountMax=%u",
++        available, needs_driver, max_count);
++    const NVSDK_NGX_Result rx = NVSDK_NGX_D3D12_DestroyParameters(caps);
++    return NVSDK_NGX_SUCCEED(ra) && NVSDK_NGX_SUCCEED(rd) && NVSDK_NGX_SUCCEED(rm) &&
++           NVSDK_NGX_SUCCEED(rx) && available != 0 && needs_driver == 0 && max_count >= 1;
++}
++
++static NVSDK_NGX_Result SafeCreateDLFG(NVSDK_NGX_DLSSG_Create_Params *cp, DWORD *code)
++{
++    *code = 0;
++    if (NgxRefuse("DLSS-G create")) return static_cast<NVSDK_NGX_Result>(0x7FFFFFFF);
++    __try
++    {
++        return NGX_D3D12_CREATE_DLSSG(g.list, 1, 1, &g.dlfg_feature, g.dlfg_params, cp);
++    }
++    __except (NoteNgxFault("DLSS-G CreateFeature", GetExceptionInformation()), EXCEPTION_EXECUTE_HANDLER)
++    { *code = GetExceptionCode(); return static_cast<NVSDK_NGX_Result>(0x7FFFFFFF); }
++}
++
++static NVSDK_NGX_Result SafeEvaluateDLFG(NVSDK_NGX_D3D12_DLSSG_Eval_Params *ep,
++                                         NVSDK_NGX_DLSSG_Opt_Eval_Params *op, DWORD *code)
++{
++    *code = 0;
++    if (NgxRefuse("DLSS-G evaluate")) return static_cast<NVSDK_NGX_Result>(0x7FFFFFFF);
++    __try
++    {
++        return NGX_D3D12_EVALUATE_DLSSG(g.list, g.dlfg_feature, g.dlfg_params, ep, op);
++    }
++    __except (NoteNgxFault("DLSS-G EvaluateFeature", GetExceptionInformation()), EXCEPTION_EXECUTE_HANDLER)
++    { *code = GetExceptionCode(); return static_cast<NVSDK_NGX_Result>(0x7FFFFFFF); }
++}
++
++static void M2bIdentity(float m[4][4])
++{
++    memset(m, 0, sizeof(float) * 16);
++    m[0][0] = m[1][1] = m[2][2] = m[3][3] = 1.0f;
++}
++
++static void M2bBuildConstants(NVSDK_NGX_DLSSG_Opt_Eval_Params *op, bool reset)
++{
++    *op = {};
++    const float near_z = 0.1f, far_z = 1000.0f, fov = 1.0471975512f; // 60 degrees
++    const float aspect = static_cast<float>(g.width) / static_cast<float>(g.height);
++    const float f = 1.0f / tanf(fov * 0.5f);
++    const float a = far_z / (far_z - near_z);
++    const float b = -near_z * far_z / (far_z - near_z);
++    // Row-major D3D perspective and its exact inverse. No TAA jitter is baked in.
++    op->cameraViewToClip[0][0] = f / aspect;
++    op->cameraViewToClip[1][1] = f;
++    op->cameraViewToClip[2][2] = a;
++    op->cameraViewToClip[2][3] = 1.0f;
++    op->cameraViewToClip[3][2] = b;
++    op->clipToCameraView[0][0] = aspect / f;
++    op->clipToCameraView[1][1] = 1.0f / f;
++    op->clipToCameraView[2][3] = 1.0f / b;
++    op->clipToCameraView[3][2] = 1.0f;
++    op->clipToCameraView[3][3] = -a / b;
++    M2bIdentity(op->clipToLensClip);
++    M2bIdentity(op->clipToPrevClip);
++    M2bIdentity(op->prevClipToClip);
++    op->multiFrameCount = 1;
++    op->multiFrameIndex = 1;
++    // SLOT_MV stores pixel-space motion, so DLSS-G needs pixel -> normalized
++    // conversion. These are deliberately independent from the Feeder's DLAA
++    // mv_scale_x/y contract and must not change that existing behavior.
++    op->mvecScale[0] = 1.0f / static_cast<float>(g.width);
++    op->mvecScale[1] = 1.0f / static_cast<float>(g.height);
++    op->cameraUp[1] = 1.0f;
++    op->cameraRight[0] = 1.0f;
++    op->cameraFwd[2] = 1.0f;
++    op->cameraNear = near_z;
++    op->cameraFar = far_z;
++    op->cameraFOV = fov;
++    op->cameraAspectRatio = aspect;
++    op->colorBuffersHDR = false;
++    op->depthInverted = g_cfg.depth_inverted >= 0 ? g_cfg.depth_inverted != 0 : g.depth_reversed;
++    op->cameraMotionIncluded = true;
++    op->reset = reset;
++    op->automodeOverrideReset = false;
++    op->notRenderingGameFrames = false;
++    op->orthoProjection = false;
++    op->motionVectorsInvalidValue = 0.0f;
++    op->motionVectorsDilated = false;
++    op->menuDetectionEnabled = false;
++    const NVSDK_NGX_Dimensions full = { g.width, g.height };
++    op->mvecsSubrectSize = op->depthSubrectSize = op->hudLessSubrectSize = full;
++    op->uiSubrectSize = op->uiAlphaSubrectSize = op->bidirectionalDistFieldSubrectSize = full;
++    op->backbufferSubrectSize = op->outputInterpSubrectSize = op->outputRealSubrectSize = full;
++}
++
++static void M2bCopyTextureToReadback(ID3D12Resource *src, ID3D12Resource *dst,
++                                     D3D12_RESOURCE_STATES state)
++{
++    Barrier(src, state, D3D12_RESOURCE_STATE_COPY_SOURCE);
++    D3D12_TEXTURE_COPY_LOCATION from = {};
++    from.pResource = src; from.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
++    D3D12_TEXTURE_COPY_LOCATION to = {};
++    to.pResource = dst; to.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
++    to.PlacedFootprint = g.dlfg_footprint;
++    g.list->CopyTextureRegion(&to, 0, 0, 0, &from, nullptr);
++    Barrier(src, D3D12_RESOURCE_STATE_COPY_SOURCE, state);
++}
++
++static bool M2bRecordEval(UINT64 frame, bool reset, const char *tag)
++{
++    NVSDK_NGX_D3D12_DLSSG_Eval_Params ep = {};
++    // This is the post-DLAA/DFC resolved output. pOutputRealFrame deliberately stays null:
++    // DLSS-G has no permission to mutate the Feeder's normal game output in this milestone.
++    ep.pBackbuffer = g.tex12[SLOT_OUTPUT];
++    ep.pDepth = g.tex12[SLOT_DEPTH];
++    ep.pMVecs = g.tex12[SLOT_MV];
++    ep.pOutputInterpFrame = g.dlfg_output;
++    NVSDK_NGX_DLSSG_Opt_Eval_Params op = {};
++    M2bBuildConstants(&op, reset);
++    DWORD code = 0;
++    const NVSDK_NGX_Result r = SafeEvaluateDLFG(&ep, &op, &code);
++    if (code != 0)
++    {
++        Log("[feed] %s: DLSS-G evaluate raised exception 0x%08X; command list will not execute", tag, code);
++        M2bFail("DLSS-G evaluate raised an exception");
++        return false;
++    }
++    if (g.dlfg_owner != 0)
++        Log("[feed] M2C: reset=%d -> NGX_D3D12_EVALUATE_DLSSG(frame %llu) 0x%08X (%s)",
++            reset ? 1 : 0, static_cast<unsigned long long>(frame), r, NgxResultName(r));
++    else
++        Log("[feed] %s: NGX_D3D12_EVALUATE_DLSSG(frame %llu, reset=%d) -> 0x%08X (%s)",
++            tag, static_cast<unsigned long long>(frame), reset ? 1 : 0, r, NgxResultName(r));
++    if (NVSDK_NGX_FAILED(r)) { M2bFail("NGX_D3D12_EVALUATE_DLSSG failed"); return true; }
++    return true;
++}
++
++// Returns false only after an SEH fault recorded half-written NGX commands. The caller
++// aborts that list (the same containment rule used by the existing DLAA path).
++static bool M2bMaybeRecord(UINT64 frame, bool dlss_reset)
++{
++    if (g_cfg.dlfg_m2b_eval == 0 || g.dlfg_state == kM2bPassed || g.dlfg_state == kM2bFailed ||
++        g.dlfg_state == kM2bReadbackPending) return true;
++    if (g.width != 2560 || g.height != 1440 || g.color_fmt != DXGI_FORMAT_B8G8R8A8_UNORM ||
++        g.output_fmt != DXGI_FORMAT_B8G8R8A8_UNORM || g.tex12[SLOT_OUTPUT] == nullptr ||
++        g.tex12[SLOT_DEPTH] == nullptr || g.tex12[SLOT_MV] == nullptr || g.feature == nullptr ||
++        !g.ngx_inited)
++    {
++        M2bFail("required existing D3D12 NGX/session resources are not the validated 2560x1440 B8/R32/R16G16 set");
++        return true;
++    }
++    if (!g_m2b_depth_valid)
++    {
++        if (g.dlfg_last_skip_frame == 0 || frame - g.dlfg_last_skip_frame >= 300)
++        {
++            g.dlfg_last_skip_frame = frame;
++            Log("[feed] M2B: skipping DLSS-G: depth invalid/flat (wait for the existing 600-frame real-depth probe)");
++        }
++        return true;
++    }
++    if (g.dlfg_feature == nullptr)
++    {
++        if (!M2bCheckCapabilities()) { M2bFail("FrameGeneration is unavailable, needs a driver, or does not support one generated frame"); return true; }
++        if (!M2bCreateResources()) { M2bFail("could not allocate private DLSS-G output/readback resources"); return true; }
++        const NVSDK_NGX_Result ap = NVSDK_NGX_D3D12_AllocateParameters(&g.dlfg_params);
++        if (NVSDK_NGX_FAILED(ap) || g.dlfg_params == nullptr)
++        {
++            M2bFail("NVSDK_NGX_D3D12_AllocateParameters for DLSS-G failed");
++            return true;
++        }
++        NVSDK_NGX_DLSSG_Create_Params cp = {};
++        cp.Width = cp.RenderWidth = g.width;
++        cp.Height = cp.RenderHeight = g.height;
++        cp.NativeBackbufferFormat = static_cast<unsigned>(DXGI_FORMAT_B8G8R8A8_UNORM);
++        cp.DynamicResolutionScaling = false;
++        DWORD ccode = 0;
++        const NVSDK_NGX_Result cr = SafeCreateDLFG(&cp, &ccode);
++        if (ccode != 0)
++        {
++            Log("[feed] M2B: NGX_D3D12_CREATE_DLSSG raised exception 0x%08X; command list will not execute", ccode);
++            g.dlfg_feature = nullptr; // NGX may have written a partial handle before the exception
++            M2bFail("NGX_D3D12_CREATE_DLSSG raised an exception");
++            return false;
++        }
++        Log("[feed] M2B: NGX_D3D12_CREATE_DLSSG -> 0x%08X (%s), feature=%p (existing D3D12 NGX session)",
++            cr, NgxResultName(cr), (void *)g.dlfg_feature);
++        if (NVSDK_NGX_FAILED(cr) || g.dlfg_feature == nullptr) { M2bFail("NGX_D3D12_CREATE_DLSSG failed"); return true; }
++        Log("[feed] M2B: armed; camera mode=approximate (no GTA camera export), FOV=60deg near=0.1 far=1000; "
++            "MV source = pixel-space current-to-previous (DLSS5_Feed.fx: prev_uv = uv + mv); "
++            "DLSS-G mvecScale = 1/width, 1/height = %.9f,%.9f",
++            1.0f / static_cast<float>(g.width), 1.0f / static_cast<float>(g.height));
++    }
++
++    // Post-DLAA output started as UAV. Copy the surrounding real frame first, then make
++    // it a read-only DLSS-G input. Depth/MV are already NON_PIXEL_SHADER_RESOURCE.
++    if (g.dlfg_state == kM2bIdle || dlss_reset)
++    {
++        if (g.dlfg_state == kM2bHistory && dlss_reset)
++            Log("[feed] M2B: Feeder reset interrupted temporal history; re-arming history on frame %llu",
++                static_cast<unsigned long long>(frame));
++        M2bCopyTextureToReadback(g.tex12[SLOT_OUTPUT], g.dlfg_prev_readback, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
++        Barrier(g.tex12[SLOT_OUTPUT], D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
++        Barrier(g.dlfg_output, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
++        if (!M2bRecordEval(frame, true, "M2B")) return false;
++        Barrier(g.dlfg_output, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON);
++        Barrier(g.tex12[SLOT_OUTPUT], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
++        if (g.dlfg_state != kM2bFailed) { g.dlfg_state = kM2bHistory; g.dlfg_history_frame = frame; Log("[feed] M2B: first real frame accepted as temporal history"); }
++        return true;
++    }
++
++    // The next valid real frame is the sole interpolation request. It is not submitted
++    // separately: the existing D3D12 queue/fence sequence executes and retires it.
++    M2bCopyTextureToReadback(g.tex12[SLOT_OUTPUT], g.dlfg_curr_readback, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
++    Barrier(g.tex12[SLOT_OUTPUT], D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
++    Barrier(g.dlfg_output, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
++    if (!M2bRecordEval(frame, false, "M2B")) return false;
++    if (g.dlfg_state != kM2bFailed)
++    {
++        M2bCopyTextureToReadback(g.dlfg_output, g.dlfg_output_readback, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
++        Log("[feed] M2B: output copied to CPU readback; awaiting existing D3D12 fence");
++        g.dlfg_readback_fence = g.fence_value + 1; // exactly the fence signalled by EndCommands for this list
++        g.dlfg_state = kM2bReadbackPending;
++    }
++    Barrier(g.dlfg_output, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON);
++    Barrier(g.tex12[SLOT_OUTPUT], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
++    return true;
++}
++
++static bool M3b1RecordEval(UINT64 frame, bool reset)
++{
++    NVSDK_NGX_D3D12_DLSSG_Eval_Params ep = {};
++    ep.pBackbuffer = g.tex12[SLOT_OUTPUT];
++    ep.pDepth = g.tex12[SLOT_DEPTH];
++    ep.pMVecs = g.tex12[SLOT_MV];
++    // This is the exact one-shot D3D12 resource already proven by M3B-1A to be
++    // shareable with the live Vulkan device. NVIDIA feature 11 writes it directly.
++    ep.pOutputInterpFrame = g.m3b1a_tex12;
++    NVSDK_NGX_DLSSG_Opt_Eval_Params op = {};
++    M2bBuildConstants(&op, reset);
++    DWORD code = 0;
++    const NVSDK_NGX_Result r = SafeEvaluateDLFG(&ep, &op, &code);
++    if (code != 0)
++    {
++        Log("[feed] M3B-1: evaluate reset=%d raised exception 0x%08X; command list will not execute",
++            reset ? 1 : 0, code);
++        M2bFail("DLSS-G evaluate raised an exception");
++        return false;
++    }
++    Log("[feed] M3B-1: evaluate reset=%d -> 0x%08X (%s), frame=%llu",
++        reset ? 1 : 0, r, NgxResultName(r), static_cast<unsigned long long>(frame));
++    if (NVSDK_NGX_FAILED(r)) M2bFail("NGX_D3D12_EVALUATE_DLSSG failed");
++    return true;
++}
++
++// Records a genuine one-shot feature-11 A/B sequence after the normal DLAA/NR
++// evaluation. The normal Feeder command list, D3D12 queue and NGX session are reused.
++static bool M3b1MaybeRecord(UINT64 frame, bool dlss_reset)
++{
++    if (g_cfg.dlfg_m3b1_present == 0 || g.dlfg_state == kM2bPassed ||
++        g.dlfg_state == kM2bFailed || g.dlfg_state == kM2bReadbackPending)
++        return true;
++    g.dlfg_owner = 2;
++    if (g_chicken_present)
++    {
++        M2bFail("DFC is present; genuine feature 11 is intentionally withheld");
++        return true;
++    }
++    if (frame <= 1 || g.width != 2560 || g.height != 1440 ||
++        g.color_fmt != DXGI_FORMAT_B8G8R8A8_UNORM ||
++        g.output_fmt != DXGI_FORMAT_B8G8R8A8_UNORM || g.tex12[SLOT_OUTPUT] == nullptr ||
++        g.tex12[SLOT_DEPTH] == nullptr || g.tex12[SLOT_MV] == nullptr ||
++        g.m3b1a_tex12 == nullptr || !g.m3b1a_vk_released || g.feature == nullptr || !g.ngx_inited)
++    {
++        M2bFail("required existing NGX/session and 2560x1440 shared B8/R32/R16G16 resources are unavailable");
++        return true;
++    }
++    if (!g_m2b_depth_valid)
++    {
++        if (g.dlfg_last_skip_frame == 0 || frame - g.dlfg_last_skip_frame >= 300)
++        {
++            g.dlfg_last_skip_frame = frame;
++            Log("[feed] M3B-1: waiting for valid non-flat depth from the existing 600-frame probe");
++        }
++        return true;
++    }
++
++    if (g.dlfg_feature == nullptr)
++    {
++        if (!M3b1CheckCapabilities())
++        {
++            M2bFail("FrameGeneration is unavailable, needs a driver, or lacks one generated frame");
++            return true;
++        }
++        if (!M3b1CreateReadbacks())
++        {
++            M2bFail("could not allocate generated-frame validation readbacks");
++            return true;
++        }
++        const NVSDK_NGX_Result ap = NVSDK_NGX_D3D12_AllocateParameters(&g.dlfg_params);
++        if (NVSDK_NGX_FAILED(ap) || g.dlfg_params == nullptr)
++        {
++            M2bFail("NVSDK_NGX_D3D12_AllocateParameters for DLSS-G failed");
++            return true;
++        }
++        NVSDK_NGX_DLSSG_Create_Params cp = {};
++        cp.Width = cp.RenderWidth = g.width;
++        cp.Height = cp.RenderHeight = g.height;
++        cp.NativeBackbufferFormat = static_cast<unsigned>(DXGI_FORMAT_B8G8R8A8_UNORM);
++        cp.DynamicResolutionScaling = false;
++        DWORD code = 0;
++        const NVSDK_NGX_Result cr = SafeCreateDLFG(&cp, &code);
++        if (code != 0)
++        {
++            Log("[feed] M3B-1: NGX_D3D12_CREATE_DLSSG raised exception 0x%08X", code);
++            g.dlfg_feature = nullptr;
++            M2bFail("NGX_D3D12_CREATE_DLSSG raised an exception");
++            return false;
++        }
++        Log("[feed] M3B-1: NGX_D3D12_CREATE_DLSSG -> 0x%08X (%s), feature=%p (existing D3D12 NGX session)",
++            cr, NgxResultName(cr), static_cast<void *>(g.dlfg_feature));
++        if (NVSDK_NGX_FAILED(cr) || g.dlfg_feature == nullptr)
++        {
++            M2bFail("NGX_D3D12_CREATE_DLSSG failed");
++            return true;
++        }
++        Log("[feed] M3B-1: armed after frame %llu; MV source=pixel-space current-to-previous, "
++            "mean sampled magnitude=%.6f px; DLSS-G mvecScale=1/width,1/height=%.9f,%.9f",
++            static_cast<unsigned long long>(frame), g_mv_probe_mean_px,
++            1.0f / static_cast<float>(g.width), 1.0f / static_cast<float>(g.height));
++    }
++
++    if (g.dlfg_state == kM2bIdle || dlss_reset)
++    {
++        if (g.dlfg_state == kM2bHistory && dlss_reset)
++            Log("[feed] M3B-1: Feeder reset interrupted history; re-arming on frame %llu",
++                static_cast<unsigned long long>(frame));
++        M2bCopyTextureToReadback(g.tex12[SLOT_OUTPUT], g.dlfg_prev_readback,
++                                 D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
++        Barrier(g.tex12[SLOT_OUTPUT], D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
++                D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
++        Barrier(g.m3b1a_tex12, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
++        if (!M3b1RecordEval(frame, true)) return false;
++        Barrier(g.m3b1a_tex12, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON);
++        Barrier(g.tex12[SLOT_OUTPUT], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
++                D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
++        if (g.dlfg_state != kM2bFailed)
++        {
++            g.dlfg_state = kM2bHistory;
++            g.dlfg_history_frame = frame;
++            Log("[feed] M3B-1: real frame A accepted as temporal history, sourceFrame=%llu",
++                static_cast<unsigned long long>(frame));
++        }
++        return true;
++    }
++
++    if (frame != g.dlfg_history_frame + 1)
++    {
++        M2bFail("real frames A and B were not sequential");
++        return true;
++    }
++    M2bCopyTextureToReadback(g.tex12[SLOT_OUTPUT], g.dlfg_curr_readback,
++                             D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
++    Barrier(g.tex12[SLOT_OUTPUT], D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
++            D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
++    Barrier(g.m3b1a_tex12, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
++    if (!M3b1RecordEval(frame, false)) return false;
++    if (g.dlfg_state != kM2bFailed)
++    {
++        M2bCopyTextureToReadback(g.m3b1a_tex12, g.dlfg_output_readback,
++                                 D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
++        g.dlfg_readback_fence = g.fence_value + 1;
++        g.m3b1_ready_value = frame;
++        g.m3b1a_source_frame = frame;
++        g.m3b1a_copy_queued = true; // immutable from this point through teardown
++        g.dlfg_state = kM2bReadbackPending;
++        Log("[feed] M3B-1: generated output queued for validation; frame A=%llu frame B=%llu readyValue=%llu",
++            static_cast<unsigned long long>(g.dlfg_history_frame),
++            static_cast<unsigned long long>(frame), static_cast<unsigned long long>(frame));
++    }
++    Barrier(g.m3b1a_tex12, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON);
++    Barrier(g.tex12[SLOT_OUTPUT], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
++            D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
++    return true;
++}
++
++static void M2cFail(const char *why)
++{
++    // The M2C decision may fail before its own handle exists. Claim its log/result
++    // ownership first so an early DFC-ARMED finding can never be misreported as M2B.
++    g.dlfg_owner = 1;
++    M2bFail(why);
++}
++
++static void M2cLogBuildState(const char *checkpoint)
++{
++    if (g_cfg.dlfg_m2c_prearm_create == 0 || !g.vk.ok || !g_chicken_present) return;
++    if (!g.m2c_dfc_detected)
++    {
++        g.m2c_dfc_detected = true;
++        Log("[feed] M2C: DFC detected");
++        Log("[feed] M2C: DFC present");
++    }
++    ChickenPoll();
++    // These are bounded feature-build checkpoints, not the former per-frame poll log.
++    Log("[feed] M2C: %s = %ld (%s)", checkpoint, g_chicken_state, DfcStateName(g_chicken_state));
++}
++
++// M2C-A deliberately creates feature 11 in the existing feature-build list, before
++// feature-1/DLAA Create can give DFC the opportunity to reach ARMED. It never publishes
++// DFC.Feeder.* (those are feature-1-only markers), replaces no entry point, and does not
++// evaluate until a later normal DLAA/DFC evaluation has succeeded in ARMED.
++static bool M2cMaybePrearmCreate()
++{
++    if (g_cfg.dlfg_m2c_prearm_create == 0 || !g.vk.ok || !g_chicken_present ||
++        g.m2c_evaluation_attempted || g.m2c_state == kM2cPrearmed ||
++        g.m2c_state == kM2cWaitingArmed || g.m2c_state == kM2cPassed || g.m2c_state == kM2cFailed)
++        return true;
++
++    M2cLogBuildState("state before DLSS-G create");
++    if (!g_chicken_loaded || !g_chicken_abi || g_chicken_state != DFC_STATE_CLAIMING)
++    {
++        if (g_chicken_state == DFC_STATE_ARMED)
++            M2cFail("DFC was already ARMED at BuildFeature entry/before feature-1 Create; no safe pre-arm window exists without a DFC-side change");
++        return true; // wait for the ABI and its explicit CLAIMING window; never guess.
++    }
++    if (g.width != 2560 || g.height != 1440 || g.color_fmt != DXGI_FORMAT_B8G8R8A8_UNORM ||
++        g.output_fmt != DXGI_FORMAT_B8G8R8A8_UNORM || g.tex12[SLOT_OUTPUT] == nullptr ||
++        g.tex12[SLOT_DEPTH] == nullptr || g.tex12[SLOT_MV] == nullptr || !g.ngx_inited)
++    {
++        M2cFail("pre-arm creation lacks the validated existing D3D12 NGX/session resources");
++        return true;
++    }
++
++    g.dlfg_owner = 1;
++    g.m2c_prearm_dfc_state = g_chicken_state;
++    Log("[feed] M2C: DFC state before DLSS-G create = %s", DfcStateName(g_chicken_state));
++    Log("[feed] M2C: attempting pre-arm DLSS-G creation");
++    if (!M2bCheckCapabilities()) { M2cFail("pre-arm FrameGeneration capability check failed"); return true; }
++    if (!M2bCreateResources()) { M2cFail("could not allocate private pre-arm output/readback resources"); return true; }
++    const NVSDK_NGX_Result ap = NVSDK_NGX_D3D12_AllocateParameters(&g.dlfg_params);
++    if (NVSDK_NGX_FAILED(ap) || g.dlfg_params == nullptr)
++    {
++        M2cFail("NVSDK_NGX_D3D12_AllocateParameters for pre-arm DLSS-G failed");
++        return true;
++    }
++    NVSDK_NGX_DLSSG_Create_Params cp = {};
++    cp.Width = cp.RenderWidth = g.width;
++    cp.Height = cp.RenderHeight = g.height;
++    cp.NativeBackbufferFormat = static_cast<unsigned>(DXGI_FORMAT_B8G8R8A8_UNORM);
++    cp.DynamicResolutionScaling = false;
++    DWORD ccode = 0;
++    const NVSDK_NGX_Result cr = SafeCreateDLFG(&cp, &ccode);
++    if (ccode != 0)
++    {
++        Log("[feed] M2C: pre-arm NGX_D3D12_CREATE_DLSSG -> exception 0x%08X", ccode);
++        g.dlfg_feature = nullptr;
++        M2cFail("pre-arm NGX_D3D12_CREATE_DLSSG raised an exception");
++        return false; // caller must discard this command list.
++    }
++    Log("[feed] M2C: pre-arm NGX_D3D12_CREATE_DLSSG -> 0x%08X (%s), feature=%p",
++        cr, NgxResultName(cr), (void *)g.dlfg_feature);
++    if (NVSDK_NGX_FAILED(cr) || g.dlfg_feature == nullptr)
++    {
++        M2cFail("pre-arm NGX_D3D12_CREATE_DLSSG failed");
++        return true;
++    }
++    g.m2c_state = kM2cPrearmed;
++    Log("[feed] M2C: pre-arm create retained; no evaluation occurs until DFC is ARMED. "
++        "MV source = pixel-space current-to-previous; DLSS-G mvecScale = 1/width, 1/height = %.9f,%.9f",
++        1.0f / static_cast<float>(g.width), 1.0f / static_cast<float>(g.height));
++    return true;
++}
++
++// Called only after the normal SafeEvaluateDLSS call returned for this frame. That gives
++// the probe a real post-DLAA/DFC SLOT_OUTPUT and proves the ordinary DFC path stayed live.
++static bool M2cMaybeRecord(UINT64 frame, bool dlss_reset)
++{
++    if (g_cfg.dlfg_m2c_prearm_create == 0 || !g_chicken_present || g.dlfg_owner == 0 ||
++        g.m2c_state == kM2cFailed || g.m2c_state == kM2cPassed || g.dlfg_state == kM2bReadbackPending)
++        return true;
++
++    ChickenPoll();
++    if (g_chicken_state != DFC_STATE_ARMED) return true;
++    if (!g.m2c_armed_seen)
++    {
++        g.m2c_armed_seen = true;
++        Log("[feed] M2C: DFC transitioned to ARMED");
++        Log("[feed] M2C: DFC ARMED and normal feature-1 evaluation succeeded");
++    }
++    if (g.dlfg_feature == nullptr) { M2bFail("pre-arm feature was invalid after DFC armed"); return true; }
++    if (!g_m2b_depth_valid)
++    {
++        if (g.dlfg_last_skip_frame == 0 || frame - g.dlfg_last_skip_frame >= 300)
++        {
++            g.dlfg_last_skip_frame = frame;
++            Log("[feed] M2C: waiting for valid real depth before coexistence evaluation");
++        }
++        return true;
++    }
++
++    if (g.dlfg_state == kM2bIdle || dlss_reset)
++    {
++        g.m2c_state = kM2cEvaluating;
++        Log("[feed] M2C: running FG evaluation with DFC active");
++        M2bCopyTextureToReadback(g.tex12[SLOT_OUTPUT], g.dlfg_prev_readback, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
++        Barrier(g.tex12[SLOT_OUTPUT], D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
++        Barrier(g.dlfg_output, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
++        if (!M2bRecordEval(frame, true, "M2C")) return false;
++        Barrier(g.dlfg_output, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON);
++        Barrier(g.tex12[SLOT_OUTPUT], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
++        if (g.dlfg_state != kM2bFailed)
++        {
++            g.dlfg_state = kM2bHistory;
++            g.dlfg_history_frame = frame;
++            g.m2c_state = kM2cWaitingArmed;
++        }
++        return true;
++    }
++
++    g.m2c_evaluation_attempted = true;
++    M2bCopyTextureToReadback(g.tex12[SLOT_OUTPUT], g.dlfg_curr_readback, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
++    Barrier(g.tex12[SLOT_OUTPUT], D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
++    Barrier(g.dlfg_output, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
++    if (!M2bRecordEval(frame, false, "M2C")) return false;
++    if (g.dlfg_state != kM2bFailed)
++    {
++        M2bCopyTextureToReadback(g.dlfg_output, g.dlfg_output_readback, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
++        g.dlfg_readback_fence = g.fence_value + 1;
++        g.dlfg_state = kM2bReadbackPending;
++        Log("[feed] M2C: readback -> queued on existing D3D12 fence");
++    }
++    Barrier(g.dlfg_output, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON);
++    Barrier(g.tex12[SLOT_OUTPUT], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
++    return true;
++}
++
++static uint64_t M2bHash(const uint8_t *p, UINT row_pitch)
++{
++    uint64_t h = 1469598103934665603ull;
++    for (UINT y = 0; y < g.height; ++y)
++        for (UINT x = 0; x < g.width * 4u; ++x) { h ^= p[y * row_pitch + x]; h *= 1099511628211ull; }
++    return h;
++}
++
++struct M2bStats { uint64_t hash, nonzero; double b, g, r; uint8_t minv[3], maxv[3]; };
++
++static M2bStats M2bStatsFor(const uint8_t *p, UINT row_pitch)
++{
++    M2bStats s = {}; s.minv[0] = s.minv[1] = s.minv[2] = 255;
++    const uint64_t pixels = static_cast<uint64_t>(g.width) * g.height;
++    for (UINT y = 0; y < g.height; ++y)
++        for (UINT x = 0; x < g.width; ++x)
++        {
++            const uint8_t *q = p + y * row_pitch + x * 4;
++            if (q[0] || q[1] || q[2]) ++s.nonzero;
++            for (UINT c = 0; c < 3; ++c) { s.minv[c] = (std::min)(s.minv[c], q[c]); s.maxv[c] = (std::max)(s.maxv[c], q[c]); }
++            s.b += q[0]; s.g += q[1]; s.r += q[2];
++        }
++    s.hash = M2bHash(p, row_pitch);
++    s.b /= pixels; s.g /= pixels; s.r /= pixels;
++    return s;
++}
++
++static bool M2bWriteBmp(const uint8_t *p, UINT row_pitch, char path[MAX_PATH])
++{
++    GetModuleFileNameA(g_self, path, MAX_PATH);
++    char *slash = strrchr(path, '\\');
++    if (slash == nullptr) return false;
++    strcpy_s(slash + 1, MAX_PATH - (slash + 1 - path), "dlfg-m2b-generated.bmp");
++    FILE *f = nullptr;
++    if (fopen_s(&f, path, "wb") != 0 || f == nullptr) return false;
++    const uint32_t pixels_bytes = g.width * g.height * 4u, file_bytes = 54u + pixels_bytes;
++    uint8_t head[54] = {};
++    head[0] = 'B'; head[1] = 'M';
++    const auto put32 = [&head](int at, uint32_t v) { head[at] = static_cast<uint8_t>(v); head[at + 1] = static_cast<uint8_t>(v >> 8); head[at + 2] = static_cast<uint8_t>(v >> 16); head[at + 3] = static_cast<uint8_t>(v >> 24); };
++    put32(2, file_bytes); put32(10, 54); put32(14, 40); put32(18, g.width); put32(22, g.height);
++    head[26] = 1; head[28] = 32; put32(34, pixels_bytes);
++    bool ok = fwrite(head, 1, sizeof(head), f) == sizeof(head);
++    for (UINT y = g.height; ok && y-- > 0; ) ok = fwrite(p + y * row_pitch, 1, g.width * 4u, f) == g.width * 4u;
++    fclose(f);
++    return ok;
++}
++
++static void M2bPollReadback()
++{
++    if (g.dlfg_state != kM2bReadbackPending || g.fence12 == nullptr ||
++        g.fence12->GetCompletedValue() < g.dlfg_readback_fence) return;
++    void *prev = nullptr, *curr = nullptr, *out = nullptr;
++    const D3D12_RANGE read = { 0, g.dlfg_readback_bytes };
++    if (FAILED(g.dlfg_prev_readback->Map(0, &read, &prev)) || prev == nullptr ||
++        FAILED(g.dlfg_curr_readback->Map(0, &read, &curr)) || curr == nullptr ||
++        FAILED(g.dlfg_output_readback->Map(0, &read, &out)) || out == nullptr)
++    {
++        if (prev) g.dlfg_prev_readback->Unmap(0, nullptr);
++        if (curr) g.dlfg_curr_readback->Unmap(0, nullptr);
++        if (out)  g.dlfg_output_readback->Unmap(0, nullptr);
++        M2bFail("could not map completed CPU readback");
++        return;
++    }
++    const UINT pitch = g.dlfg_footprint.Footprint.RowPitch;
++    const uint8_t *a = static_cast<const uint8_t *>(prev), *b = static_cast<const uint8_t *>(curr), *o = static_cast<const uint8_t *>(out);
++    const M2bStats sa = M2bStatsFor(a, pitch), sb = M2bStatsFor(b, pitch), so = M2bStatsFor(o, pitch);
++    uint64_t diff_a = 0, diff_b = 0, diff_ab = 0;
++    for (UINT y = 0; y < g.height; ++y)
++        for (UINT x = 0; x < g.width; ++x)
++        {
++            const uint8_t *pa = a + y * pitch + x * 4, *pb = b + y * pitch + x * 4, *po = o + y * pitch + x * 4;
++            if (memcmp(po, pa, 3) != 0) ++diff_a;
++            if (memcmp(po, pb, 3) != 0) ++diff_b;
++            if (memcmp(pa, pb, 3) != 0) ++diff_ab;
++        }
++    char bmp[MAX_PATH] = {};
++    const bool bmp_ok = M2bWriteBmp(o, pitch, bmp);
++    const D3D12_RANGE none = { 0, 0 };
++    g.dlfg_prev_readback->Unmap(0, &none); g.dlfg_curr_readback->Unmap(0, &none); g.dlfg_output_readback->Unmap(0, &none);
++    const double pixels = static_cast<double>(g.width) * g.height;
++    const char *tag = DlfgOwnerTag();
++    Log("[feed] %s: readback completed; output checksum %016llx nonzero %llu/%llu avg RGB %.2f/%.2f/%.2f min RGB %u/%u/%u max RGB %u/%u/%u",
++        tag,
++        static_cast<unsigned long long>(so.hash), static_cast<unsigned long long>(so.nonzero),
++        static_cast<unsigned long long>(static_cast<uint64_t>(pixels)), so.r, so.g, so.b,
++        so.minv[2], so.minv[1], so.minv[0], so.maxv[2], so.maxv[1], so.maxv[0]);
++    Log("[feed] %s: Frame A checksum %016llx; Frame B checksum %016llx; generated differs from A: %llu (%.3f%%), B: %llu (%.3f%%)",
++        tag,
++        static_cast<unsigned long long>(sa.hash), static_cast<unsigned long long>(sb.hash),
++        static_cast<unsigned long long>(diff_a), 100.0 * diff_a / pixels,
++        static_cast<unsigned long long>(diff_b), 100.0 * diff_b / pixels);
++    if (!bmp_ok) { M2bFail("could not write dlfg-m2b-generated.bmp beside the experimental Feeder"); return; }
++    const uint64_t material = (static_cast<uint64_t>(g.width) * g.height) / 10000u; // 0.01%
++    const bool insufficient = g.dlfg_owner == 2
++        ? so.nonzero == 0 || diff_a < material || diff_b < material
++        : so.nonzero == 0 || diff_a == 0 || diff_b == 0;
++    if (insufficient)
++    {
++        M2bFail("readback was empty or not materially different from both surrounding real frames");
++        return;
++    }
++    if (g.dlfg_owner == 2 && g_mv_probe_mean_px <= 0.0001 && diff_ab >= material)
++    {
++        M2bFail("motion vectors were zero while frames A and B contained material motion");
++        return;
++    }
++    g.dlfg_state = kM2bPassed;
++    if (g.dlfg_owner == 2)
++    {
++        Log("[feed] M3B-1: generated output validated checksum=%016llx nonzero=%llu differsA=%llu differsB=%llu "
++            "AtoB=%llu mvMeanPx=%.6f",
++            static_cast<unsigned long long>(so.hash), static_cast<unsigned long long>(so.nonzero),
++            static_cast<unsigned long long>(diff_a), static_cast<unsigned long long>(diff_b),
++            static_cast<unsigned long long>(diff_ab), g_mv_probe_mean_px);
++        const uint64_t serial = PublishM3bExternalFrame(g.m3b1a_source_frame, g.m3b1_ready_value, true);
++        Log("[feed] M3B-1: published serial=%llu readyValue=%llu source frame A=%llu B=%llu image=%p",
++            static_cast<unsigned long long>(serial), static_cast<unsigned long long>(g.m3b1_ready_value),
++            static_cast<unsigned long long>(g.dlfg_history_frame),
++            static_cast<unsigned long long>(g.m3b1a_source_frame),
++            reinterpret_cast<void *>(g.m3b1a_vk_img));
++    }
++    else if (g.dlfg_owner == 1)
++    {
++        g.m2c_state = kM2cPassed;
++        Log("[feed] M2C: readback -> success");
++        Log("[feed] M2C: generated differs from A/B -> %llu/%llu pixels",
++            static_cast<unsigned long long>(diff_a), static_cast<unsigned long long>(diff_b));
++        Log("[feed] MILESTONE 2C PASSED: pre-arm DLSS-G feature remained valid after DFC ARMED; "
++            "both off-screen evaluations and readback succeeded while the normal DFC path continued; BMP: %s", bmp);
++    }
++    else
++        Log("[feed] MILESTONE 2B PASSED: one off-screen DLSS-G frame generated after real frame %llu and verified on a later continuing Feeder frame; BMP: %s",
++            static_cast<unsigned long long>(g.dlfg_history_frame), bmp);
++}
++
+ // ---------------------------------------------------------------------------
+ // Resources
+ // ---------------------------------------------------------------------------
+@@ -3066,15 +4116,26 @@ static void ReleaseFrameResources()
+     // stops a later Vulkan, OpenGL or same-device build from inheriting a stale true.
+     g.pq_bridge = false;
+ 
++    // Stop new M3B-1A consumers before waiting for any already-submitted Vulkan
++    // use. The imported image stays alive until that queue is idle below.
++    AcquireSRWLockExclusive(&g_m3b1a_lock);
++    g_m3b1a_publication = {};
++    g.m3b1_genuine_serial = 0;
++    ReleaseSRWLockExclusive(&g_m3b1a_lock);
++
+     // The private fence retires D3D12 only. Vulkan may still have copy-home
+     // commands referencing these imports (including on the immediate list).
+     if (g.vk.ok && g.rs_queue && (g.vk_img[SLOT_COLOR] || g_vk_probe.dev)) g.rs_queue->wait_idle();
+     DrainGpu();
++    GuideProbeAbort();
++    M2bRelease();
+     FeedVkProbeRelease();
+     // Vulkan transport: drop our raw VkImage imports (the memory is the D3D12 resource's;
+     // freeing the import does not free the D3D12 resource, which SafeRelease(tex12) does).
+     if (g.vk.ok)
+     {
++        if (g.m3b1a_vk_img != VK_NULL_HANDLE) { g.vk.DestroyImage(g.vk.dev, g.m3b1a_vk_img, nullptr); g.m3b1a_vk_img = VK_NULL_HANDLE; }
++        if (g.m3b1a_vk_mem != VK_NULL_HANDLE) { g.vk.FreeMemory(g.vk.dev, g.m3b1a_vk_mem, nullptr); g.m3b1a_vk_mem = VK_NULL_HANDLE; }
+         for (int i = 0; i < SLOT_COUNT; ++i)
+         {
+             if (g.vk_img[i] != VK_NULL_HANDLE) { g.vk.DestroyImage(g.vk.dev, g.vk_img[i], nullptr); g.vk_img[i] = VK_NULL_HANDLE; }
+@@ -3112,6 +4173,13 @@ static void ReleaseFrameResources()
+     }
+     for (int i = 0; i < SLOT_COUNT; ++i)
+         if (g.tex_shared_ext[i] != nullptr) { CloseHandle(g.tex_shared_ext[i]); g.tex_shared_ext[i] = nullptr; }
++    if (g.m3b1a_shared != nullptr) { CloseHandle(g.m3b1a_shared); g.m3b1a_shared = nullptr; }
++    SafeRelease(g.m3b1a_tex12);
++    g.m3b1a_vk_released = false;
++    g.m3b1a_copy_queued = false;
++    g.m3b1a_published = false;
++    g.m3b1a_source_frame = 0;
++    g.m3b1_ready_value = 0;
+     if (g.home_buf_handle != nullptr) { CloseHandle(g.home_buf_handle); g.home_buf_handle = nullptr; }
+     SafeRelease(g.home_buf12);
+     g.home_pitch = 0;
+@@ -3820,8 +4888,20 @@ static bool CreateDlssFeature(UINT w, UINT h, bool inverted, bool *crashed)
+ 
+     if (!BeginCommands()) { Log("[feed] could not start a command list"); return false; }
+     Breadcrumb("creating the DLSS feature");
++    // The earliest safe M2C point: all shared textures and the existing D3D12/NGX
++    // session are ready, but the ordinary feature-1 Create has not run on this list.
++    M2cLogBuildState("state at BuildFeature entry");
++    if (!M2cMaybePrearmCreate())
++    {
++        AbortCommands(); // an SEH-faulting feature-11 Create leaves this list unsafe
++        Log("[feed] M2C: pre-arm create fault contained; feature-1 Create was not submitted");
++        if (crashed != nullptr) *crashed = true;
++        return false;
++    }
++    M2cLogBuildState("state before feature-1 create");
+     DWORD ccode = 0;
+     NVSDK_NGX_Result rf = SafeCreateDLSS(&cp, &ccode);
++    M2cLogBuildState("state after feature-1 create");
+     if (ccode != 0)
+     {
+         AbortCommands();  // half-recorded NGX work must never reach the GPU
+@@ -5148,6 +6228,43 @@ static bool MakeSharedTexVk(int slot, UINT w, UINT h, DXGI_FORMAT fmt, bool uav,
+     return true;
+ }
+ 
++static bool MakeM3b1aSharedTexVk(UINT w, UINT h, bool dlssg_output)
++{
++    D3D12_HEAP_PROPERTIES hp = {};
++    hp.Type = D3D12_HEAP_TYPE_DEFAULT;
++    D3D12_RESOURCE_DESC rd = {};
++    rd.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
++    rd.Width = w;
++    rd.Height = h;
++    rd.DepthOrArraySize = 1;
++    rd.MipLevels = 1;
++    rd.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
++    rd.SampleDesc.Count = 1;
++    rd.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
++    rd.Flags = D3D12_RESOURCE_FLAG_ALLOW_SIMULTANEOUS_ACCESS |
++               (dlssg_output ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : D3D12_RESOURCE_FLAG_NONE);
++    HRESULT hr = g.dev12->CreateCommittedResource(&hp, D3D12_HEAP_FLAG_SHARED, &rd,
++        D3D12_RESOURCE_STATE_COMMON, nullptr, __uuidof(ID3D12Resource),
++        reinterpret_cast<void **>(&g.m3b1a_tex12));
++    if (SUCCEEDED(hr))
++        hr = g.dev12->CreateSharedHandle(g.m3b1a_tex12, nullptr, GENERIC_ALL, nullptr, &g.m3b1a_shared);
++    if (FAILED(hr))
++    {
++        Log("[feed] M3B-1A: dedicated shared D3D12 image creation failed 0x%08X", hr);
++        return false;
++    }
++    const D3D12_RESOURCE_ALLOCATION_INFO ai = g.dev12->GetResourceAllocationInfo(0, 1, &rd);
++    if (!FeedVkImportImage(&g.vk, g.m3b1a_shared, w, h, VK_FORMAT_B8G8R8A8_UNORM, dlssg_output,
++                           &g.m3b1a_vk_img, &g.m3b1a_vk_mem, ai.SizeInBytes))
++    {
++        Log("[feed] M3B-1A: dedicated D3D12 image Vulkan import failed");
++        return false;
++    }
++    Log("[feed] %s: dedicated %ux%u B8G8R8A8_UNORM shared D3D12 image imported as VkImage=%p",
++        dlssg_output ? "M3B-1" : "M3B-1A", w, h, reinterpret_cast<void *>(g.m3b1a_vk_img));
++    return true;
++}
++
+ static bool BuildResourcesVk(UINT w, UINT h, DXGI_FORMAT bb_fmt)
+ {
+     if (g.session_ready && g_cfg.mode >= 2 && g.feature != nullptr && g.tex12[SLOT_COLOR] != nullptr &&
+@@ -5190,6 +6307,20 @@ static bool BuildResourcesVk(UINT w, UINT h, DXGI_FORMAT bb_fmt)
+         return false;
+     }
+ 
++    if (g_cfg.dlfg_m3b1a_publish != 0 || g_cfg.dlfg_m3b1_present != 0)
++    {
++        if (w != 2560 || h != 1440 || g.output_fmt != DXGI_FORMAT_B8G8R8A8_UNORM)
++        {
++            Log("[feed] M3B-1A: disabled for this build: requires 2560x1440 B8G8R8A8_UNORM output, got %ux%u %s",
++                w, h, FormatName(g.output_fmt));
++        }
++        else if (!MakeM3b1aSharedTexVk(w, h, g_cfg.dlfg_m3b1_present != 0))
++        {
++            ReleaseFrameResources();
++            return false;
++        }
++    }
++
+     // buffer_home: a shared LINEAR buffer for the output hop. The imported OUTPUT
+     // VkImage stays (NGX needs the texture, and it remains the fallback), but the copy
+     // home reads this buffer instead: on at least one driver/format combination the
+@@ -6354,6 +7485,9 @@ static void FeedFrameVk(reshade::api::effect_runtime *rt, reshade::api::command_
+             FeedDisable("passthrough requires matching COLOR/OUTPUT formats; NGX was NOT called");
+             return;
+         }
++        // Completion is observed only on a later real Feeder frame, after the existing
++        // D3D12 fence retired the readback. There is no CPU wait or extra queue submit.
++        M2bPollReadback();
+         FeedVkProbeBegin(rt, bb_res);
+         VkCommandBuffer cb = FeedVkDispatch<VkCommandBuffer>(cl->get_native());
+         const uint64_t capture_cb = FeedVkValue(cb);
+@@ -6504,6 +7638,11 @@ static void FeedFrameVk(reshade::api::effect_runtime *rt, reshade::api::command_
+             const int reset = (g.need_reset || g_cfg.reset_every) ? 1 : 0;
+             g.need_reset = false;
+ 
++            // M2B-PREP tap point: the real game images above have been captured into
++            // the existing shared transport resources. This is intentionally before
++            // the existing D3D12 DLSS evaluate and is logging only.
++            LogM2bProbeVk(n, cb, bb_img, dp_img, mv_img);
++
+             // async_home=2: the copy home carries frame n-1, which does not depend on
+             // anything this frame does on the D3D12 side -- so it can ride the SAME
+             // command buffer as the input copies. One submit per frame, the shape a
+@@ -6531,6 +7670,15 @@ static void FeedFrameVk(reshade::api::effect_runtime *rt, reshade::api::command_
+             // *available* to the evaluate over there -- the in-fence below only orders
+             // the work, it does not publish the bytes. Recorded before the flush so it
+             // rides the same submit as the copies.
++            if (g.m3b1a_vk_img != VK_NULL_HANDLE && !g.m3b1a_vk_released)
++            {
++                // The dedicated publication image is never part of the recurring shared
++                // set. Initialize it once, release it to D3D12, and never acquire/reuse it
++                // in Feeder after publication.
++                FeedVkBarrier(&g.vk, cb, g.m3b1a_vk_img, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
++                FeedVkExternalTransfer(&g.vk, cb, g.m3b1a_vk_img, gfx_family, true /*release*/);
++                g.m3b1a_vk_released = true;
++            }
+             for (int i = 0; i < SLOT_COUNT; ++i)
+                 if (g.vk_img[i] != VK_NULL_HANDLE)
+                     FeedVkExternalTransfer(&g.vk, cb, g.vk_img[i], gfx_family, true /*release*/);
+@@ -6554,6 +7702,8 @@ static void FeedFrameVk(reshade::api::effect_runtime *rt, reshade::api::command_
+ 
+             // D3D12: wait for the copies, evaluate, signal back. Unchanged machinery.
+             bool done = false;
++            bool m3b1a_copy_this_frame = false;
++            bool m3b1_signal_this_frame = false;
+             if (!BeginCommands()) FeedFail("command list");
+             else
+             {
+@@ -6646,9 +7796,47 @@ static void FeedFrameVk(reshade::api::effect_runtime *rt, reshade::api::command_
+                 }
+                 else
+                 {
++                    // Every DLSS-G experiment records after DLAA/NR resolved this real frame.
++                    // M3B-1 has explicit precedence and writes feature 11 directly into the
++                    // immutable external image; all paths reuse this list/queue/NGX session.
++                    const bool m3b1_active = g_cfg.dlfg_m3b1_present != 0;
++                    const bool m2c_active = g_cfg.dlfg_m2c_prearm_create != 0 && g_chicken_present;
++                    const bool dlfg_ok = m3b1_active ? (NVSDK_NGX_SUCCEED(re)
++                                                                        ? M3b1MaybeRecord(n, reset != 0)
++                                                                        : true)
++                                                     : m2c_active ? M2cMaybeRecord(n, reset != 0)
++                                                                  : M2bMaybeRecord(n, reset != 0);
++                    m3b1_signal_this_frame = m3b1_active && g.dlfg_state == kM2bReadbackPending &&
++                                             g.m3b1_ready_value == n;
++                    if (!dlfg_ok)
++                    {
++                        AbortCommands();
++                        Log("[feed] %s: DLSS-G command recording fault contained; no probe work was submitted",
++                            m3b1_active ? "M3B-1" : m2c_active ? "M2C" : "M2B");
++                    }
++                    else
++                    {
+                     FeedVkProbeD12(true); // D: exact pInOutput, after EvaluateFeature/CopyResource
+                     StaleProbeRecord(g.tex12[SLOT_COLOR],  D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
+                                      g.tex12[SLOT_OUTPUT], D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
++                    if (g_cfg.dlfg_m3b1a_publish != 0 && !m3b1_active &&
++                        g.m3b1a_tex12 != nullptr && g.m3b1a_vk_released &&
++                        !g.m3b1a_copy_queued && !g.m3b1a_published && NVSDK_NGX_SUCCEED(re))
++                    {
++                        // One-shot producer: post-NR Output -> immutable shared image. COMMON
++                        // is D3D12's external resting state and maps to the published Vulkan
++                        // GENERAL layout. The fence12_out signal below orders this copy.
++                        Barrier(g.tex12[SLOT_OUTPUT], D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
++                        Barrier(g.m3b1a_tex12, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
++                        g.list->CopyResource(g.m3b1a_tex12, g.tex12[SLOT_OUTPUT]);
++                        Barrier(g.m3b1a_tex12, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
++                        Barrier(g.tex12[SLOT_OUTPUT], D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
++                        g.m3b1a_copy_queued = true;
++                        g.m3b1a_source_frame = n;
++                        m3b1a_copy_this_frame = true;
++                        Log("[feed] M3B-1A producer copy complete: sourceFrame=%llu (queued on existing D3D12 list)",
++                            static_cast<unsigned long long>(n));
++                    }
+                     if (g.home_buf12 != nullptr)
+                     {
+                         // buffer_home: linearise the output into the shared buffer on
+@@ -6673,21 +7861,47 @@ static void FeedFrameVk(reshade::api::effect_runtime *rt, reshade::api::command_
+                     Barrier(g.tex12[SLOT_MV],     D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON);
+                     if (g.mask_ok) Barrier(g.tex12[SLOT_MASK], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON);
+                     Barrier(g.tex12[SLOT_OUTPUT], D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON);
+-                    EndCommands();
++                    const UINT64 submitted_fence = EndCommands();
+                     if (NVSDK_NGX_FAILED(re))
+                     {
+                         Log("[feed] evaluate failed 0x%08X (%s)", re, NgxResultName(re));
+                         FeedFail("evaluate");
+                         g.frame_ready = false;
+                     }
++                    else if (submitted_fence == 0)
++                    {
++                        if (m3b1_signal_this_frame)
++                            M2bFail("D3D12 command list containing generated output was not submitted");
++                        g.frame_ready = false;
++                    }
+                     else
+                         done = true;
++                    }
+                 }
+             }
+             if (done)
+             {
+-                g.queue->Signal(g.fence12_out, n);   // after the evaluate, GPU-ordered
++                const HRESULT signal_hr = g.queue->Signal(g.fence12_out, n);   // after the evaluate/copy, GPU-ordered
+                 CK("queue Signal(fence12_out)");
++                if (m3b1_signal_this_frame)
++                {
++                    if (SUCCEEDED(signal_hr))
++                        Log("[feed] M3B-1: producer fence signaled value=%llu (publication waits for validation)",
++                            static_cast<unsigned long long>(n));
++                    else
++                        M2bFail("fence12_out signal failed; generated-frame publication withheld");
++                }
++                if (m3b1a_copy_this_frame && SUCCEEDED(signal_hr))
++                {
++                    const uint64_t serial = PublishM3bExternalFrame(n, n, false);
++                    Log("[feed] M3B-1A producer fence signaled value=%llu serial=%llu image=%p timeline=%p",
++                        static_cast<unsigned long long>(n), static_cast<unsigned long long>(serial),
++                        reinterpret_cast<void *>(g.m3b1a_vk_img), reinterpret_cast<void *>(g.vk_sem_out));
++                }
++                else if (m3b1a_copy_this_frame)
++                {
++                    Log("[feed] M3B-1A: fence12_out signal failed 0x%08X; publication withheld", signal_hr);
++                }
+             }
+             else
+             {
