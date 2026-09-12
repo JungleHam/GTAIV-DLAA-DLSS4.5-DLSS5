@@ -88,15 +88,13 @@ Requirements:
 - Visual Studio 2022 or Build Tools
 - `Desktop development with C++`
 
-If you are using **PowerShell**, commands in the current directory need the `.\` prefix.
+No terminal knowledge is required for the normal install flow.
 
-Run:
+1. **Double-click `BUILD.bat`.**
+2. Wait for it to say `SUCCESS` and create `ReShade64-bbridge.dll`.
+3. Close the build window.
 
-```powershell
-.\BUILD.bat
-```
-
-It clones exact ReShade `v6.8.0` with submodules, applies the patch idempotently, and builds:
+`BUILD.bat` clones exact ReShade `v6.8.0` with submodules, applies the patch idempotently, and builds:
 
 ```text
 ReShade64-bbridge.dll
@@ -104,20 +102,23 @@ ReShade64-bbridge.dll
 
 ## Install
 
-Close both:
+First fully close GTA IV and `NvRemixBridge.exe`.
+
+Then simply **double-click `INSTALL.bat`**.
+
+The installer now handles the rest itself:
+
+1. Windows shows a User Account Control prompt — click **Yes**.
+2. The installer asks for your GTA IV folder.
+3. Copy/paste the folder path, or drag the folder into the installer window, then press **Enter**.
+
+Example path:
 
 ```text
-GTAIV.exe
-NvRemixBridge.exe
+B:\Games\Steam\steamapps\common\Grand Theft Auto IV\GTAIV
 ```
 
-Open an **Administrator PowerShell or Command Prompt** in this folder. In PowerShell, run:
-
-```powershell
-.\INSTALL.bat "X:\path\to\Grand Theft Auto IV\GTAIV"
-```
-
-In classic Command Prompt (`cmd.exe`), the `./` or `.\` prefix is not required.
+The script is deliberately forgiving: if you paste `GTAIV.exe` itself, or select the outer `Grand Theft Auto IV` folder, it tries to resolve the correct `GTAIV` folder automatically.
 
 The script backs up:
 
@@ -149,16 +150,14 @@ You should be able to:
 - open/close ReShade with Home;
 - move the ReShade cursor;
 - click tabs, checkboxes and sliders;
-- operate Deep Fried Chicken live;
+- operate the DLSS5-Feeder preset selector and Deep Fried Chicken live;
 - return control to GTA when the overlay closes.
 
 ## Restore stock ReShade
 
-Close GTA IV and `NvRemixBridge.exe`, then from an Administrator PowerShell terminal:
+Close GTA IV and `NvRemixBridge.exe`, then simply **double-click `RESTORE_ORIGINAL.bat`**.
 
-```powershell
-.\RESTORE_ORIGINAL.bat "X:\path\to\Grand Theft Auto IV\GTAIV"
-```
+It requests Administrator permission itself and asks for the GTA IV folder in the same way as the installer. No terminal command is required.
 
 ## Scope
 
