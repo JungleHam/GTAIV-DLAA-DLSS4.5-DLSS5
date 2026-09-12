@@ -3,6 +3,7 @@ setlocal EnableExtensions DisableDelayedExpansion
 cd /d "%~dp0"
 
 set "SELF=%~f0"
+set "BB_SELF=%~f0"
 set "PATCHED=%~dp0ReShade64-bbridge.dll"
 set "RESHADESYS=C:\ProgramData\ReShade\ReShade64.dll"
 set "BACKUP=C:\ProgramData\ReShade\ReShade64.dll.pre-bbridge-input"
@@ -14,7 +15,7 @@ if errorlevel 1 (
   echo Administrator permission is required to install the patched ReShade Vulkan DLL.
   echo Windows will now show a User Account Control prompt. Click Yes to continue.
   echo.
-  powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '%SELF%' -Verb RunAs" || (
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath $env:BB_SELF -Verb RunAs" || (
     echo ERROR: Could not request Administrator permission.
     pause
     exit /b 1
@@ -144,7 +145,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
 echo.
 echo ============================================================
 echo INSTALLED SUCCESSFULLY
-necho ============================================================
+echo ============================================================
 echo.
 echo Launch GTA IV normally and press HOME to test the ReShade interface.
 echo.
