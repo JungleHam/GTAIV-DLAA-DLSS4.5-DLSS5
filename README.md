@@ -2,7 +2,7 @@
 
 A reproducible, version-pinned setup for running **real NVIDIA NGX DLAA** in GTA IV, with an optional **DLSS 5 Neural Rendering / NGX Feature 18** stage through Deep Fried Chicken.
 
-This repository is intentionally **not a modpack**. It contains the integration logic, configuration, verification notes, installers, and the ReShade/b-bridge input patch. Third-party projects and NVIDIA runtimes are downloaded from their original sources or supplied by the user.
+This repository is intentionally **not a modpack**. It contains the integration logic, configuration, verification notes, installers, and the ReShade/b-bridge input patch. Third-party projects are fetched from pinned upstream locations, while files that should not be redistributed here are supplied by the user.
 
 > **Status:** tested working stack as of 2026-09-12. Back up your game before using it.
 
