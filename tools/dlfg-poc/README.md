@@ -1,113 +1,106 @@
-# DLFG milestone 1 POC
+# DLFG milestone 1.2 POC
 
 This folder is an **isolated experiment** for adding NVIDIA DLSS Frame Generation to the existing GTA IV b-bridge/DLAA stack.
 
-It does **not** modify the working renderer or present generated frames yet.
+## Important: milestone 1.1 in-game probe is retired
 
-## Milestone 1 goal
+The first probe loaded a ReShade add-on into `NvRemixBridge.exe`, created a second Vulkan/NGX device in the same process, then shut that NGX context down. Live testing showed that this can destabilize the real DLAA/DLSS5 session during the legal-screen to game swapchain transition.
 
-Prove all of the following inside `NvRemixBridge.exe` on the target RTX GPU:
+**Do not use `INSTALL.bat` for milestone 1.1.** It now refuses to install.
 
-1. the x64 ReShade add-on loads;
-2. NVIDIA's Vulkan NGX client initializes;
-3. NGX reports DLSS Frame Generation available;
-4. a private Vulkan graphics device can create an NGX DLSS-G feature at 2560x1440;
-5. the feature is released cleanly without touching the game's swapchain.
-
-Success is this line in `.trex\dlfg-probe.log`:
-
-```text
-SUCCESS: NVIDIA NGX DLSS Frame Generation feature was created on the RTX GPU.
-```
-
-This is deliberately a capability/feature-create probe only. It does **not** evaluate an interpolated frame yet.
-
-## Safety model
-
-The probe creates a second, private Vulkan instance/device on the NVIDIA GPU. It does not replace `d3d9vk_x64.dll`, does not patch the game's Vulkan swapchain and does not call `vkQueuePresentKHR`.
-
-`UNINSTALL.bat` removes only the POC files and restores a pre-existing `nvngx_dlssg.dll` if one was present.
-
-## Build
-
-Double-click:
-
-```text
-BUILD.bat
-```
-
-It fetches pinned source/header dependencies only:
-
-- ReShade 6.8.0 commit `18deaa52de0c425a78b329e9cb3c497281cd00ec`
-- NVIDIA DLSS SDK 310.9.1 commit `374959484e79a640feaba44c93ac8cfb0a03f5b5`
-- Vulkan-Headers commit `ee2ec5fd83dafce291024683b50dc89219333076`
-
-Requirements are the same Visual Studio C++ build tools already used for the ReShade input patch.
-
-Output:
-
-```text
-dlfg-probe.addon64
-```
-
-## Get the DLSS-G runtime
-
-Double-click:
-
-```text
-GET-RUNTIME.bat
-```
-
-For this first experiment it downloads NVIDIA's official RTX Remix 1.5.2 release archive, verifies the published archive SHA256, extracts `nvngx_dlssg.dll`, then deletes the temporary archive. It does **not** install RTX Remix itself.
-
-The download is large (~230 MB) because NVIDIA distributes the runtime inside the full Remix release package.
-
-## Install / run
-
-1. Fully close GTA IV.
-2. Double-click `INSTALL.bat`.
-3. Paste or drag the folder containing `GTAIV.exe`.
-4. For the first test, keep the known-good DLAA path. Turning DFC neural processing off is preferred simply to reduce variables; it is not permanently changed by the installer.
-5. Launch GTA IV and leave it running in a rendered scene for at least 5 seconds.
-6. Close the game.
-7. Open/send:
-
-```text
-GTAIV\.trex\dlfg-probe.log
-```
-
-## Expected progression
-
-A healthy log should progress roughly through:
-
-```text
-runtime: nvngx_dlssg.dll found next to the add-on
-NVSDK_NGX_VULKAN_RequiredExtensions -> ...
-selected GPU: NVIDIA GeForce RTX ...
-NVSDK_NGX_VULKAN_Init(...) -> 0x00000001
-FrameGeneration.Available: ... value=1
-DLSSG.MultiFrameCountMax: ...
-NGX_VK_CREATE_DLSSG(...) -> 0x00000001 feature=...
-SUCCESS: NVIDIA NGX DLSS Frame Generation feature was created on the RTX GPU.
-MILESTONE 1 PASSED.
-```
-
-If it fails, send the complete `dlfg-probe.log`; each stage is intentionally logged so the next iteration has a precise failure point.
-
-## Remove
-
-Fully close GTA IV and double-click:
+If you already installed the old probe, fully close GTA IV and run:
 
 ```text
 UNINSTALL.bat
 ```
 
-## What comes next
+This removes only the experimental probe files and restores a pre-existing `nvngx_dlssg.dll` if one was present.
 
-Only after this milestone succeeds:
+## What the logs proved before the crash
 
-- milestone 2: feed resolved color + Lumenite motion vectors + depth to DLSS-G and produce an **off-screen** interpolated image;
+On the RTX 4070 Ti SUPER test system:
+
+- HAGS is enabled;
+- `NVSDK_NGX_VULKAN_GetFeatureRequirements(FrameGeneration)` reports supported;
+- minimum hardware architecture is `0x190` (Ada);
+- `FrameGeneration.Available = 1`;
+- `FrameGeneration.NeedsUpdatedDriver = 0`;
+- `DLSSG.MultiFrameCountMax = 1` (normal 2x frame generation);
+- feature creation still returns `0xBAD00005` / `FAIL_InvalidParameter` for BGRA8, RGBA8 and RGBA16F.
+
+The in-process probe also revealed an important version clue: NGX reports the Frame Generation feature as **310.2.1**, while the DLSS runtime in the working feeder path is **310.9.1**. That runtime/API mismatch is now one of the main suspects for the invalid-parameter result.
+
+## Milestone 1.2: safe standalone probe
+
+Milestone 1.2 runs in a **separate process**. Nothing is copied into GTA IV and the game must be closed while it runs.
+
+The standalone executable is intentionally named `NvRemixBridge.exe` inside this experiment's `standalone` folder so NVIDIA's driver/NGX application matching is as close as practical to the real Remix bridge without touching the actual game process.
+
+### Get the DLSS-G runtime
+
+Run once:
+
+```text
+GET-RUNTIME.bat
+```
+
+It downloads NVIDIA's official RTX Remix 1.5.2 archive, verifies it, and extracts only `nvngx_dlssg.dll`.
+
+### Run the safe probe
+
+1. Fully close GTA IV.
+2. Put the compiled `standalone\NvRemixBridge.exe` in this folder's `standalone` subfolder.
+3. Double-click:
+
+```text
+RUN-STANDALONE.bat
+```
+
+The runner copies `nvngx_dlssg.dll` into the isolated folder, launches the probe, and prints the resulting log.
+
+Send:
+
+```text
+standalone\dlfg-standalone.log
+```
+
+No Administrator prompt and no game-path input are required.
+
+## Build
+
+The GitHub Actions workflow builds milestone 1.2 automatically. Local build support uses the same pinned dependencies:
+
+- NVIDIA DLSS SDK 310.9.1 commit `374959484e79a640feaba44c93ac8cfb0a03f5b5`
+- Vulkan-Headers commit `ee2ec5fd83dafce291024683b50dc89219333076`
+
+CI build entry point:
+
+```text
+BUILD-STANDALONE-CI.bat
+```
+
+Output:
+
+```text
+standalone\NvRemixBridge.exe
+```
+
+## Goal
+
+The standalone probe asks the same core question without risking the working game stack:
+
+```text
+Can NVIDIA NGX create a Vulkan DLSS-G feature at 2560x1440 on this RTX 4070 Ti SUPER?
+```
+
+If it still returns `FAIL_InvalidParameter`, the next experiment is runtime-version alignment rather than more invasive game injection.
+
+## What comes after feature creation works
+
+Only after isolated feature creation succeeds:
+
+- milestone 2: integrate on the **existing renderer/feeder device**, not a second NGX context, and produce one off-screen interpolated frame;
 - milestone 3: add a safe 2x presenter/pacer (`real -> generated -> real`);
-- milestone 4: move FG after the DFC Neural Rendering output and test `DLAA -> DLSS5 NR -> DLSS FG`.
+- milestone 4: place FG after the DFC Neural Rendering output and test `DLAA -> DLSS5 NR -> DLSS FG`.
 
-Do not merge this experiment into the main installer until 2x presentation is stable and rollback has been tested repeatedly.
+The known-good main DLAA/DLSS5 installer remains untouched until these experiments are stable and reversible.
