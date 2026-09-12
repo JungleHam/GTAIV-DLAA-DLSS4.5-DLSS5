@@ -50,7 +50,7 @@ GTA IV DirectInput
   -> normal ReShade input system / ImGui
 ```
 
-With the patch installed, `Home` opens the normal ReShade overlay, mouse/keyboard input works, and the Deep Fried Chicken tab is interactive.
+With the patch working correctly, `Home` opens the normal ReShade overlay, mouse/keyboard input works, and the Deep Fried Chicken tab is interactive.
 
 ## Bring your own / prerequisites
 
@@ -122,7 +122,7 @@ The installer creates a rollback backup, downloads pinned upstream components, i
 
 Read [`docs/DLAA.md`](docs/DLAA.md) first.
 
-### 3. Recommended: install the interactive ReShade patch
+### 3. Recommended: install and verify the interactive ReShade patch
 
 This step no longer requires opening PowerShell, Command Prompt, or an Administrator terminal manually.
 
@@ -138,6 +138,8 @@ Then:
 2. Close that window and **double-click `INSTALL.bat`**.
 3. The installer asks for your GTA IV folder. **Copy/paste the path or drag the folder into the window**, then press **Enter**.
 4. Windows will ask for Administrator permission — click **Yes**. The installer continues automatically with the folder you already selected.
+5. Fully launch GTA IV again and wait until you reach a rendered menu or gameplay scene.
+6. Press **Home**.
 
 Example:
 
@@ -149,14 +151,23 @@ The path is requested before elevation so normal Explorer drag-and-drop works. T
 
 This builds ReShade from the exact 6.8.0 source tag, applies the cross-process input patch, backs up the active global ReShade Vulkan DLL and replaces it with the patched build.
 
-See [`docs/RESHade-INPUT-PATCH.md`](docs/RESHade-INPUT-PATCH.md).
+**Step 3 is not considered complete just because the installer copied its files.** It is only verified when **Home actually opens ReShade and the overlay accepts mouse/keyboard input**.
 
-#### DLAA model / quality preset selector
-
-After Step 3, launch GTA IV and press **Home**, then open:
+If **Home does nothing**, stop here and do **not** continue to the DLSS 5 step yet. Keep these two files for troubleshooting:
 
 ```text
-Add-ons -> DLSS 5 Feed -> DLSS render preset -> Preset
+GTAIV\.trex\bridge.conf
+GTAIV\.trex\ReShade.log
+```
+
+See [`docs/RESHade-INPUT-PATCH.md`](docs/RESHade-INPUT-PATCH.md).
+
+#### DLAA model / quality preset selector — only after Home works
+
+Once Step 3 passes the Home-key verification, open:
+
+```text
+Home -> Add-ons -> DLSS 5 Feed -> DLSS render preset -> Preset
 ```
 
 The choices mean:
@@ -173,7 +184,7 @@ There is no simple `E < F < J < K` quality ladder for every scene. **Start with 
 
 This selector changes the **DLAA render model only**. It does **not** enable DLSS Super Resolution Quality/Balanced/Performance; GTA IV still renders at native resolution and DLAA remains a 1:1 anti-aliasing pass.
 
-> **DLAA setup is complete after Step 3.** At this point you can stop here and use GTA IV with DLAA only. Everything below is optional and is only for adding **DLSS 5 Neural Rendering** on top of the working DLAA setup.
+> **The DLAA rendering setup itself is already present after Step 2; Step 3 adds the interactive Home-menu controls.** For the documented full DLAA setup, do not consider Step 3 finished until Home works. Everything below is optional and only adds **DLSS 5 Neural Rendering** on top.
 
 ### 4. Optional: upgrade to DLSS 5 Neural Rendering
 
