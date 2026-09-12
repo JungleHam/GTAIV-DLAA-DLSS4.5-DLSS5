@@ -1,54 +1,95 @@
 @echo off
-setlocal EnableExtensions
+setlocal EnableExtensions DisableDelayedExpansion
 cd /d "%~dp0"
 
+set "SELF=%~f0"
 set "PATCHED=%~dp0ReShade64-bbridge.dll"
 set "RESHADESYS=C:\ProgramData\ReShade\ReShade64.dll"
 set "BACKUP=C:\ProgramData\ReShade\ReShade64.dll.pre-bbridge-input"
 
-if "%~1"=="" (
-  echo Usage:
-  echo   INSTALL.bat "X:\path\to\Grand Theft Auto IV\GTAIV"
+rem Make this usable by double-clicking: request UAC automatically, then continue.
+net session >nul 2>nul
+if errorlevel 1 (
+  echo.
+  echo Administrator permission is required to install the patched ReShade Vulkan DLL.
+  echo Windows will now show a User Account Control prompt. Click Yes to continue.
+  echo.
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '%SELF%' -Verb RunAs" || (
+    echo ERROR: Could not request Administrator permission.
+    pause
+    exit /b 1
+  )
+  exit /b 0
+)
+
+set "GAME=%~1"
+if not defined GAME (
+  echo ============================================================
+  echo ReShade b-bridge input patch installer
+  echo ============================================================
+  echo.
+  echo Please enter the GTA IV game folder that contains GTAIV.exe.
+  echo You can COPY/PASTE the path, or DRAG THE GTAIV FOLDER into this window.
   echo.
   echo Example:
-  echo   INSTALL.bat "B:\Games\Steam\steamapps\common\Grand Theft Auto IV\GTAIV"
+  echo   B:\Games\Steam\steamapps\common\Grand Theft Auto IV\GTAIV
+  echo.
+  set /p "GAME=Game folder: "
+)
+
+if not defined GAME (
+  echo.
+  echo ERROR: No game folder was entered.
   pause
   exit /b 1
 )
 
-set "GAME=%~1"
+rem Drag-and-drop usually adds quotes; remove them.
+set "GAME=%GAME:"=%"
+
+rem Be forgiving if the user pasted GTAIV.exe itself instead of its folder.
+for %%I in ("%GAME%") do if /I "%%~nxI"=="GTAIV.exe" set "GAME=%%~dpI"
+
+rem Be forgiving if the user selected the outer "Grand Theft Auto IV" folder.
+if not exist "%GAME%\GTAIV.exe" if exist "%GAME%\GTAIV\GTAIV.exe" set "GAME=%GAME%\GTAIV"
+
 set "TREX=%GAME%\.trex"
 set "POC=%TREX%\bridge-input.addon64"
 set "POCDISABLED=%TREX%\bridge-input.addon64.poc-disabled"
 
-net session >nul 2>nul
-if errorlevel 1 (
-  echo ERROR: Right-click Command Prompt/Terminal and run as Administrator,
-  echo then run this script from there.
-  pause
-  exit /b 1
-)
+echo.
+echo Using game folder:
+echo   %GAME%
+echo.
 
 if not exist "%GAME%\GTAIV.exe" (
-  echo ERROR: GTAIV.exe not found in:
-  echo   %GAME%
+  echo ERROR: GTAIV.exe was not found there.
+  echo.
+  echo Make sure you entered the folder that actually contains GTAIV.exe.
+  echo On the Steam Complete Edition it normally ends in:
+  echo   \Grand Theft Auto IV\GTAIV
   pause
   exit /b 1
 )
 if not exist "%TREX%\NvRemixBridge.exe" (
   echo ERROR: b-bridge server not found:
   echo   %TREX%\NvRemixBridge.exe
+  echo.
+  echo Complete Steps 1 and 2 of the main README first.
   pause
   exit /b 1
 )
 if not exist "%PATCHED%" (
-  echo ERROR: ReShade64-bbridge.dll not found. Run BUILD.bat first.
+  echo ERROR: ReShade64-bbridge.dll not found.
+  echo.
+  echo Double-click BUILD.bat first and wait for it to report SUCCESS.
   pause
   exit /b 1
 )
 if not exist "%RESHADESYS%" (
   echo ERROR: Existing global ReShade Vulkan DLL not found:
   echo   %RESHADESYS%
+  echo.
   echo Install the ReShade Vulkan layer through Install-DLAA.bat first.
   pause
   exit /b 1
@@ -101,9 +142,13 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
 )
 
 echo.
-echo INSTALLED.
-echo Launch GTA IV, press HOME and test the ReShade / DFC interface.
+echo ============================================================
+echo INSTALLED SUCCESSFULLY
+necho ============================================================
 echo.
-echo Rollback:
-echo   RESTORE_ORIGINAL.bat "%GAME%"
+echo Launch GTA IV normally and press HOME to test the ReShade interface.
+echo.
+echo To undo this patch later, simply double-click RESTORE_ORIGINAL.bat.
+echo It will ask for the same GTA IV folder and request Administrator permission itself.
+echo.
 pause
