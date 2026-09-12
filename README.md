@@ -136,8 +136,8 @@ Then:
 
 1. **Double-click `BUILD.bat`** and wait until it says `SUCCESS`.
 2. Close that window and **double-click `INSTALL.bat`**.
-3. Windows will ask for Administrator permission — click **Yes**.
-4. The installer asks for your GTA IV folder. **Copy/paste the path or drag the folder into the window**, then press **Enter**.
+3. The installer asks for your GTA IV folder. **Copy/paste the path or drag the folder into the window**, then press **Enter**.
+4. Windows will ask for Administrator permission — click **Yes**. The installer continues automatically with the folder you already selected.
 
 Example:
 
@@ -145,7 +145,7 @@ Example:
 B:\Games\Steam\steamapps\common\Grand Theft Auto IV\GTAIV
 ```
 
-The installer is forgiving if you paste `GTAIV.exe` itself or select the outer `Grand Theft Auto IV` folder; it tries to resolve the correct folder automatically.
+The path is requested before elevation so normal Explorer drag-and-drop works. The installer is forgiving if you paste `GTAIV.exe` itself or select the outer `Grand Theft Auto IV` folder; it tries to resolve the correct folder automatically.
 
 This builds ReShade from the exact 6.8.0 source tag, applies the cross-process input patch, backs up the active global ReShade Vulkan DLL and replaces it with the patched build.
 
