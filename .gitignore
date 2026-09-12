@@ -11,3 +11,22 @@ input/*.zip
 *.log
 _PRE_DFC_BACKUP_*/
 _DLAA_PREINSTALL_BACKUP_*/
+
+# Isolated DLFG M2A dependencies and locally generated diagnostic output.
+tools/dlfg-poc/deps/
+tools/dlfg-poc/dlfg-probe.addon64
+tools/dlfg-poc/nvngx_dlssg.dll
+tools/dlfg-poc/standalone/NvRemixBridge.exe
+tools/dlfg-poc/standalone/nvngx_dlssg.dll
+tools/dlfg-poc/standalone/dlfg-generated.bmp
+tools/dlfg-poc/dlfg_probe_standalone_ci.obj
+tools/dlfg-poc/dlfg_probe_standalone.obj
+
+# Local exact-upstream Feeder checkout, M2B build output, and manually made restore backups.
+tools/dlfg-poc/m2b/feeder-src/
+tools/dlfg-poc/m2b/m2b-build/
+tools/dlfg-poc/m2b/backup/
+
+# Exact upstream OptiScaler DLSSNR checkout and M3A-OS local build output.
+tools/dlfg-poc/m3a-os/OptiScaler/
+tools/dlfg-poc/m3a-os/m3a-build/

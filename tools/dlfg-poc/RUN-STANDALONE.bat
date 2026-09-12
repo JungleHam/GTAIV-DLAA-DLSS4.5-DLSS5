@@ -39,7 +39,7 @@ copy /y "nvngx_dlssg.dll" "standalone\nvngx_dlssg.dll" >nul || (
   exit /b 1
 )
 
-del /q "standalone\dlfg-standalone.log" 2>nul
+del /q "standalone\dlfg-standalone.log" "standalone\dlfg-generated.bmp" 2>nul
 
 echo Running isolated probe...
 pushd "standalone"
@@ -56,6 +56,11 @@ if exist "standalone\dlfg-standalone.log" (
   type "standalone\dlfg-standalone.log"
 ) else (
   echo ERROR: no log was created.
+)
+if "%RC%"=="0" if exist "standalone\dlfg-generated.bmp" (
+  echo.
+  echo SUCCESS: generated image:
+  echo   %CD%\standalone\dlfg-generated.bmp
 )
 echo.
 pause

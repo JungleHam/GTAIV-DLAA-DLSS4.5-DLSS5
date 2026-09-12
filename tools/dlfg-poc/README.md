@@ -1,4 +1,4 @@
-# DLFG milestone 1.2 POC
+# DLFG experimental POC
 
 This folder is an **isolated experiment** for adding NVIDIA DLSS Frame Generation to the existing GTA IV b-bridge/DLAA stack.
 
@@ -66,9 +66,30 @@ standalone\dlfg-standalone.log
 
 No Administrator prompt and no game-path input are required.
 
+### Milestone 1.2: PASSED on RTX 4070 Ti SUPER
+
+The isolated Vulkan probe confirmed:
+
+- `FrameGeneration.Available = 1`
+- `NeedsUpdatedDriver = 0`
+- `MultiFrameCountMax = 1`
+- `NGX_VK_CREATE_DLSSG = Success`
+
+### Milestone 2A: PASSED on RTX 4070 Ti SUPER
+
+The standalone evaluator performed two successful DLSS-G evaluations using fully synthetic Vulkan resources. Its bright-object horizontal centroids were `899.50` for Frame A, `938.25` for the generated frame, and `979.50` for Frame B (mathematical midpoint `939.50`). This proves actual off-screen interpolation, not merely feature creation.
+
+This does **not** mean GTA IV frame generation works. M2B passed its off-screen real-resource evaluation with DFC physically absent: DLSS-G create and both evaluations succeeded, and CPU readback differed from both surrounding real frames. With DFC present and ARMED, a conventional post-arm feature-11 Create returned `PlatformError`; M2C-A is the default-off pre-arm coexistence root-cause test. It remains off-screen and does not present or modify the GTA IV backbuffer. See [m2b/README-M2B-PREP.md](m2b/README-M2B-PREP.md).
+
+### Milestone 3A-OS: OptiScaler Vulkan presentation instrumentation
+
+M3A-OS is a default-off **observation-only** experiment in the final OptiScaler Vulkan path. It records the real swapchain and throttled present contract, including image indices, wait semaphores, and return codes, while resolving (but never calling) the acquire/submit functions needed by a later design. It neither adds a present nor changes any `VkPresentInfoKHR` field, swapchain behavior, OptiFG setting, Streamline behavior, DLAA, DLSS5 NR, or Feeder NGX operation. See [m3a-os/README-M3A-OS.md](m3a-os/README-M3A-OS.md). It has passed hardware inspection and is not itself a presentation implementation.
+
+M3A-OS and M3B-0 have passed on hardware, including M3B-0 after swapchain recreation. M3B-1A also passed twice: Feeder's one-shot shareable D3D12 image was synchronized, acquired from external ownership, copied into an extra Vulkan swapchain image, and presented before the original frame. M3B-1 now replaces only that producer image with genuine native NVIDIA feature-11 output; it remains default-off, one-shot, and has no continuous pacing loop.
+
 ## Build
 
-The GitHub Actions workflow builds milestone 1.2 automatically. Local build support uses the same pinned dependencies:
+The GitHub Actions workflow builds the standalone M2A evaluator. Local build support uses the same pinned dependencies:
 
 - NVIDIA DLSS SDK 310.9.1 commit `374959484e79a640feaba44c93ac8cfb0a03f5b5`
 - Vulkan-Headers commit `ee2ec5fd83dafce291024683b50dc89219333076`
@@ -90,17 +111,23 @@ standalone\NvRemixBridge.exe
 The standalone probe asks the same core question without risking the working game stack:
 
 ```text
-Can NVIDIA NGX create a Vulkan DLSS-G feature at 2560x1440 on this RTX 4070 Ti SUPER?
+Can NVIDIA NGX evaluate and produce a real Vulkan DLSS-G intermediate frame at 2560x1440 on this RTX 4070 Ti SUPER?
 ```
 
-If it still returns `FAIL_InvalidParameter`, the next experiment is runtime-version alignment rather than more invasive game injection.
+That question is now answered yes in the isolated process.
 
 ## What comes after feature creation works
 
-Only after isolated feature creation succeeds:
+After isolated interpolation succeeds:
 
-- milestone 2: integrate on the **existing renderer/feeder device**, not a second NGX context, and produce one off-screen interpolated frame;
-- milestone 3: add a safe 2x presenter/pacer (`real -> generated -> real`);
+- milestone 2B-PREP: passed real-resource acquisition and confirmation of the existing Feeder D3D12 NGX session;
+- milestone 2B: passed one off-screen evaluation in that same session with DFC absent; no presentation;
+- milestone 2C-A: default-off DFC/DLSS-G pre-arm coexistence root-cause test; no presentation;
+- milestone 3A-OS: default-off final Vulkan swapchain/present instrumentation; no presentation;
+- milestone 3B-0: passed default-off one-shot copied-frame duplicate/original presentation test;
+- milestone 3B-1A: passed one-shot D3D12-to-Vulkan external-image presentation proof;
+- milestone 3B-1: default-off one-shot genuine NVIDIA DLSS-G generated-frame presentation test;
+- milestone 3 continuous: only after M3B-1 evidence, design a safe 2x DLSS-G presenter/pacer (`real -> generated -> real`);
 - milestone 4: place FG after the DFC Neural Rendering output and test `DLAA -> DLSS5 NR -> DLSS FG`.
 
 The known-good main DLAA/DLSS5 installer remains untouched until these experiments are stable and reversible.

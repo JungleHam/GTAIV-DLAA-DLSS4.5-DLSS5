@@ -25,23 +25,16 @@ if not exist "deps\vulkan\include\vulkan\vulkan.h" (
 )
 
 if not exist "standalone" mkdir "standalone"
-del /q "standalone\NvRemixBridge.exe" "standalone\*.obj" "standalone\dlfg_probe_standalone_ci.cpp" 2>nul
-
-rem The source originally opened a Unicode-oriented CRT stream (ccs=UTF-8)
-rem and then wrote to it with narrow vfprintf. MSVC treats that as an invalid
-rem parameter and fast-fails with 0xC0000409 before the first log line. Build
-rem a corrected temporary source using a normal binary stream for narrow logs.
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$s=[IO.File]::ReadAllText('standalone\dlfg_probe_standalone.cpp'); $s=$s.Replace('L\"w, ccs=UTF-8\"','L\"wb\"'); [IO.File]::WriteAllText('standalone\dlfg_probe_standalone_ci.cpp',$s,[Text.UTF8Encoding]::new($false))" || exit /b 45
+del /q "standalone\NvRemixBridge.exe" "standalone\*.obj" "dlfg_probe_standalone.obj" 2>nul
 
 cl /nologo /std:c++20 /EHsc /O2 /MD /FIcstdarg ^
   /I"deps\dlss\include" ^
   /I"deps\vulkan\include" ^
-  "standalone\dlfg_probe_standalone_ci.cpp" ^
+  "standalone\dlfg_probe_standalone.cpp" ^
   /link /LIBPATH:"deps\dlss\lib\Windows_x86_64\x64" nvsdk_ngx_d.lib ^
   user32.lib advapi32.lib version.lib gdi32.lib ^
   /OUT:"standalone\NvRemixBridge.exe"
 set "RC=%ERRORLEVEL%"
-del /q "standalone\dlfg_probe_standalone_ci.cpp" 2>nul
 if not "%RC%"=="0" exit /b %RC%
 if not exist "standalone\NvRemixBridge.exe" exit /b 51
 exit /b 0
