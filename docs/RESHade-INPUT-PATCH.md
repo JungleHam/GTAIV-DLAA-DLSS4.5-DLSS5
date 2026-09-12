@@ -88,10 +88,12 @@ Requirements:
 - Visual Studio 2022 or Build Tools
 - `Desktop development with C++`
 
+If you are using **PowerShell**, commands in the current directory need the `.\` prefix.
+
 Run:
 
-```text
-BUILD.bat
+```powershell
+.\BUILD.bat
 ```
 
 It clones exact ReShade `v6.8.0` with submodules, applies the patch idempotently, and builds:
@@ -109,11 +111,13 @@ GTAIV.exe
 NvRemixBridge.exe
 ```
 
-Open an **Administrator** Command Prompt in this folder and run:
+Open an **Administrator PowerShell or Command Prompt** in this folder. In PowerShell, run:
 
-```text
-INSTALL.bat "X:\path\to\Grand Theft Auto IV\GTAIV"
+```powershell
+.\INSTALL.bat "X:\path\to\Grand Theft Auto IV\GTAIV"
 ```
+
+In classic Command Prompt (`cmd.exe`), the `./` or `.\` prefix is not required.
 
 The script backs up:
 
@@ -150,10 +154,10 @@ You should be able to:
 
 ## Restore stock ReShade
 
-Close GTA IV and `NvRemixBridge.exe`, then from an Administrator terminal:
+Close GTA IV and `NvRemixBridge.exe`, then from an Administrator PowerShell terminal:
 
-```text
-RESTORE_ORIGINAL.bat "X:\path\to\Grand Theft Auto IV\GTAIV"
+```powershell
+.\RESTORE_ORIGINAL.bat "X:\path\to\Grand Theft Auto IV\GTAIV"
 ```
 
 ## Scope
