@@ -142,17 +142,33 @@ client.DirectInput.forward.mousePolicy = 3
 client.DirectInput.forward.keyboardPolicy = 3
 ```
 
-## Expected result
+## Verify before continuing
 
-Launch GTA IV and press Home.
+The installer being able to copy the files is **not enough to prove the input patch is working**.
 
-You should be able to:
+After installation:
 
-- open/close ReShade with Home;
-- move the ReShade cursor;
-- click tabs, checkboxes and sliders;
-- operate the DLSS5-Feeder preset selector and Deep Fried Chicken live;
-- return control to GTA when the overlay closes.
+1. Fully launch GTA IV again.
+2. Wait until you reach a rendered menu or gameplay scene.
+3. Press **Home**.
+
+Step 3 is only considered successful if the ReShade overlay opens and accepts mouse/keyboard input.
+
+If **Home does nothing**, stop there and do **not** continue to the DLSS 5 Neural Rendering step yet. Keep these two files for troubleshooting:
+
+```text
+GTAIV\.trex\bridge.conf
+GTAIV\.trex\ReShade.log
+```
+
+The expected successful result is:
+
+- Home opens/closes ReShade;
+- the ReShade cursor moves;
+- tabs, checkboxes and sliders can be clicked;
+- the DLSS5-Feeder preset selector is interactive;
+- after DFC is installed later, its UI is interactive too;
+- closing the overlay returns control to GTA.
 
 ## Restore stock ReShade
 
