@@ -155,6 +155,9 @@ static bool _m3c0Abort = false;
     $newLock = @'
     std::lock_guard lock(_m3bMutex);
     if (_m3c0Abort || frame.serial == _m3b1aLastSerial) return false;
+    // Keep this as a "resources used on this swapchain" flag so swapchain
+    // recreation still waits the device idle before destroying M3B resources.
+    _m3b1aAttempted = true;
 '@
     if (-not $ot.Contains($oldLock)) { throw 'Could not find OptiScaler one-shot attempt block.' }
     $ot = $ot.Replace($oldLock, $newLock)
