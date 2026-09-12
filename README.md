@@ -258,6 +258,27 @@ tools/reshade-bbridge-input/     ReShade 6.8.0 cross-process input patch
 tools/debug/bridge-input-poc/    Original transport proof-of-concept source
 ```
 
+## Credits & acknowledgements
+
+Huge thanks to the projects and communities this integration builds on:
+
+- [FusionFix](https://github.com/ThirteenAG/GTAIV.EFLC.FusionFix) — ThirteenAG and contributors
+- [b-bridge](https://github.com/gutbash/b-bridge) — gutbash and contributors, building on NVIDIA bridge work
+- [DXVK](https://github.com/doitsujin/dxvk) — doitsujin and contributors
+- [ReShade](https://github.com/crosire/reshade) — Patrick Mours / crosire and contributors
+- [DLSS5-Feeder](https://github.com/jlrouzies-fr/DLSS5-Feeder) — jlrouzies-fr and contributors
+- [LumeniteFX](https://github.com/umar-afzaal/LumeniteFX) — umar-afzaal and contributors
+- **Deep Fried Chicken** — its authors/community for the optional Neural Rendering add-on
+- [DLSS5 Autopilot](https://github.com/Kizzuwatnaa/DLSS5-Autopilot) — Kizzuwatnaa and contributors; source of the RTX 40-compatible `nvngx_dlssnr.dll` used in the reference setup
+- [NVIDIA](https://developer.nvidia.com/rtx/dlss) — NGX / DLSS technology and runtimes
+- [RankFTW/rhi-repo](https://github.com/RankFTW/rhi-repo) — source used for the pinned `nvngx_dlss.dll` package
+- [7-Zip](https://www.7-zip.org/) — Igor Pavlov / 7-Zip project
+- **Rockstar Games** — Grand Theft Auto IV
+
+See [`docs/THIRD-PARTY.md`](docs/THIRD-PARTY.md) for the expanded third-party and redistribution notes.
+
+Grand Theft Auto, Rockstar Games, NVIDIA, GeForce, RTX, DLSS and other product names are trademarks of their respective owners. This is an independent community project and is not affiliated with, endorsed by, or sponsored by Rockstar Games, NVIDIA, or the upstream projects listed above.
+
 ## License
 
 Original scripts, patching glue and documentation in this repository are licensed under the MIT License unless a file says otherwise.
