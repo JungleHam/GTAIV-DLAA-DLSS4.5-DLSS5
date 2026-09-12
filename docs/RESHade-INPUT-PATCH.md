@@ -106,11 +106,12 @@ First fully close GTA IV and `NvRemixBridge.exe`.
 
 Then simply **double-click `INSTALL.bat`**.
 
-The installer now handles the rest itself:
+The installer handles the rest itself:
 
-1. Windows shows a User Account Control prompt — click **Yes**.
-2. The installer asks for your GTA IV folder.
-3. Copy/paste the folder path, or drag the folder into the installer window, then press **Enter**.
+1. It asks for your GTA IV folder while still running normally.
+2. Copy/paste the folder path, or drag the folder into the installer window, then press **Enter**.
+3. Windows shows a User Account Control prompt — click **Yes**.
+4. The elevated installer continues automatically with the same folder.
 
 Example path:
 
@@ -118,7 +119,7 @@ Example path:
 B:\Games\Steam\steamapps\common\Grand Theft Auto IV\GTAIV
 ```
 
-The script is deliberately forgiving: if you paste `GTAIV.exe` itself, or select the outer `Grand Theft Auto IV` folder, it tries to resolve the correct `GTAIV` folder automatically.
+The path is requested before elevation so normal Explorer drag-and-drop works. The script is also deliberately forgiving: if you paste `GTAIV.exe` itself, or select the outer `Grand Theft Auto IV` folder, it tries to resolve the correct `GTAIV` folder automatically.
 
 The script backs up:
 
@@ -157,7 +158,7 @@ You should be able to:
 
 Close GTA IV and `NvRemixBridge.exe`, then simply **double-click `RESTORE_ORIGINAL.bat`**.
 
-It requests Administrator permission itself and asks for the GTA IV folder in the same way as the installer. No terminal command is required.
+It asks for the GTA IV folder first, then requests Administrator permission automatically and continues with the selected folder. No terminal command is required.
 
 ## Scope
 
