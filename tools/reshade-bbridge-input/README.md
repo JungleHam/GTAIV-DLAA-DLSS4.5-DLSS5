@@ -2,24 +2,20 @@
 
 See [`../../docs/RESHade-INPUT-PATCH.md`](../../docs/RESHade-INPUT-PATCH.md) for the design and full instructions.
 
-> **PowerShell note:** PowerShell does not execute files from the current directory unless you prefix them with `./` or `.\`. The examples below use `.\` so they work directly in PowerShell.
+## Easy install
 
-Quick usage:
+No terminal commands are required for the normal flow:
 
-```powershell
-.\BUILD.bat
-```
+1. Double-click **`BUILD.bat`** and wait for `SUCCESS`.
+2. Double-click **`INSTALL.bat`**.
+3. Approve the Windows Administrator/UAC prompt.
+4. Paste or drag in the GTA IV folder that contains `GTAIV.exe`, then press Enter.
+5. Launch GTA IV and press **Home**.
 
-then from an Administrator terminal:
+The installer also accepts the game path as a command-line argument for advanced users, but that is optional.
 
-```powershell
-.\INSTALL.bat "X:\path\to\Grand Theft Auto IV\GTAIV"
-```
+## Rollback
 
-Rollback:
-
-```powershell
-.\RESTORE_ORIGINAL.bat "X:\path\to\Grand Theft Auto IV\GTAIV"
-```
+Double-click **`RESTORE_ORIGINAL.bat`**, approve UAC, and enter the same GTA IV folder when asked.
 
 The build output `ReShade64-bbridge.dll` and cloned `reshade-src/` tree are ignored by Git.
