@@ -150,6 +150,8 @@ This builds ReShade from the exact 6.8.0 source tag, applies the cross-process i
 
 See [`docs/RESHade-INPUT-PATCH.md`](docs/RESHade-INPUT-PATCH.md).
 
+> **DLAA setup is complete after Step 3.** At this point you can stop here and use GTA IV with DLAA only. Everything below is optional and is only for adding **DLSS 5 Neural Rendering** on top of the working DLAA setup.
+
 ### 4. Optional: upgrade to DLSS 5 Neural Rendering
 
 Supply the two tested files described in [`input/README.md`](input/README.md):
