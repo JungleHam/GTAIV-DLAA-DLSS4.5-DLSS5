@@ -66,7 +66,10 @@ echo.
 echo SUCCESS:
 echo   %~dp0ReShade64-bbridge.dll
 echo.
-echo Next run INSTALL.bat from an Administrator terminal.
+echo Next: close this window and DOUBLE-CLICK INSTALL.bat.
+echo INSTALL.bat requests Administrator permission itself and then asks for your GTA IV folder.
+echo No terminal commands are required.
+echo.
 pause
 exit /b 0
 
