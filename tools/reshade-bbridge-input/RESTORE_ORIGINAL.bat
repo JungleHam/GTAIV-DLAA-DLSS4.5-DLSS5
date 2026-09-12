@@ -6,21 +6,7 @@ set "BB_SELF=%~f0"
 set "RESHADESYS=C:\ProgramData\ReShade\ReShade64.dll"
 set "BACKUP=C:\ProgramData\ReShade\ReShade64.dll.pre-bbridge-input"
 
-rem Double-click friendly: request UAC automatically.
-net session >nul 2>nul
-if errorlevel 1 (
-  echo.
-  echo Administrator permission is required to restore the original ReShade Vulkan DLL.
-  echo Windows will now show a User Account Control prompt. Click Yes to continue.
-  echo.
-  powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath $env:BB_SELF -Verb RunAs" || (
-    echo ERROR: Could not request Administrator permission.
-    pause
-    exit /b 1
-  )
-  exit /b 0
-)
-
+rem Ask for the game first so paste/drag works in a normal non-elevated window.
 set "GAME=%~1"
 if not defined GAME (
   echo ============================================================
@@ -47,21 +33,38 @@ set "GAME=%GAME:"=%"
 for %%I in ("%GAME%") do if /I "%%~nxI"=="GTAIV.exe" set "GAME=%%~dpI"
 if not exist "%GAME%\GTAIV.exe" if exist "%GAME%\GTAIV\GTAIV.exe" set "GAME=%GAME%\GTAIV"
 
+if not exist "%GAME%\GTAIV.exe" (
+  echo.
+  echo ERROR: GTAIV.exe was not found there.
+  echo Make sure you entered the folder that actually contains GTAIV.exe.
+  pause
+  exit /b 1
+)
+
+rem Request UAC automatically and preserve the selected game folder.
+net session >nul 2>nul
+if errorlevel 1 (
+  set "BB_GAME=%GAME%"
+  echo.
+  echo Windows will now ask for Administrator permission.
+  echo Click Yes to restore the original ReShade Vulkan DLL.
+  echo.
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$arg='\"'+$env:BB_GAME+'\"'; Start-Process -FilePath $env:BB_SELF -ArgumentList $arg -Verb RunAs" || (
+    echo ERROR: Could not request Administrator permission.
+    pause
+    exit /b 1
+  )
+  exit /b 0
+)
+
 set "TREX=%GAME%\.trex"
 set "POC=%TREX%\bridge-input.addon64"
 set "POCDISABLED=%TREX%\bridge-input.addon64.poc-disabled"
 
 echo.
 echo Using game folder:
-echo   %GAME%
+echo   "%GAME%"
 echo.
-
-if not exist "%GAME%\GTAIV.exe" (
-  echo ERROR: GTAIV.exe was not found there.
-  echo Make sure you entered the folder that actually contains GTAIV.exe.
-  pause
-  exit /b 1
-)
 
 for %%P in (GTAIV.exe NvRemixBridge.exe) do (
   tasklist /FI "IMAGENAME eq %%P" 2>nul | find /I "%%P" >nul && (
@@ -73,7 +76,7 @@ for %%P in (GTAIV.exe NvRemixBridge.exe) do (
 
 if not exist "%BACKUP%" (
   echo ERROR: Backup not found:
-  echo   %BACKUP%
+  echo   "%BACKUP%"
   echo.
   echo Nothing was changed.
   pause
