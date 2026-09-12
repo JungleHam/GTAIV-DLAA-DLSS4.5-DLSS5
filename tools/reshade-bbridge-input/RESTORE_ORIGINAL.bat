@@ -49,7 +49,7 @@ if errorlevel 1 (
   echo Windows will now ask for Administrator permission.
   echo Click Yes to restore the original ReShade Vulkan DLL.
   echo.
-  powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$arg='"'+$env:BB_GAME+'"'; Start-Process -FilePath $env:BB_SELF -ArgumentList $arg -Verb RunAs" || (
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$arg=[char]34+$env:BB_GAME+[char]34; Start-Process -FilePath $env:BB_SELF -ArgumentList $arg -Verb RunAs" || (
     echo ERROR: Could not request Administrator permission.
     pause
     exit /b 1
