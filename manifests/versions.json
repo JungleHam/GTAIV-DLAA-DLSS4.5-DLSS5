@@ -45,15 +45,19 @@
     },
     "deep-fried-chicken": {
       "version": "1.7.4 checkpoint 70",
+      "source": "https://discord.gg/g2v2XGqvR",
       "archive_sha256": "91dc4137b1f2d7cdbd7f9eb4de9d33848b59e3af7a747d5d798271ee262eab09",
       "archive_password": "chicken",
       "redistributed": false
     },
     "nvngx_dlssnr": {
       "version": "310.8.0",
+      "variant": "310.8.0-RTX40 community build, sm_89",
+      "source_project": "https://github.com/Kizzuwatnaa/DLSS5-Autopilot",
+      "source_releases": "https://github.com/Kizzuwatnaa/DLSS5-Autopilot/releases",
       "dll_sha256": "4b8d19bc3eff58a084f5eca7489c921501c203450169fb82ff4f649a4482ba05",
       "redistributed": false,
-      "notes": "Known-good Neural Rendering runtime used in the successful RTX 4070 Ti SUPER test."
+      "notes": "RTX 40-series-compatible Neural Rendering runtime obtained through DLSS5 Autopilot. Known-good on the successful RTX 4070 Ti SUPER test. This is not the stock RTX 50 FP8 build."
     }
   }
 }
