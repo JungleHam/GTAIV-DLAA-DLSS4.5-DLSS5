@@ -130,17 +130,21 @@ From:
 tools/reshade-bbridge-input/
 ```
 
-run:
+If you are using **PowerShell**, batch files in the current directory must be prefixed with `.\`.
 
-```text
-BUILD.bat
+Run:
+
+```powershell
+.\BUILD.bat
 ```
 
-Then from an **Administrator** Command Prompt:
+Then from an **Administrator PowerShell** in the same folder:
 
-```text
-INSTALL.bat "X:\path\to\Grand Theft Auto IV\GTAIV"
+```powershell
+.\INSTALL.bat "X:\path\to\Grand Theft Auto IV\GTAIV"
 ```
+
+If you use classic `cmd.exe` instead, the `.\` prefix is optional.
 
 This builds ReShade from the exact 6.8.0 source tag, applies the cross-process input patch, backs up the active global ReShade Vulkan DLL and replaces it with the patched build.
 
