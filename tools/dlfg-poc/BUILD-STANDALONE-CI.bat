@@ -27,7 +27,7 @@ if not exist "deps\vulkan\include\vulkan\vulkan.h" (
 if not exist "standalone" mkdir "standalone"
 del /q "standalone\NvRemixBridge.exe" "standalone\*.obj" 2>nul
 
-cl /nologo /std:c++20 /EHsc /O2 /MD ^
+cl /nologo /std:c++20 /EHsc /O2 /MD /FIcstdarg ^
   /I"deps\dlss\include" ^
   /I"deps\vulkan\include" ^
   "standalone\dlfg_probe_standalone.cpp" ^
