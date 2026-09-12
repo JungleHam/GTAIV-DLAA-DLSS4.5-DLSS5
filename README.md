@@ -124,8 +124,6 @@ Read [`docs/DLAA.md`](docs/DLAA.md) first.
 
 ### 3. Recommended: install and verify the interactive ReShade patch
 
-This step no longer requires opening PowerShell, Command Prompt, or an Administrator terminal manually.
-
 Open:
 
 ```text
@@ -134,12 +132,14 @@ tools/reshade-bbridge-input/
 
 Then:
 
-1. **Double-click `BUILD.bat`** and wait until it says `SUCCESS`.
-2. Close that window and **double-click `INSTALL.bat`**.
-3. The installer asks for your GTA IV folder. **Copy/paste the path or drag the folder into the window**, then press **Enter**.
-4. Windows will ask for Administrator permission — click **Yes**. The installer continues automatically with the folder you already selected.
+1. **Double-click `BUILD.bat`** and wait until it says `BUILD SUCCESS - PATCH MARKER VERIFIED`.
+2. Close that window.
+3. **Right-click `INSTALL.bat` -> `Run as administrator`.** This is currently the reliable way to install the patched global ReShade DLL.
+4. The installer asks for your GTA IV folder. Copy/paste the path or drag the folder into the window, then press **Enter**.
 5. Fully launch GTA IV again and wait until you reach a rendered menu or gameplay scene.
 6. Press **Home**.
+
+> **Important:** simply double-clicking `INSTALL.bat` may print the UAC message and then exit with code `0` without the elevated installer visibly continuing. If that happens, nothing is necessarily wrong with your build — run `INSTALL.bat` explicitly with **Right-click -> Run as administrator** and enter the game path again.
 
 Example:
 
@@ -147,7 +147,7 @@ Example:
 B:\Games\Steam\steamapps\common\Grand Theft Auto IV\GTAIV
 ```
 
-The path is requested before elevation so normal Explorer drag-and-drop works. The installer is forgiving if you paste `GTAIV.exe` itself or select the outer `Grand Theft Auto IV` folder; it tries to resolve the correct folder automatically.
+The installer is forgiving if you paste `GTAIV.exe` itself or select the outer `Grand Theft Auto IV` folder; it tries to resolve the correct folder automatically.
 
 This builds ReShade from the exact 6.8.0 source tag, applies the cross-process input patch, backs up the active global ReShade Vulkan DLL and replaces it with the patched build.
 
