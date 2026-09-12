@@ -2,7 +2,6 @@
 setlocal EnableExtensions DisableDelayedExpansion
 cd /d "%~dp0"
 
-set "SELF=%~f0"
 set "BB_SELF=%~f0"
 set "PATCHED=%~dp0ReShade64-bbridge.dll"
 set "RESHADESYS=C:\ProgramData\ReShade\ReShade64.dll"
@@ -55,6 +54,7 @@ rem Be forgiving if the user selected the outer "Grand Theft Auto IV" folder.
 if not exist "%GAME%\GTAIV.exe" if exist "%GAME%\GTAIV\GTAIV.exe" set "GAME=%GAME%\GTAIV"
 
 set "TREX=%GAME%\.trex"
+set "BB_TREX=%TREX%"
 set "POC=%TREX%\bridge-input.addon64"
 set "POCDISABLED=%TREX%\bridge-input.addon64.poc-disabled"
 
@@ -135,7 +135,7 @@ copy /y "%PATCHED%" "%RESHADESYS%" >nul || (
 )
 
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
-  "$p='%TREX%\bridge.conf'; if(!(Test-Path -LiteralPath $p)){throw 'bridge.conf not found'}; $t=[IO.File]::ReadAllText($p); foreach($kv in @(@('client.DirectInput.forward.mousePolicy','3'),@('client.DirectInput.forward.keyboardPolicy','3'))){$k=$kv[0];$v=$kv[1];$pat='(?m)^\s*'+[regex]::Escape($k)+'\s*=.*$';$line=$k+' = '+$v;if($t -match $pat){$t=[regex]::Replace($t,$pat,$line)}else{if($t.Length -gt 0 -and !$t.EndsWith([Environment]::NewLine)){$t+=[Environment]::NewLine};$t+=$line+[Environment]::NewLine}};[IO.File]::WriteAllText($p,$t,(New-Object Text.UTF8Encoding($false)))" || (
+  "$p=Join-Path $env:BB_TREX 'bridge.conf'; if(!(Test-Path -LiteralPath $p)){throw 'bridge.conf not found'}; $t=[IO.File]::ReadAllText($p); foreach($kv in @(@('client.DirectInput.forward.mousePolicy','3'),@('client.DirectInput.forward.keyboardPolicy','3'))){$k=$kv[0];$v=$kv[1];$pat='(?m)^\s*'+[regex]::Escape($k)+'\s*=.*$';$line=$k+' = '+$v;if($t -match $pat){$t=[regex]::Replace($t,$pat,$line)}else{if($t.Length -gt 0 -and !$t.EndsWith([Environment]::NewLine)){$t+=[Environment]::NewLine};$t+=$line+[Environment]::NewLine}};[IO.File]::WriteAllText($p,$t,(New-Object Text.UTF8Encoding($false)))" || (
   echo WARNING: Could not update bridge.conf automatically.
   echo Add these manually:
   echo   client.DirectInput.forward.mousePolicy = 3
