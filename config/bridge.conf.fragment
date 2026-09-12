@@ -1,0 +1,6 @@
+# Required by the ReShade b-bridge input patch.
+client.DirectInput.forward.mousePolicy = 3
+client.DirectInput.forward.keyboardPolicy = 3
+
+# Known-good frame cap setting used by the DLAA installer.
+clientFrameCap = 0
