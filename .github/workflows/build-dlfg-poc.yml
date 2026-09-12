@@ -1,4 +1,4 @@
-name: Build DLFG milestone-1 POC
+name: Build DLFG milestone-1.2 standalone POC
 
 on:
   push:
@@ -16,13 +16,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build x64 ReShade add-on
+      - name: Build isolated standalone probe
         shell: cmd
-        run: tools\dlfg-poc\BUILD-CI.bat
+        run: tools\dlfg-poc\BUILD-STANDALONE-CI.bat
 
-      - name: Upload probe add-on
+      - name: Upload standalone probe
         uses: actions/upload-artifact@v4
         with:
-          name: dlfg-milestone1-poc
-          path: tools/dlfg-poc/dlfg-probe.addon64
+          name: dlfg-milestone1.2-standalone
+          path: |
+            tools/dlfg-poc/standalone/NvRemixBridge.exe
+            tools/dlfg-poc/RUN-STANDALONE.bat
           if-no-files-found: error
