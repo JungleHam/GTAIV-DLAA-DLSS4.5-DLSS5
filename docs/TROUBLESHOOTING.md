@@ -20,6 +20,27 @@ TextureSearchPaths=.\reshade-shaders\Textures
 
 Do not use trailing `\**` in this bridge setup.
 
+## Home does nothing after Step 3
+
+First inspect `.trex\ReShade.log`.
+
+If it contains:
+
+```text
+Cannot capture input for window ... created by a different process
+```
+
+then the stock/unpatched ReShade DLL is still loading. Step 3 is not complete, regardless of what an older installer window may have reported.
+
+The patched build should instead log lines beginning with:
+
+```text
+b-bridge input relay: accepting foreign render window
+b-bridge input relay: handshake complete
+```
+
+Use the current `BUILD.bat` and `INSTALL.bat` from `tools/reshade-bbridge-input/`. The current build script performs a clean rebuild and verifies that the compiled DLL contains the patch marker; the installer verifies that the global `C:\ProgramData\ReShade\ReShade64.dll` is byte-for-byte identical to the patched DLL before claiming success.
+
 ## ReShade UI visible but mouse/keyboard dead
 
 Install the patch under:
@@ -34,6 +55,8 @@ and ensure `.trex\bridge.conf` contains:
 client.DirectInput.forward.mousePolicy = 3
 client.DirectInput.forward.keyboardPolicy = 3
 ```
+
+If the patched ReShade log shows `accepting foreign render window` but never shows `handshake complete`, the patched DLL loaded but the b-bridge message-channel handshake failed. Check `bridge.conf` and the bridge client logs next.
 
 If you are debugging only the original POC and the handshake succeeds but no events arrive, `client.hookMessagePump = True` is a secondary test. It is not part of the normal known-good setup.
 
@@ -71,6 +94,8 @@ Turn NVIDIA Smooth Motion off first.
 ## One motion-vector probe is zero
 
 Do not diagnose the whole pipeline from a single static-scene probe. In the tested setup isolated low/zero-MV probes occurred while surrounding probes were healthy and neural processing continued successfully.
+
+If motion-vector and depth probes remain zero/flat continuously during actual gameplay, that is different: fix the ReShade depth/motion-vector inputs before judging DLAA quality or enabling Neural Rendering.
 
 ## Neural Rendering performance is much lower than DLAA
 
