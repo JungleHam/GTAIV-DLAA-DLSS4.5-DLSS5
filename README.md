@@ -116,7 +116,7 @@ Copy:
 install/Install-DLAA.bat
 ```
 
-into the folder containing `GTAIV.exe`, then run it.
+into the folder containing `GTAIV.exe`, then **double-click it**.
 
 The installer creates a rollback backup, downloads pinned upstream components, installs ReShade 6.8.0 as the Vulkan layer for `NvRemixBridge.exe`, configures Lumenite as Feeder motion-vector provider 3, and enables Feeder DLAA mode at native work resolution.
 
@@ -124,56 +124,56 @@ Read [`docs/DLAA.md`](docs/DLAA.md) first.
 
 ### 3. Recommended: install the interactive ReShade patch
 
-From:
+This step no longer requires opening PowerShell, Command Prompt, or an Administrator terminal manually.
+
+Open:
 
 ```text
 tools/reshade-bbridge-input/
 ```
 
-If you are using **PowerShell**, batch files in the current directory must be prefixed with `.\`.
+Then:
 
-Run:
+1. **Double-click `BUILD.bat`** and wait until it says `SUCCESS`.
+2. Close that window and **double-click `INSTALL.bat`**.
+3. Windows will ask for Administrator permission — click **Yes**.
+4. The installer asks for your GTA IV folder. **Copy/paste the path or drag the folder into the window**, then press **Enter**.
 
-```powershell
-.\BUILD.bat
+Example:
+
+```text
+B:\Games\Steam\steamapps\common\Grand Theft Auto IV\GTAIV
 ```
 
-Then from an **Administrator PowerShell** in the same folder:
-
-```powershell
-.\INSTALL.bat "X:\path\to\Grand Theft Auto IV\GTAIV"
-```
-
-If you use classic `cmd.exe` instead, the `.\` prefix is optional.
+The installer is forgiving if you paste `GTAIV.exe` itself or select the outer `Grand Theft Auto IV` folder; it tries to resolve the correct folder automatically.
 
 This builds ReShade from the exact 6.8.0 source tag, applies the cross-process input patch, backs up the active global ReShade Vulkan DLL and replaces it with the patched build.
 
 See [`docs/RESHade-INPUT-PATCH.md`](docs/RESHade-INPUT-PATCH.md).
 
-> **DLAA setup is complete after Step 3.** At this point you can stop here and use GTA IV with DLAA only. Everything below is optional and is only for adding **DLSS 5 Neural Rendering** on top of the working DLAA setup.
+#### DLAA model / quality preset selector
 
-#### DLAA model / quality selector — available after Step 3
-
-The pinned **DLSS5-Feeder 0.15.1 already includes a live DLSS render-preset selector**. Step 3 makes it usable because the patched ReShade build restores mouse and keyboard input to the server-side overlay.
-
-Launch GTA IV, press **Home**, then open:
+After Step 3, launch GTA IV and press **Home**, then open:
 
 ```text
 Add-ons -> DLSS 5 Feed -> DLSS render preset -> Preset
 ```
 
-Available presets in the pinned Feeder build:
+The choices mean:
 
-| Preset | What to use it for |
-|---|---|
-| **K (transformer)** | **Recommended for normal DLAA use.** NVIDIA documents K as the default transformer preset for DLAA / Quality / Balanced |
-| **J (transformer)** | Alternative transformer model; may show a little less ghosting but more flicker than K |
-| **Default** | Let the NVIDIA runtime choose its default behavior |
-| **E / F (legacy CNN)** | Deprecated legacy models; mainly useful as troubleshooting alternatives for motion / transparent-object artifacts |
+| Choice | Model | What it does |
+|---|---|---|
+| **K** | Modern transformer | **Recommended.** NVIDIA's default preset for DLAA / Quality / Balanced. Targets the best image quality, with somewhat higher GPU cost than the older models. |
+| **J** | Modern transformer | Similar to K, but NVIDIA notes it may show a little less ghosting at the cost of more flicker. Try it if K leaves visible trails. |
+| **Default** | Runtime-selected | Does not force a specific model; the NVIDIA runtime picks its normal default. That choice can vary with runtime/OTA behavior. |
+| **E** | Legacy CNN | Deprecated old model. Mainly useful for troubleshooting; in this Feeder setup it can sometimes help with motion/transparency warping around smoke, dust, flames, etc. |
+| **F** | Legacy CNN | Another deprecated legacy CNN option. Like E, use it as a fallback if the transformer presets produce visible temporal artifacts. |
 
-Changing the preset live causes Feeder to rebuild the DLSS feature and save the selected value to `.trex\dlss5-feed.cfg`.
+There is no simple `E < F < J < K` quality ladder for every scene. **Start with K**, try J for ghosting, and treat E/F as troubleshooting alternatives. Changing the preset briefly rebuilds the DLSS feature, so a small hitch is normal.
 
-This is a **DLAA model/preset selector**, not DLSS Super Resolution Quality/Balanced/Performance. GTA IV still renders at native resolution and DLAA remains 1:1.
+This selector changes the **DLAA render model only**. It does **not** enable DLSS Super Resolution Quality/Balanced/Performance; GTA IV still renders at native resolution and DLAA remains a 1:1 anti-aliasing pass.
+
+> **DLAA setup is complete after Step 3.** At this point you can stop here and use GTA IV with DLAA only. Everything below is optional and is only for adding **DLSS 5 Neural Rendering** on top of the working DLAA setup.
 
 ### 4. Optional: upgrade to DLSS 5 Neural Rendering
 
@@ -190,7 +190,7 @@ Then copy:
 install/Upgrade-DLSS5-DFC.bat
 ```
 
-beside `GTAIV.exe` and run it.
+beside `GTAIV.exe` and **double-click it**.
 
 ## Switching to DLAA only
 
