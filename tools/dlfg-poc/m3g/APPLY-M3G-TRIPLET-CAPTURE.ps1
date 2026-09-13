@@ -18,11 +18,12 @@ $text = Read-Normalized $feedCpp
 # exports the already-existing M3B-1 validation triplet that the Feeder has in CPU
 # readback memory: sequential real A, generated midpoint G, sequential real B.
 if (!$text.Contains('// M3G objective triplet writer')) {
-    $anchor = @'
-static void M2bPollReadback()
-{
-'@
-    if (!$text.Contains($anchor)) { throw 'M3G anchor not found: M2bPollReadback' }
+    # Insert next to the existing BMP helper rather than relying on the exact
+    # M2bPollReadback declaration spelling. The generated Feeder tree can preserve
+    # equivalent poll code with slightly different formatting across rebuild layers.
+    $anchor = 'static bool M2bWriteBmp('
+    $pos = $text.IndexOf($anchor)
+    if ($pos -lt 0) { throw 'M3G anchor not found: M2bWriteBmp' }
 
     $helper = @'
 // M3G objective triplet writer. The M3B-1 bootstrap already owns three CPU readbacks
@@ -62,7 +63,7 @@ static bool M3gWriteBmpNamed(const uint8_t *p, UINT row_pitch, const char *name,
 }
 
 '@
-    $text = $text.Replace($anchor, $helper + $anchor)
+    $text = $text.Insert($pos, $helper)
 }
 
 if (!$text.Contains('// M3G objective triplet export')) {
