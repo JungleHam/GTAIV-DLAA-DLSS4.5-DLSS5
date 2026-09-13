@@ -14,12 +14,21 @@ if not exist "%M2B%\BUILD-M2B-PROBE.bat" (
   echo [M3C] Missing %M2B%\BUILD-M2B-PROBE.bat
   exit /b 1
 )
+if not exist "%~dp0APPLY-M3C-RING.ps1" (
+  echo [M3C] Missing APPLY-M3C-RING.ps1
+  exit /b 1
+)
 
 rem Reproduce the exact hardware-proven M3B-2B source/binaries first.
 call "%M3B2B%\BUILD-M3B2B.bat"
 if errorlevel 1 exit /b %errorlevel%
 
-rem Layer ONLY the default-off M3C publication FIFO on top of the proven M3B-2B producer.
+rem Patch the freshly regenerated M3B-2A ring with newline-safe M3C FIFO semantics first.
+rem APPLY-M3C-QUEUE.ps1 then sees the integration marker and only layers the config/main-source changes.
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0APPLY-M3C-RING.ps1"
+if errorlevel 1 exit /b %errorlevel%
+
+rem Layer ONLY the default-off M3C config/main-source integration on top of proven M3B-2B.
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0APPLY-M3C-QUEUE.ps1"
 if errorlevel 1 exit /b %errorlevel%
 
@@ -45,11 +54,11 @@ certutil -hashfile "%OUT%\OptiScaler-M3C.dll" SHA256 | findstr /R /V "hash CertU
 echo.
 echo [M3C] TEST MODE:
 echo   dlfg_m3b2b_native=1
- echo   dlfg_m3c_queue=1
+echo   dlfg_m3c_queue=1
 echo   Keep FusionFix Windowed = On and Windowed Borderless = On.
 echo   Do NOT press Alt+Enter and do NOT switch Windowed Off.
 echo.
 echo [M3C] TARGET:
 echo   MILESTONE M3C PRODUCER PASSED = 300 consecutive publications with sourceFrame delta=1
- echo   OptiScaler consumer should also remain consecutive with no present/consumer-done failures.
+echo   OptiScaler consumer should also remain consecutive with no present/consumer-done failures.
 endlocal
