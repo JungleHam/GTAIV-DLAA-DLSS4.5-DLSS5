@@ -19,7 +19,7 @@ rem Reproduce the complete M3F source/binary baseline first.
 call "%M3F%\BUILD-M3F.bat"
 if errorlevel 1 exit /b %errorlevel%
 
-rem Add CPU-side export of the already-existing M3B-1 validation readbacks.
+rem Add manual runtime export of a clean continuous-native A/G/B triplet.
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0APPLY-M3G-TRIPLET-CAPTURE.ps1"
 if errorlevel 1 exit /b %errorlevel%
 
@@ -42,14 +42,20 @@ echo [M3G] SHA-256:
 certutil -hashfile "%OUT%\dlss5-feed-m3g.addon64" SHA256 | findstr /R /V "hash CertUtil"
 certutil -hashfile "%OUT%\OptiScaler-M3G.dll" SHA256 | findstr /R /V "hash CertUtil"
 echo.
-echo [M3G] OBJECTIVE CAPTURE:
-echo   The native M3B-1 bootstrap will save three BMPs next to the live Feeder addon:
-echo     dlfg-m3g-A-prev-real.bmp
-echo     dlfg-m3g-G-generated.bmp
-echo     dlfg-m3g-B-current-real.bmp
-echo.
-echo   A and B are sequential real frames; G is the feature-11 generated midpoint.
-echo   Upload those three files for offline alignment/ghosting analysis.
+echo [M3G] MANUAL OBJECTIVE CAPTURE:
+echo   Page Up   = capture set 1
+ echo   Page Down = capture set 2
+ echo.
+echo   Each key captures the next clean continuous-native triplet:
+echo     A = real frame
+ echo     G = NVIDIA feature-11 generated midpoint
+ echo     B = next sequential real frame
+ echo.
+echo   Filenames are written next to the live Feeder addon and include the active M3F MV mode,
+echo   for example: dlfg-m3g-1-mode0-A-prev-real.bmp
+ echo.
+echo   Recommended first run: M3F mode 0 baseline, steady horizontal camera pan, press Page Up.
+echo   A second in-game comparison can use another M3F mode, then press Page Down.
 echo.
 echo [M3G] Keep FusionFix Windowed ON + Borderless ON. Do not Alt+Enter.
 endlocal
