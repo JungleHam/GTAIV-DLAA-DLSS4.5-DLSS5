@@ -24,6 +24,12 @@ rem consumer is intentionally unchanged.
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0APPLY-M3B2B-FEEDER.ps1"
 if errorlevel 1 exit /b %errorlevel%
 
+rem Follow-up robustness patch for M3B-2B startup. The native mode can reach the old
+rem M3B-1 prerequisite gate before every normal NGX/interop resource is ready. Retry
+rem only in M3B-2B mode and print an explicit per-prerequisite diagnostic mask.
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0APPLY-M3B2B-PREREQ-RETRY.ps1"
+if errorlevel 1 exit /b %errorlevel%
+
 rem Rebuild the already-generated/patched Feeder source tree.
 call "%M2B%\BUILD-M2B-PROBE.bat"
 if errorlevel 1 exit /b %errorlevel%
