@@ -13,27 +13,16 @@ if ($norm.Contains($marker)) {
     exit 0
 }
 
+# Patch only the stable terminal action inside M3b1MaybeRecord rather than matching
+# the entire surrounding prerequisite condition. Earlier M3B-1/M3B-2B patches can
+# legitimately change that condition's formatting/gates while this failure call stays
+# the same. This keeps the patch resilient and preserves the original one-shot path.
 $old = @'
-    if (frame <= 1 || g.width != 2560 || g.height != 1440 ||
-        g.color_fmt != DXGI_FORMAT_B8G8R8A8_UNORM ||
-        g.output_fmt != DXGI_FORMAT_B8G8R8A8_UNORM || g.tex12[SLOT_OUTPUT] == nullptr ||
-        g.tex12[SLOT_DEPTH] == nullptr || g.tex12[SLOT_MV] == nullptr ||
-        g.m3b1a_tex12 == nullptr || !g.m3b1a_vk_released || g.feature == nullptr || !g.ngx_inited)
-    {
         M2bFail("required existing NGX/session and 2560x1440 shared B8/R32/R16G16 resources are unavailable");
         return true;
-    }
 '@
 
 $new = @'
-    const bool m3b1_prereq_missing =
-        frame <= 1 || g.width != 2560 || g.height != 1440 ||
-        g.color_fmt != DXGI_FORMAT_B8G8R8A8_UNORM ||
-        g.output_fmt != DXGI_FORMAT_B8G8R8A8_UNORM || g.tex12[SLOT_OUTPUT] == nullptr ||
-        g.tex12[SLOT_DEPTH] == nullptr || g.tex12[SLOT_MV] == nullptr ||
-        g.m3b1a_tex12 == nullptr || !g.m3b1a_vk_released || g.feature == nullptr || !g.ngx_inited;
-    if (m3b1_prereq_missing)
-    {
         if (g_cfg.dlfg_m3b2b_native != 0)
         {
             // M3B-2B can become active earlier in startup than the old one-shot test did.
@@ -66,13 +55,17 @@ $new = @'
         // is not the owner of the experiment.
         M2bFail("required existing NGX/session and 2560x1440 shared B8/R32/R16G16 resources are unavailable");
         return true;
-    }
 '@
 
-if (!$norm.Contains($old)) {
-    throw 'Could not find the M3B-1 prerequisite gate; no file written.'
+$pos = $norm.IndexOf($old)
+if ($pos -lt 0) {
+    throw 'Could not find the stable M3B-1 prerequisite failure action; no file written.'
 }
-$norm = $norm.Replace($old, $new)
+$second = $norm.IndexOf($old, $pos + $old.Length)
+if ($second -ge 0) {
+    throw 'Found more than one M3B-1 prerequisite failure action; refusing ambiguous patch.'
+}
+$norm = $norm.Remove($pos, $old.Length).Insert($pos, $new)
 
 if ($hadCrLf) { $norm = $norm.Replace("`n", "`r`n") }
 [IO.File]::WriteAllText($source, $norm, [Text.UTF8Encoding]::new($false))
