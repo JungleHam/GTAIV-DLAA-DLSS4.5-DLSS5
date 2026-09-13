@@ -15,17 +15,21 @@ function Write-Normalized([string]$path, [string]$text) {
     Set-Content -Path $path -Value $text -NoNewline -Encoding UTF8
 }
 
+# Patch the common SafeCreateDLFG helper by locating the function and inserting after
+# its first '*code = 0;' statement. Do not depend on exact whitespace from generated source.
 $cppText = Read-Normalized $cpp
 if (!$cppText.Contains('[feed] M3I-A: CREATE contract')) {
-    $createAnchor = @'
-static NVSDK_NGX_Result SafeCreateDLFG(NVSDK_NGX_DLSSG_Create_Params *cp, DWORD *code)
-{
-    *code = 0;
-'@
-    $createReplacement = @'
-static NVSDK_NGX_Result SafeCreateDLFG(NVSDK_NGX_DLSSG_Create_Params *cp, DWORD *code)
-{
-    *code = 0;
+    $sig = 'static NVSDK_NGX_Result SafeCreateDLFG('
+    $sigPos = $cppText.IndexOf($sig)
+    if ($sigPos -lt 0) { throw 'M3I-A anchor not found: SafeCreateDLFG signature' }
+
+    $codeStmt = '*code = 0;'
+    $codePos = $cppText.IndexOf($codeStmt, $sigPos)
+    if ($codePos -lt 0) { throw 'M3I-A anchor not found: SafeCreateDLFG code reset' }
+
+    $insertPos = $codePos + $codeStmt.Length
+    $createLog = @'
+
     if (cp != nullptr)
     {
         Log("[feed] M3I-A: CREATE contract Width=%u Height=%u RenderWidth=%u RenderHeight=%u NativeFormat=%u DRS=%d g=%ux%u",
@@ -34,8 +38,7 @@ static NVSDK_NGX_Result SafeCreateDLFG(NVSDK_NGX_DLSSG_Create_Params *cp, DWORD 
             g.width, g.height);
     }
 '@
-    if (!$cppText.Contains($createAnchor)) { throw 'M3I-A anchor not found: SafeCreateDLFG prologue' }
-    $cppText = $cppText.Replace($createAnchor, $createReplacement)
+    $cppText = $cppText.Insert($insertPos, $createLog)
     Write-Normalized $cpp $cppText
 }
 
@@ -119,22 +122,19 @@ static void M3iAuditEvalContract(UINT64 frame, bool reset,
     $incText = $incText.Insert($pos, $helper)
 }
 
+# Insert the audit call immediately after M2bBuildConstants in the continuous feature-11
+# evaluator. Again use function-relative token lookup rather than an exact multiline block.
 if (!$incText.Contains('M3iAuditEvalContract(frame, reset, op);')) {
-    $callAnchor = @'
-    NVSDK_NGX_DLSSG_Opt_Eval_Params op = {};
-    M2bBuildConstants(&op, reset);
+    $evalSig = 'static M3b2bEvalResult M3b2bEvaluate(UINT64 frame, bool reset)'
+    $evalPos = $incText.IndexOf($evalSig)
+    if ($evalPos -lt 0) { throw 'M3I-A anchor not found: M3b2bEvaluate for call site' }
 
-    DWORD code = 0;
-'@
-    $callReplacement = @'
-    NVSDK_NGX_DLSSG_Opt_Eval_Params op = {};
-    M2bBuildConstants(&op, reset);
-    M3iAuditEvalContract(frame, reset, op);
+    $buildStmt = 'M2bBuildConstants(&op, reset);'
+    $buildPos = $incText.IndexOf($buildStmt, $evalPos)
+    if ($buildPos -lt 0) { throw 'M3I-A anchor not found: M2bBuildConstants call in M3b2bEvaluate' }
 
-    DWORD code = 0;
-'@
-    if (!$incText.Contains($callAnchor)) { throw 'M3I-A anchor not found: M3b2bEvaluate constants/evaluate site' }
-    $incText = $incText.Replace($callAnchor, $callReplacement)
+    $callInsertPos = $buildPos + $buildStmt.Length
+    $incText = $incText.Insert($callInsertPos, "`n    M3iAuditEvalContract(frame, reset, op);")
 }
 
 Write-Normalized $inc $incText
