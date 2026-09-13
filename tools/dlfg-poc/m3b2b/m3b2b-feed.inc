@@ -6,8 +6,9 @@
 //
 // Bootstrap:
 //   M3B-1 still performs its validated A/B one-shot first. Only after its CPU readback
-//   reaches kM2bPassed do we continue evaluating the same feature on every valid real
-//   frame. The first continuous request therefore follows the validated temporal history.
+//   reaches kM2bPassed do we begin the continuous path. Because that asynchronous
+//   validation can leave a temporal gap after frame B, the first continuous evaluation
+//   is always reset=true and is used only to seed fresh feature-11 history.
 //
 // Runtime:
 //   real N -> feature 11 -> g.m3b1a_tex12 -> free M3B-2A ring slot -> Vulkan consumer.
@@ -115,9 +116,11 @@ static bool M3b2bRecordNative(UINT64 frame, bool dlssReset, int *slotOut)
     if (!g_m3b2b.announced)
     {
         g_m3b2b.announced = true;
-        // kM2bPassed means the immediately preceding M3B-1 A/B sequence was already
-        // generated and read back successfully, so its temporal history is valid.
-        Log("[feed] M3B-2B: M3B-1 bootstrap validated; continuing the same native feature-11 history");
+        // CPU validation of the bootstrap A/B pair completes on a later real frame.
+        // Force a fresh history seed before the first continuous interpolation so we
+        // never bridge that temporal gap with stale feature history.
+        g_m3b2b.needReset = true;
+        Log("[feed] M3B-2B: M3B-1 bootstrap validated; seeding fresh continuous feature-11 history");
     }
 
     constexpr double kM3b2bMinMovingMvMeanPx = 0.05;
