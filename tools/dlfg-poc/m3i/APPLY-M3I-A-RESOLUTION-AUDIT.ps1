@@ -17,10 +17,25 @@ function Write-Normalized([string]$path, [string]$text) {
 
 $cppText = Read-Normalized $cpp
 if (!$cppText.Contains('[feed] M3I-A: CREATE contract')) {
-    $anchor = "static NVSDK_NGX_Result SafeCreateDLFG(NVSDK_NGX_DLSSG_Create_Params *cp, DWORD *code)`n{`n    *code = 0;"
-    $replacement = "static NVSDK_NGX_Result SafeCreateDLFG(NVSDK_NGX_DLSSG_Create_Params *cp, DWORD *code)`n{`n    *code = 0;`n    if (cp != nullptr)`n    {`n        Log(\"[feed] M3I-A: CREATE contract Width=%u Height=%u RenderWidth=%u RenderHeight=%u NativeFormat=%u DRS=%d g=%ux%u\",`n            cp->Width, cp->Height, cp->RenderWidth, cp->RenderHeight,`n            cp->NativeBackbufferFormat, cp->DynamicResolutionScaling ? 1 : 0, g.width, g.height);`n    }"
-    if (!$cppText.Contains($anchor)) { throw 'M3I-A anchor not found: SafeCreateDLFG prologue' }
-    $cppText = $cppText.Replace($anchor, $replacement)
+    $createAnchor = @'
+static NVSDK_NGX_Result SafeCreateDLFG(NVSDK_NGX_DLSSG_Create_Params *cp, DWORD *code)
+{
+    *code = 0;
+'@
+    $createReplacement = @'
+static NVSDK_NGX_Result SafeCreateDLFG(NVSDK_NGX_DLSSG_Create_Params *cp, DWORD *code)
+{
+    *code = 0;
+    if (cp != nullptr)
+    {
+        Log("[feed] M3I-A: CREATE contract Width=%u Height=%u RenderWidth=%u RenderHeight=%u NativeFormat=%u DRS=%d g=%ux%u",
+            cp->Width, cp->Height, cp->RenderWidth, cp->RenderHeight,
+            cp->NativeBackbufferFormat, cp->DynamicResolutionScaling ? 1 : 0,
+            g.width, g.height);
+    }
+'@
+    if (!$cppText.Contains($createAnchor)) { throw 'M3I-A anchor not found: SafeCreateDLFG prologue' }
+    $cppText = $cppText.Replace($createAnchor, $createReplacement)
     Write-Normalized $cpp $cppText
 }
 
@@ -32,6 +47,7 @@ if (!$incText.Contains('// M3I-A resolution/subrect audit')) {
 
     $helper = @'
 // M3I-A resolution/subrect audit.
+// Diagnostic only: no feature-11 inputs are intentionally changed.
 static bool g_m3i_a_logged_reset = false;
 static bool g_m3i_a_logged_live = false;
 
@@ -51,24 +67,36 @@ static void M3iAuditResource(const char *name, ID3D12Resource *resource)
         static_cast<unsigned>(d.Flags), static_cast<unsigned long long>(d.Alignment));
 }
 
-static void M3iAuditRect(const char *name, const NVSDK_NGX_Coordinates &base, const NVSDK_NGX_Dimensions &size)
+static void M3iAuditRect(const char *name,
+                         const NVSDK_NGX_Coordinates &base,
+                         const NVSDK_NGX_Dimensions &size)
 {
-    Log("[feed] M3I-A: SUBRECT %s base=%u,%u size=%ux%u", name ? name : "?", base.X, base.Y, size.Width, size.Height);
+    Log("[feed] M3I-A: SUBRECT %s base=%u,%u size=%ux%u",
+        name ? name : "?", base.X, base.Y, size.Width, size.Height);
 }
 
-static void M3iAuditEvalContract(UINT64 frame, bool reset, const NVSDK_NGX_DLSSG_Opt_Eval_Params &op)
+static void M3iAuditEvalContract(UINT64 frame, bool reset,
+                                 const NVSDK_NGX_DLSSG_Opt_Eval_Params &op)
 {
-    bool &already = reset ? g_m3i_a_logged_reset : g_m3i_a_logged_live;
-    if (already) return;
-    already = true;
+    if (reset)
+    {
+        if (g_m3i_a_logged_reset) return;
+        g_m3i_a_logged_reset = true;
+    }
+    else
+    {
+        if (g_m3i_a_logged_live) return;
+        g_m3i_a_logged_live = true;
+    }
 
     Log("[feed] M3I-A: EVAL contract frame=%llu reset=%d g=%ux%u work_resolution=%d%% work_upscale=%d work_sharpness=%.3f",
-        static_cast<unsigned long long>(frame), reset ? 1 : 0, g.width, g.height,
-        g_cfg.work_resolution, g_cfg.work_upscale, g_cfg.work_sharpness);
+        static_cast<unsigned long long>(frame), reset ? 1 : 0,
+        g.width, g.height, g_cfg.work_resolution, g_cfg.work_upscale, g_cfg.work_sharpness);
     Log("[feed] M3I-A: EVAL meta multiFrame=%u/%u mvecScale=(%.9f,%.9f) jitter=(%.6f,%.6f) cameraMotionIncluded=%d motionVectorsDilated=%d cameraFOV=%.6f near=%.6f far=%.3f aspect=%.6f",
-        op.multiFrameIndex, op.multiFrameCount, op.mvecScale[0], op.mvecScale[1],
-        op.jitterOffset[0], op.jitterOffset[1], op.cameraMotionIncluded ? 1 : 0,
-        op.motionVectorsDilated ? 1 : 0, op.cameraFOV, op.cameraNear, op.cameraFar, op.cameraAspectRatio);
+        op.multiFrameIndex, op.multiFrameCount,
+        op.mvecScale[0], op.mvecScale[1], op.jitterOffset[0], op.jitterOffset[1],
+        op.cameraMotionIncluded ? 1 : 0, op.motionVectorsDilated ? 1 : 0,
+        op.cameraFOV, op.cameraNear, op.cameraFar, op.cameraAspectRatio);
 
     M3iAuditResource("SLOT_COLOR", g.tex12[SLOT_COLOR]);
     M3iAuditResource("SLOT_OUTPUT/backbuffer", g.tex12[SLOT_OUTPUT]);
@@ -92,10 +120,21 @@ static void M3iAuditEvalContract(UINT64 frame, bool reset, const NVSDK_NGX_DLSSG
 }
 
 if (!$incText.Contains('M3iAuditEvalContract(frame, reset, op);')) {
-    $anchor = "    NVSDK_NGX_DLSSG_Opt_Eval_Params op = {};`n    M2bBuildConstants(&op, reset);`n`n    DWORD code = 0;"
-    $replacement = "    NVSDK_NGX_DLSSG_Opt_Eval_Params op = {};`n    M2bBuildConstants(&op, reset);`n    M3iAuditEvalContract(frame, reset, op);`n`n    DWORD code = 0;"
-    if (!$incText.Contains($anchor)) { throw 'M3I-A anchor not found: M3b2bEvaluate constants/evaluate site' }
-    $incText = $incText.Replace($anchor, $replacement)
+    $callAnchor = @'
+    NVSDK_NGX_DLSSG_Opt_Eval_Params op = {};
+    M2bBuildConstants(&op, reset);
+
+    DWORD code = 0;
+'@
+    $callReplacement = @'
+    NVSDK_NGX_DLSSG_Opt_Eval_Params op = {};
+    M2bBuildConstants(&op, reset);
+    M3iAuditEvalContract(frame, reset, op);
+
+    DWORD code = 0;
+'@
+    if (!$incText.Contains($callAnchor)) { throw 'M3I-A anchor not found: M3b2bEvaluate constants/evaluate site' }
+    $incText = $incText.Replace($callAnchor, $callReplacement)
 }
 
 Write-Normalized $inc $incText
