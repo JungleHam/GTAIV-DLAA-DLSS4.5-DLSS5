@@ -23,6 +23,11 @@ rem Add diagnostic-only capture of the exact B-frame MV + depth resources fed to
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0APPLY-M3H-INPUT-CAPTURE.ps1"
 if errorlevel 1 exit /b %errorlevel%
 
+rem M3H v2: install the exact-input queue call that v1 accidentally skipped because its
+rem idempotence check matched the helper declaration before it reached the call site.
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0APPLY-M3H-V2.ps1"
+if errorlevel 1 exit /b %errorlevel%
+
 rem Only Feeder changed. Rebuild it from the now-patched generated source tree.
 call "%M2B%\BUILD-M2B-PROBE.bat"
 if errorlevel 1 exit /b %errorlevel%
@@ -44,13 +49,13 @@ certutil -hashfile "%OUT%\OptiScaler-M3H.dll" SHA256 | findstr /R /V "hash CertU
 echo.
 echo [M3H] MANUAL OBJECTIVE INPUT CAPTURE:
 echo   ` = capture set 1
- echo   = = capture set 2
- echo.
+echo   = = capture set 2
+echo.
 echo   Each successful trigger saves the existing M3G A/G/B triplet PLUS:
 echo     dlfg-m3h-N-modeM-MV-R16G16_FLOAT.bin
- echo     dlfg-m3h-N-modeM-DEPTH-R32_FLOAT.bin
- echo     dlfg-m3h-N-modeM-inputs.txt
- echo.
+echo     dlfg-m3h-N-modeM-DEPTH-R32_FLOAT.bin
+echo     dlfg-m3h-N-modeM-inputs.txt
+echo.
 echo   These are the exact B-frame MV/depth resources supplied to NVIDIA feature 11.
 echo   No DLSS-G input values, transport, pacing, or present order are intentionally changed.
 echo.
