@@ -13,22 +13,32 @@ if ($norm.Contains($marker)) {
     exit 0
 }
 
-# Patch only the stable terminal action inside M3b1MaybeRecord rather than matching
-# the entire surrounding prerequisite condition. Earlier M3B-1/M3B-2B patches can
-# legitimately change that condition's formatting/gates while this failure call stays
-# the same. This keeps the patch resilient and preserves the original one-shot path.
-$old = @'
-        M2bFail("required existing NGX/session and 2560x1440 shared B8/R32/R16G16 resources are unavailable");
-        return true;
-'@
+$funcStart = $norm.IndexOf('static bool M3b1MaybeRecord(')
+$funcEnd = $norm.IndexOf('static void M2cFail(', $funcStart)
+if ($funcStart -lt 0 -or $funcEnd -lt 0) {
+    throw 'Could not locate M3b1MaybeRecord/M2cFail anchors; no changes made.'
+}
 
-$new = @'
+# Insert inside the existing M3B-1 prerequisite failure block instead of replacing
+# its failure statement. This is resilient to prior edits of the exact M2bFail text.
+$ifPos = $norm.IndexOf('    if (frame <= 1', $funcStart)
+if ($ifPos -lt 0 -or $ifPos -ge $funcEnd) {
+    throw 'Could not locate the M3B-1 prerequisite condition; no file written.'
+}
+
+$openBrace = $norm.IndexOf("`n    {", $ifPos)
+if ($openBrace -lt 0 -or $openBrace -ge $funcEnd) {
+    throw 'Could not locate the M3B-1 prerequisite block opening brace; no file written.'
+}
+$insertAt = $openBrace + "`n    {".Length
+
+$insert = @'
+
         if (g_cfg.dlfg_m3b2b_native != 0)
         {
             // M3B-2B can become active earlier in startup than the old one-shot test did.
-            // A temporarily missing normal NGX feature or interop resource must not poison
-            // the native-stream state permanently. Wait for the exact proven prerequisites
-            // and report each component so a genuinely missing resource is diagnosable.
+            // Do not poison the stream permanently when the normal NGX feature or one of
+            // the interop resources is simply not ready yet; wait and log each prerequisite.
             static UINT64 s_m3b2b_last_prereq_log = 0;
             if (s_m3b2b_last_prereq_log == 0 || frame - s_m3b2b_last_prereq_log >= 300)
             {
@@ -50,27 +60,14 @@ $new = @'
             }
             return true;
         }
-
-        // Preserve the exact known-good M3B-1 one-shot failure behaviour when M3B-2B
-        // is not the owner of the experiment.
-        M2bFail("required existing NGX/session and 2560x1440 shared B8/R32/R16G16 resources are unavailable");
-        return true;
 '@
 
-$pos = $norm.IndexOf($old)
-if ($pos -lt 0) {
-    throw 'Could not find the stable M3B-1 prerequisite failure action; no file written.'
-}
-$second = $norm.IndexOf($old, $pos + $old.Length)
-if ($second -ge 0) {
-    throw 'Found more than one M3B-1 prerequisite failure action; refusing ambiguous patch.'
-}
-$norm = $norm.Remove($pos, $old.Length).Insert($pos, $new)
+$norm = $norm.Insert($insertAt, $insert)
 
 if ($hadCrLf) { $norm = $norm.Replace("`n", "`r`n") }
 [IO.File]::WriteAllText($source, $norm, [Text.UTF8Encoding]::new($false))
 
 Write-Host 'Applied M3B-2B bootstrap prerequisite retry/diagnostic fix:'
-Write-Host '  - M3B-2B retries temporary missing bootstrap resources instead of permanently failing'
+Write-Host '  - M3B-2B retries inside the existing prerequisite failure block'
 Write-Host '  - logs each prerequisite as 0/1 so the remaining blocker is explicit'
-Write-Host '  - explicit M3B-1 one-shot behaviour is unchanged'
+Write-Host '  - explicit M3B-1 one-shot failure behaviour remains unchanged'
