@@ -24,6 +24,12 @@ rem consumer is intentionally unchanged.
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0APPLY-M3B2B-FEEDER.ps1"
 if errorlevel 1 exit /b %errorlevel%
 
+rem BUILD-M3B2A refreshes m3b2a-feed.inc from its pristine M3B-2A source every run.
+rem If the main M3B-2B integration was already present, APPLY-M3B2B-FEEDER exits early,
+rem so explicitly re-enable the proven ring for native mode on every build.
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0ENSURE-M3B2B-RING.ps1"
+if errorlevel 1 exit /b %errorlevel%
+
 rem Follow-up robustness patch for M3B-2B startup. The native mode can reach the old
 rem M3B-1 prerequisite gate before every normal NGX/interop resource is ready. Retry
 rem only in M3B-2B mode and print an explicit per-prerequisite diagnostic mask.
