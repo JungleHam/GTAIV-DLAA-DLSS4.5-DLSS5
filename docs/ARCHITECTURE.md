@@ -1,5 +1,8 @@
 # Architecture
 
+For this branch's native **NR -> DLAA** experiment, see [M3K-NR.md](M3K-NR.md).
+The historical optional DFC path described below is not used by M3K.
+
 The unusual part of this setup is that GTA IV itself is still a 32-bit Direct3D 9 application, while the post-processing and NGX work occurs in a separate 64-bit process.
 
 ## Rendering path

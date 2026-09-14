@@ -11,3 +11,7 @@ input/*.zip
 *.log
 _PRE_DFC_BACKUP_*/
 _DLAA_PREINSTALL_BACKUP_*/
+
+# Isolated M3K source dependencies and generated artifacts
+tools/m3k-nr/_work/
+tools/m3k-nr/out-m3k/

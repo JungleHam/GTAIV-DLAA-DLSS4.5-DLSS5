@@ -1,5 +1,10 @@
 # GTA IV — DLAA + DLSS 5 Neural Rendering
 
+**M3K branch:** the new default-off **NR -> DLAA** experiment is documented in
+[M3K-NR](docs/M3K-NR.md), with an [isolated build and manual test install](tools/m3k-nr/README.md).
+The baseline documentation below describes the earlier optional DFC path.
+M3K does not use that installer or require Frame Generation.
+
 A reproducible, version-pinned setup for running **real NVIDIA NGX DLAA** in GTA IV, with an optional **DLSS 5 Neural Rendering / NGX Feature 18** stage through Deep Fried Chicken.
 
 This repository is intentionally **not a modpack**. It contains the integration logic, configuration, verification notes, installers, and the ReShade/b-bridge input patch. Third-party projects are fetched from pinned upstream locations, while files that should not be redistributed here are supplied by the user.

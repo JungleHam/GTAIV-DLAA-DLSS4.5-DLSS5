@@ -1,0 +1,24 @@
+M3K NR -> DLAA integration
+Copyright 2026 JungleHam
+
+This product includes adaptations of the feature-18 contract and x64
+caller-identity shim from:
+
+DLSS5 ReShade AIO
+Copyright 2026 kibblerz
+
+This product includes software developed for the DLSS5 ReShade AIO project:
+https://github.com/kibblerz/DLSS5-Reshade-AIO
+
+Reference revision: 09301f5528e619e8b9ec17c257d167e2985f53b0
+Derived portions: src/m3k_contract.h, src/m3k_nr.h, src/m3k_bridge.cpp.
+Modified for Feeder-owned D3D12/NGX, native one-pass NR, isolated NR parameters,
+default-off modes, safe failed-recording fallback, and private runtime paths.
+Those portions retain Apache-2.0; see licenses/Apache-2.0.txt.
+
+Feeder patch/build: DLSS5-Feeder 0.15.1, revision
+3f624855276c4bde55145c712782477639b30e85, MIT, Jean-Laurent ROUZIES,
+with portions derived from NIGos. ReShade, ImGui, and MinHook retain their
+respective notices. The build places these in out-m3k/licenses.
+NVIDIA SDK/runtime material retains NVIDIA's terms; no NVIDIA runtime DLL
+is redistributed or downloaded by the M3K build.

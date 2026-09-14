@@ -1,0 +1,143 @@
+diff --git a/src/dlss5-feed.cpp b/src/dlss5-feed.cpp
+index d8d5bfc9d1a3d0066a1c03aabf7e2491fce5d688..6e613f399b8b7d1473bbda0dbec35490ce444585 100644
+--- a/src/dlss5-feed.cpp
++++ b/src/dlss5-feed.cpp
+@@ -3060,6 +3060,8 @@ static void Barrier(ID3D12Resource *res, D3D12_RESOURCE_STATES from, D3D12_RESOU
+ // Resources
+ // ---------------------------------------------------------------------------
+ 
++#include "m3k_nr.h"
++
+ static void ReleaseFrameResources()
+ {
+     // Per-build state. Only the D3D11 cross-API builder turns it on; clearing it here is what
+@@ -3070,6 +3072,7 @@ static void ReleaseFrameResources()
+     // commands referencing these imports (including on the immediate list).
+     if (g.vk.ok && g.rs_queue && (g.vk_img[SLOT_COLOR] || g_vk_probe.dev)) g.rs_queue->wait_idle();
+     DrainGpu();
++    g_m3k.ShutdownRuntime(g_ngx_dying); // NR retires before Feeder parameters/core/device
+     FeedVkProbeRelease();
+     // Vulkan transport: drop our raw VkImage imports (the memory is the D3D12 resource's;
+     // freeing the import does not free the D3D12 resource, which SafeRelease(tex12) does).
+@@ -6213,6 +6216,50 @@ static void FeedFrame12(reshade::api::effect_runtime *rt, reshade::api::command_
+ // cross-API fences, and our private D3D12 list carries only the NGX evaluate.
+ // ---------------------------------------------------------------------------
+ 
++// M3K: unchanged D3D12 input recording, reusable when an NR recording fails.
++// Moved from FeedFrameVk; no changes to Vulkan ownership or presentation.
++static void M3kRecordVkInputs()
++{
++    if (g.in_buf12[SLOT_COLOR] != nullptr && g_cfg.mode >= 2)
++    {
++        // buffer_home inputs: the Vulkan side wrote the shared buffers;
++        // land them in the textures the evaluate actually reads.
++        static const struct { int slot; DXGI_FORMAT fmt; } kFill[] = {
++            { SLOT_COLOR, DXGI_FORMAT_UNKNOWN }, { SLOT_DEPTH, DXGI_FORMAT_R32_FLOAT },
++            { SLOT_MV, DXGI_FORMAT_R16G16_FLOAT }, { SLOT_MASK, DXGI_FORMAT_R8_UNORM },
++        };
++        for (const auto &d : kFill)
++        {
++            if (g.in_buf12[d.slot] == nullptr) continue;
++            if (d.slot == SLOT_MASK && !g.mask_ok) continue;
++            D3D12_TEXTURE_COPY_LOCATION src = {};
++            src.pResource = g.in_buf12[d.slot];
++            src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
++            src.PlacedFootprint.Offset = 0;
++            src.PlacedFootprint.Footprint = { d.slot == SLOT_COLOR ? g.color_fmt : d.fmt,
++                                              g.width, g.height, 1, g.in_pitch[d.slot] };
++            D3D12_TEXTURE_COPY_LOCATION dst = {};
++            dst.pResource = g.tex12[d.slot];
++            dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
++            dst.SubresourceIndex = 0;
++            Barrier(g.tex12[d.slot], D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
++            g.list->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
++            CK(kSlotName[d.slot]);
++            Barrier(g.tex12[d.slot], D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
++        }
++    }
++    Barrier(g.tex12[SLOT_COLOR],  D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
++    Barrier(g.tex12[SLOT_DEPTH],  D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
++    Barrier(g.tex12[SLOT_MV],     D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
++    if (g.mask_ok) Barrier(g.tex12[SLOT_MASK], D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
++    GuideProbeRecord(g.tex12[SLOT_MV], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
++                     g.tex12[SLOT_DEPTH], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
++    Barrier(g.tex12[SLOT_OUTPUT], D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
++    CK("input barriers");
++}
++
++#include "m3k_vk.h"
++
+ static void FeedFrameVk(reshade::api::effect_runtime *rt, reshade::api::command_list *cl, reshade::api::resource_view rtv)
+ {
+     using namespace reshade::api;
+@@ -6354,6 +6401,7 @@ static void FeedFrameVk(reshade::api::effect_runtime *rt, reshade::api::command_
+             FeedDisable("passthrough requires matching COLOR/OUTPUT formats; NGX was NOT called");
+             return;
+         }
++        M3kPrepareFrame(); // A0 creates on a separate list; displayed color remains original
+         FeedVkProbeBegin(rt, bb_res);
+         VkCommandBuffer cb = FeedVkDispatch<VkCommandBuffer>(cl->get_native());
+         const uint64_t capture_cb = FeedVkValue(cb);
+@@ -6561,42 +6609,7 @@ static void FeedFrameVk(reshade::api::effect_runtime *rt, reshade::api::command_
+                 // BeginCommands sits on a queue that is already stuck (#63).
+                 g.queue->Wait(g.fence12_in, n);
+                 CK("queue Wait(fence12_in)");
+-                if (g.in_buf12[SLOT_COLOR] != nullptr && g_cfg.mode >= 2)
+-                {
+-                    // buffer_home inputs: the Vulkan side wrote the shared buffers;
+-                    // land them in the textures the evaluate actually reads.
+-                    static const struct { int slot; DXGI_FORMAT fmt; } kFill[] = {
+-                        { SLOT_COLOR, DXGI_FORMAT_UNKNOWN }, { SLOT_DEPTH, DXGI_FORMAT_R32_FLOAT },
+-                        { SLOT_MV, DXGI_FORMAT_R16G16_FLOAT }, { SLOT_MASK, DXGI_FORMAT_R8_UNORM },
+-                    };
+-                    for (const auto &d : kFill)
+-                    {
+-                        if (g.in_buf12[d.slot] == nullptr) continue;
+-                        if (d.slot == SLOT_MASK && !g.mask_ok) continue;
+-                        D3D12_TEXTURE_COPY_LOCATION src = {};
+-                        src.pResource = g.in_buf12[d.slot];
+-                        src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+-                        src.PlacedFootprint.Offset = 0;
+-                        src.PlacedFootprint.Footprint = { d.slot == SLOT_COLOR ? g.color_fmt : d.fmt,
+-                                                          g.width, g.height, 1, g.in_pitch[d.slot] };
+-                        D3D12_TEXTURE_COPY_LOCATION dst = {};
+-                        dst.pResource = g.tex12[d.slot];
+-                        dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+-                        dst.SubresourceIndex = 0;
+-                        Barrier(g.tex12[d.slot], D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST);
+-                        g.list->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+-                        CK(kSlotName[d.slot]);
+-                        Barrier(g.tex12[d.slot], D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON);
+-                    }
+-                }
+-                Barrier(g.tex12[SLOT_COLOR],  D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+-                Barrier(g.tex12[SLOT_DEPTH],  D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+-                Barrier(g.tex12[SLOT_MV],     D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+-                if (g.mask_ok) Barrier(g.tex12[SLOT_MASK], D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+-                GuideProbeRecord(g.tex12[SLOT_MV], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE,
+-                                 g.tex12[SLOT_DEPTH], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+-                Barrier(g.tex12[SLOT_OUTPUT], D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+-                CK("input barriers");
++                M3kRecordVkInputs();
+ 
+                 NVSDK_NGX_D3D12_DLSS_Eval_Params ep = {};
+                 ep.Feature.pInColor  = g.tex12[SLOT_COLOR];
+@@ -6634,7 +6647,7 @@ static void FeedFrameVk(reshade::api::effect_runtime *rt, reshade::api::command_
+                 }
+                 else
+                 {
+-                    re = SafeEvaluateDLSS(&ep, &ecode);
++                    re = M3kEvaluateBeforeDlaa(&ep, &ecode);
+                     CK("NGX evaluate");
+                 }
+                 if (ecode != 0)
+@@ -6673,7 +6686,8 @@ static void FeedFrameVk(reshade::api::effect_runtime *rt, reshade::api::command_
+                     Barrier(g.tex12[SLOT_MV],     D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON);
+                     if (g.mask_ok) Barrier(g.tex12[SLOT_MASK], D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COMMON);
+                     Barrier(g.tex12[SLOT_OUTPUT], D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COMMON);
+-                    EndCommands();
++                    const UINT64 submitted = EndCommands();
++                    if (submitted == 0) { re = NVSDK_NGX_Result_Fail; g_m3k.ResetHistory(); }
+                     if (NVSDK_NGX_FAILED(re))
+                     {
+                         Log("[feed] evaluate failed 0x%08X (%s)", re, NgxResultName(re));
