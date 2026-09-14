@@ -24,7 +24,8 @@ if errorlevel 1 exit /b %errorlevel%
 rem One new variable: fill feature-11 temporal clip transforms from GTA IV's
 rem live current/previous VIEW matrices. The viewport is found once, then only
 rem a tiny read of VIEW/VIEWINV happens per evaluation.
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0APPLY-M3I-G-TEMPORAL-CAMERA.ps1"
+rem v2 uses a robust single-line insertion anchor after prevClipToClip identity.
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0APPLY-M3I-G-TEMPORAL-CAMERA-V2.ps1"
 if errorlevel 1 exit /b %errorlevel%
 
 powershell -NoProfile -Command ^
