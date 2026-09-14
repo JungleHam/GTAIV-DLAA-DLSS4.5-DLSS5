@@ -23,6 +23,11 @@ rem Add zero-behaviour-change remote read of GTA IV's live rage::grcViewport.
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0APPLY-M3I-C-VIEWPORT-AUDIT.ps1"
 if errorlevel 1 exit /b %errorlevel%
 
+rem V2: exact signature did not resolve on the first hardware run. Add a relaxed
+rem x86 absolute-MOV locator plus stage-by-stage diagnostics. Still read-only.
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0APPLY-M3I-C-V2-DIAGNOSTIC.ps1"
+if errorlevel 1 exit /b %errorlevel%
+
 rem Only Feeder source changed. Rebuild from generated source tree.
 call "%M2B%\BUILD-M2B-PROBE.bat"
 if errorlevel 1 exit /b %errorlevel%
@@ -42,12 +47,13 @@ echo [M3I-C] SHA-256:
 certutil -hashfile "%OUT%\dlss5-feed-m3i-c.addon64" SHA256 | findstr /R /V "hash CertUtil"
 certutil -hashfile "%OUT%\OptiScaler-M3I-C.dll" SHA256 | findstr /R /V "hash CertUtil"
 echo.
-echo [M3I-C] VIEWPORT AUDIT ONLY:
+echo [M3I-C] VIEWPORT AUDIT V2 ONLY:
 echo   - no DLSS-G values are changed yet
  echo   - finds GTAIV.exe from the 64-bit helper
- echo   - uses FusionFix's documented current-viewport signature
- echo   - reads live viewport FOV / aspect / near / far
- echo   - logs values whenever they change
+ echo   - tries FusionFix's exact current-viewport signature first
+ echo   - falls back to a strongly validated relaxed x86 MOV locator
+ echo   - logs process/module/scan failure stage if it still cannot resolve
+ echo   - reads live viewport FOV / aspect / near / far when found
  echo.
 echo [M3I-C] TEST AFTER INSTALL:
 echo   1. Start gameplay and stand still for a few seconds.
