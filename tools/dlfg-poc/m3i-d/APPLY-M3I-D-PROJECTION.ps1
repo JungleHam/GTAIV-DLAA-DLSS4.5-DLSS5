@@ -38,7 +38,17 @@ $aspectLine = '    const float aspect = static_cast<float>(g.width) / static_cas
 $aspectPos = $text.IndexOf($aspectLine, $pos)
 if ($aspectPos -lt 0) { throw 'M3I-D anchor not found: aspect line' }
 $insertPos = $aspectPos + $aspectLine.Length
-$log = "`n    static bool m3i_d_logged = false;`n    if (!m3i_d_logged) { Log(\"[feed] M3I-D: projection contract FOVdeg=45.000000 near=0.050000 far=1500.000 aspect=%.9f\", aspect); m3i_d_logged = true; }"
+
+$log = @'
+
+    static bool m3i_d_logged = false;
+    if (!m3i_d_logged)
+    {
+        Log("[feed] M3I-D: projection contract FOVdeg=45.000000 near=0.050000 far=1500.000 aspect=%.9f", aspect);
+        m3i_d_logged = true;
+    }
+'@
+
 $text = $text.Insert($insertPos, $log)
 
 Write-Normalized $cpp $text
