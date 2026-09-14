@@ -18,11 +18,11 @@ $funcPos = $text.IndexOf($func)
 if ($funcPos -lt 0) { throw 'M3I-I anchor missing: M2bBuildConstants' }
 
 function Replace-OneAfter([string]$old, [string]$new, [string]$name) {
-    $script:p = $text.IndexOf($old, $funcPos)
-    if ($script:p -lt 0) { throw "M3I-I anchor missing: $name" }
-    $next = $text.IndexOf($old, $script:p + $old.Length)
+    $p = $script:text.IndexOf($old, $script:funcPos)
+    if ($p -lt 0) { throw "M3I-I anchor missing: $name" }
+    $next = $script:text.IndexOf($old, $p + $old.Length)
     if ($next -ge 0) { throw "M3I-I anchor not unique: $name" }
-    $script:text = $text.Remove($script:p, $old.Length).Insert($script:p, $new)
+    $script:text = $script:text.Remove($p, $old.Length).Insert($p, $new)
 }
 
 # Diagnostic contract: the source MV texture remains bound, but its scale is forced to zero.
@@ -49,10 +49,6 @@ $insert = @'
     }
 '@
 $text = $text.Insert($insertPos, "`n" + $insert)
-
-# Add a stable marker for build guards.
-$text = $text.Replace('// M3I-I: camera-only motion diagnostic. Keep the MV texture/resource plumbing identical,',
-                      '// M3I-I: camera-only motion diagnostic`n    // Keep the MV texture/resource plumbing identical,')
 
 Set-Content -Path $cpp -Value $text -NoNewline -Encoding UTF8
 Write-Host 'Applied M3I-I: camera-only motion diagnostic.'
