@@ -18,9 +18,7 @@ function Run([string]$Program, [string[]]$Arguments) {
 
 Write-Host '=== A2-S2.4 gate 1/4: reproduce S2.3 live 1..5 build ==='
 & (Join-Path $toolRoot 'build-s23.ps1')
-if (-not (Test-Path -LiteralPath (Join-Path $s23Out 'BUILD-VERIFIED.txt'))) {
-    throw 'S2.3 build verification marker missing'
-}
+if (-not (Test-Path -LiteralPath (Join-Path $s23Out 'BUILD-VERIFIED.txt'))) { throw 'S2.3 build verification marker missing' }
 
 $feeder = Join-Path $workRoot 'feeder'
 $ngx = Join-Path $workRoot 'ngx-sdk'
@@ -35,7 +33,14 @@ Copy-Item -LiteralPath $s23Generated -Destination $generated -Recurse
 
 Write-Host '=== A2-S2.4 gate 3/4: add live DLSS reconstruction profiles ==='
 $feedSource = Join-Path $feeder 'src\dlss5-feed.cpp'
-& (Join-Path $toolRoot 'a2-s24-srprofiles-stage.ps1') -GeneratedRoot $generated -FeederSource $feedSource
+
+# The main S2.4 transform owns all M3K/DLSS state changes. Give its overlay-only
+# verification a tiny deterministic scratch file, then patch the real ReShade panel
+# with the separate robust inserter below.
+$dummyFeed = Join-Path $workRoot 's24-overlay-dummy.cpp'
+'        ImGui::TextWrapped("First use of a higher count may hitch briefly while its independent NR feature is created. Click 5 once to warm all five, then 1-5 comparisons are immediate without restarting GTA.");' | Set-Content -Encoding UTF8 -LiteralPath $dummyFeed
+& (Join-Path $toolRoot 'a2-s24-srprofiles-stage.ps1') -GeneratedRoot $generated -FeederSource $dummyFeed
+& (Join-Path $toolRoot 'a2-s24-overlay-stage.ps1') -FeederSource $feedSource
 
 $vkText = [IO.File]::ReadAllText((Join-Path $generated 'm3k_vk.h'))
 $feedText = [IO.File]::ReadAllText($feedSource)
@@ -46,9 +51,7 @@ foreach ($marker in @(
     'DLSS reconstruction (live)',
     'DLAA only (presenter)',
     'Ultra Performance')) {
-    if (($vkText + $feedText).IndexOf($marker, [StringComparison]::Ordinal) -lt 0) {
-        throw "Generated S2.4 source missing marker: $marker"
-    }
+    if (($vkText + $feedText).IndexOf($marker, [StringComparison]::Ordinal) -lt 0) { throw "Generated S2.4 source missing marker: $marker" }
 }
 
 if (Test-Path -LiteralPath $out) { Remove-Item -LiteralPath $out -Recurse -Force }
@@ -63,10 +66,7 @@ Copy-Item -LiteralPath (Join-Path $toolRoot 'm3k-nr.ini') -Destination $out
 Copy-Item -LiteralPath (Join-Path $toolRoot 'README.md'), (Join-Path $toolRoot 'NOTICE') -Destination $out
 Copy-Item -Path (Join-Path $baseOut 'licenses\*') -Destination (Join-Path $out 'licenses') -Force
 
-$hashes = Get-FileHash -Algorithm SHA256 -LiteralPath `
-    (Join-Path $out 'dlss5-feed.addon64'), `
-    (Join-Path $out 'm3k\m3k-nvngx.dll')
-
+$hashes = Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $out 'dlss5-feed.addon64'), (Join-Path $out 'm3k\m3k-nvngx.dll')
 @(
     'M3K A2-S2.4 x64 build passed compile and CPU-only contract/fallback/shim tests.',
     'Permanent ReShade M3K panel: live independent Feature18 NR passes 1..5.',
@@ -78,7 +78,6 @@ $hashes = Get-FileHash -Algorithm SHA256 -LiteralPath `
     'Feeder=3f624855276c4bde55145c712782477639b30e85',
     'NGX SDK=374959484e79a640feaba44c93ac8cfb0a03f5b5',
     'Vulkan headers=2cd90f9d20df57eac214c148f3aed885372ddcfe',
-    ($hashes | ForEach-Object { "$($_.Hash)  $([IO.Path]::GetFileName($_.Path))" })
-) | Set-Content -Encoding UTF8 -LiteralPath (Join-Path $out 'BUILD-VERIFIED.txt')
+    ($hashes | ForEach-Object { "$($_.Hash)  $([IO.Path]::GetFileName($_.Path))" })) | Set-Content -Encoding UTF8 -LiteralPath (Join-Path $out 'BUILD-VERIFIED.txt')
 
 Write-Host "M3K A2-S2.4 BUILD VERIFIED: $out (manual install only)"
