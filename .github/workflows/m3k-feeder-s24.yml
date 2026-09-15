@@ -1,0 +1,41 @@
+name: M3K Feeder A2-S2.4 Live SR Profiles
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - gtaiv-m3k-a2-sr-profiles
+    paths:
+      - .github/workflows/m3k-feeder-s24.yml
+      - tools/m3k-nr/a2-s24-srprofiles-stage.ps1
+      - tools/m3k-nr/build-s24.ps1
+      - tools/m3k-nr/a2-s23-live-stage.ps1
+      - tools/m3k-nr/build-s23.ps1
+      - tools/m3k-nr/a2-s22-multipass-stage.ps1
+      - tools/m3k-nr/build-s22.ps1
+      - tools/m3k-nr/a2-s2-stage.ps1
+      - tools/m3k-nr/compile-s2.bat
+      - tools/m3k-nr/src/**
+      - tools/m3k-nr/tests/**
+
+jobs:
+  build-feeder-s24:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v6
+
+      - name: Build live NR + SR profile Feeder
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\tools\m3k-nr\build-s24.ps1
+          Get-Content .\tools\m3k-nr\out-m3k-s24\BUILD-VERIFIED.txt
+
+      - name: Upload A2-S2.4 live build
+        uses: actions/upload-artifact@v7
+        with:
+          name: M3K-A2-S2.4-Live-SRProfiles-x64
+          path: tools/m3k-nr/out-m3k-s24
+          if-no-files-found: error
