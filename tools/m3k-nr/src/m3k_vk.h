@@ -6,9 +6,8 @@
 #pragma once
 
 // A2-S0 source-tap ABI exported by the instrumented vanilla DXVK 3.0.2 runtime.
-// This stage is intentionally read-only: it only proves that the Feeder process can
-// see the exact low-resolution D3D9 present source that DXVK later scales to the WSI
-// image. No NGX contract or displayed pixels are changed here.
+// A2-S0.5 can optionally use the same handle for a visible 1:1 GPU copy proof.
+// Neither stage changes the NGX contract.
 struct M3kDxvkPresentSourceV1
 {
     UINT size;
@@ -28,6 +27,7 @@ using M3kQueryPresentSourceV1 = int (__cdecl *)(M3kDxvkPresentSourceV1 *);
 
 static M3kDxvkPresentSourceV1 g_m3kPresentSource = {};
 static bool g_m3kSourceTapReady = false;
+static bool g_m3kSourceProof = false;
 
 static void M3kProbeDxvkPresentSource()
 {
@@ -80,6 +80,87 @@ static void M3kProbeDxvkPresentSource()
     }
 }
 
+// A2-S0.5: visible proof that the Feeder can actually issue a GPU read from the
+// true low-resolution D3D9 source image exported by DXVK. This is deliberately
+// diagnostic-only: no scaling, no NR, no SR, and it is OFF by default.
+static void M3kSourceGpuProof(VkCommandBuffer cb, VkImage finalImage, UINT finalW, UINT finalH)
+{
+    if (!g_m3kSourceProof || !g_m3kSourceTapReady || !g.vk.ok ||
+        cb == VK_NULL_HANDLE || finalImage == VK_NULL_HANDLE)
+        return;
+
+    const M3kDxvkPresentSourceV1 info = g_m3kPresentSource;
+    const UINT64 feederDevice = FeedVkValue(g.vk.dev);
+    if (info.device != feederDevice)
+    {
+        static bool said = false;
+        if (!said)
+        {
+            said = true;
+            Log("M3K-A2-S0.5: GPU proof blocked: source VkDevice=0x%llX but Feeder VkDevice=0x%llX",
+                static_cast<unsigned long long>(info.device),
+                static_cast<unsigned long long>(feederDevice));
+        }
+        return;
+    }
+
+    if (info.format != static_cast<UINT>(VK_FORMAT_B8G8R8A8_UNORM) ||
+        g.bb_fmt != DXGI_FORMAT_B8G8R8A8_UNORM)
+    {
+        static bool said = false;
+        if (!said)
+        {
+            said = true;
+            Log("M3K-A2-S0.5: GPU proof blocked: source VkFormat=%u, final DXGI format=%u",
+                info.format, static_cast<UINT>(g.bb_fmt));
+        }
+        return;
+    }
+
+    const VkImageLayout srcLayout = static_cast<VkImageLayout>(info.layout);
+    if (srcLayout != VK_IMAGE_LAYOUT_GENERAL &&
+        srcLayout != VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+    {
+        static bool said = false;
+        if (!said)
+        {
+            said = true;
+            Log("M3K-A2-S0.5: GPU proof blocked: unsupported source layout=%u", info.layout);
+        }
+        return;
+    }
+
+    // Do nothing until the genuine low-res-source / high-res-presenter split exists.
+    if (info.presenterWidth != finalW || info.presenterHeight != finalH ||
+        (info.width >= finalW && info.height >= finalH))
+        return;
+
+    const VkImage sourceImage = FeedVkHandle<VkImage>(info.image);
+    if (sourceImage == VK_NULL_HANDLE || sourceImage == finalImage)
+        return;
+
+    // For 1920x1080 -> 2560x1440 this copies 1280x1080, 1:1, into the
+    // top-left of the final frame. The visible pixel-size mismatch is intentional.
+    const UINT halfW = finalW / 2u;
+    const UINT copyW = info.width < halfW ? info.width : halfW;
+    const UINT copyH = info.height < finalH ? info.height : finalH;
+    if (!copyW || !copyH)
+        return;
+
+    // Keep DXVK's tracked source layout unchanged; this barrier only publishes
+    // prior writes to the raw command that follows.
+    FeedVkBarrier(&g.vk, cb, sourceImage, srcLayout, srcLayout);
+    FeedVkCopyImage(&g.vk, cb, sourceImage, srcLayout,
+                    finalImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, copyW, copyH);
+
+    static UINT64 proofFrames = 0;
+    ++proofFrames;
+    if (proofFrames == 1 || (proofFrames % 300) == 0)
+        Log("M3K-A2-S0.5: GPU source copy ACTIVE seq=%llu raw=%ux%u -> top-left %ux%u of final=%ux%u (1:1, no scaling)",
+            static_cast<unsigned long long>(info.sequence),
+            info.width, info.height, copyW, copyH, finalW, finalH);
+}
+
 static int g_m3kMode = 0;
 static bool g_m3kArmed = false, g_m3kWasUsed = false;
 
@@ -97,6 +178,7 @@ static void M3kPrepareFrame()
         }
         const UINT requested = GetPrivateProfileIntW(L"M3K", L"Mode", 0, path);
         const int mode = requested <= 2 ? int(requested) : 0;
+        const bool sourceProof = GetPrivateProfileIntW(L"M3K", L"SourceProof", 0, path) != 0;
         static bool first = true;
         if (first || mode != g_m3kMode) {
             Log("M3K: mode=%d (%s); config=%ls", mode,
@@ -105,11 +187,18 @@ static void M3kPrepareFrame()
             if (mode == 0) g_m3k.ShutdownRuntime(g_ngx_dying);
             g_m3kMode = mode; first = false;
         }
+        static bool proofFirst = true;
+        if (proofFirst || sourceProof != g_m3kSourceProof)
+        {
+            Log("M3K-A2-S0.5: SourceProof=%d (1 = raw true-source pixels overwrite the top-left of the final frame)",
+                sourceProof ? 1 : 0);
+            proofFirst = false;
+        }
+        g_m3kSourceProof = sourceProof;
     }
 
-    // A2-S0 is deliberately independent of NR Mode 0/1/2. Querying the DXVK
-    // export is read-only and lets us validate the future SR source path while
-    // keeping the known-good DLAA baseline untouched.
+    // A2-S0 remains independent of NR Mode 0/1/2. A2-S0.5 is separately gated
+    // by SourceProof and only acts later, while the final Vulkan image is copy_dest.
     M3kProbeDxvkPresentSource();
 
     g_m3kArmed = false;
