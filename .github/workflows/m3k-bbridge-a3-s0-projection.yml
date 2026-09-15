@@ -46,10 +46,22 @@ jobs:
       - name: Setup Meson
         run: pip install meson==0.64.1
 
-      - name: Build release x86 client only
-        shell: cmd
+      - name: Build only x86 d3d9 target
+        shell: pwsh
         working-directory: tools/m3k-nr/_work/bbridge-a3-s0
-        run: powershell -command "& { . .\build_bridge.ps1; Build -Platform x86 -BuildFlavour release -BuildSubDir _compRelease_x86 ; exit $LastExitCode }"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          . .\build_common.ps1
+          SetupVS -Platform x86
+          meson setup --buildtype release --backend ninja _compA3S0 --debug
+          if ($LASTEXITCODE -ne 0) { throw "meson setup failed: $LASTEXITCODE" }
+          Copy-Item .\Directory.Build.Props -Destination .\_compA3S0 -Force
+          meson compile -C _compA3S0 d3d9
+          if ($LASTEXITCODE -ne 0) { throw "d3d9 target build failed: $LASTEXITCODE" }
+          New-Item -ItemType Directory -Force -Path .\_output | Out-Null
+          $built = '.\_compA3S0\src\client\d3d9.dll'
+          if (-not (Test-Path -LiteralPath $built)) { throw "Missing targeted build output: $built" }
+          Copy-Item -LiteralPath $built -Destination .\_output\d3d9.dll -Force
 
       - name: Verify x86 output
         shell: pwsh
@@ -62,6 +74,7 @@ jobs:
             'Stable base=S2.7 Custom UQ 77%',
             'Upstream b-bridge=1dad5e6d4dcf8647e354aa9a87f611256fb61142',
             'Includes=proven UI virtualization/resync + read-only SetVertexShaderConstantF probe',
+            'Build=targeted Meson d3d9 target only',
             'No shader constants are modified in A3-S0.',
             ((Get-FileHash -Algorithm SHA256 "$out/d3d9.dll").Hash + '  d3d9.dll')
           ) | Set-Content "$out/M3K-A3-S0-PROJECTION-BUILD.txt"
