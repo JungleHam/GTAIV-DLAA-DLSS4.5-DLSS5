@@ -8,6 +8,7 @@ on:
     paths:
       - .github/workflows/m3k-feeder-s24.yml
       - tools/m3k-nr/a2-s24-srprofiles-stage.ps1
+      - tools/m3k-nr/a2-s24-overlay-stage.ps1
       - tools/m3k-nr/build-s24.ps1
       - tools/m3k-nr/a2-s23-live-stage.ps1
       - tools/m3k-nr/build-s23.ps1
