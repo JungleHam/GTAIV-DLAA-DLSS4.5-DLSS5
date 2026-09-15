@@ -1,0 +1,101 @@
+name: M3K b-bridge A3-S2.1 Native DLAA Jitter Gate x86
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ gtaiv-m3k-a3-jitter-history ]
+    paths:
+      - 'tools/m3k-nr/a2-s21-bbridge-ui.py'
+      - 'tools/m3k-nr/a3-s2-bbridge-coherent-draw-jitter.py'
+      - 'tools/m3k-nr/a3-s21-bbridge-native-jitter-gate.py'
+      - '.github/workflows/m3k-bbridge-a3-s21-native-gate.yml'
+
+jobs:
+  build-bbridge-a3-s21:
+    runs-on: windows-2022
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Clone pinned b-bridge
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path tools/m3k-nr/_work | Out-Null
+          git clone --filter=blob:none https://github.com/gutbash/b-bridge.git tools/m3k-nr/_work/bbridge-a3-s21
+          git -C tools/m3k-nr/_work/bbridge-a3-s21 checkout 1dad5e6d4dcf8647e354aa9a87f611256fb61142
+          git -C tools/m3k-nr/_work/bbridge-a3-s21 submodule update --init --recursive
+          $head = git -C tools/m3k-nr/_work/bbridge-a3-s21 rev-parse HEAD
+          if ($head -ne '1dad5e6d4dcf8647e354aa9a87f611256fb61142') { throw "Wrong b-bridge revision: $head" }
+
+      - name: Apply UI resync + A3-S2 coherent jitter + Native gate
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python tools/m3k-nr/a2-s21-bbridge-ui.py tools/m3k-nr/_work/bbridge-a3-s21
+          python tools/m3k-nr/a3-s2-bbridge-coherent-draw-jitter.py tools/m3k-nr/_work/bbridge-a3-s21
+          python tools/m3k-nr/a3-s21-bbridge-native-jitter-gate.py tools/m3k-nr/_work/bbridge-a3-s21
+          $window = Get-Content tools/m3k-nr/_work/bbridge-a3-s21/src/client/window.cpp -Raw
+          $device = Get-Content tools/m3k-nr/_work/bbridge-a3-s21/src/client/d3d9_device.cpp -Raw
+          $swap = Get-Content tools/m3k-nr/_work/bbridge-a3-s21/src/client/d3d9_swapchain.cpp -Raw
+          foreach ($marker in @('[M3K-UI] config-change resync WM_SIZE','NewGetClientRect')) {
+            if (-not $window.Contains($marker)) { throw "Missing UI marker: $marker" }
+          }
+          foreach ($marker in @('M3K A3-S2: coherent draw-boundary','M3K_SYNC_WVP_FOR_DRAW','[M3K-JITTER2] DRAW','[M3K-JITTER2] RESTORE','M3K_GTAIV_Jitter_v1','A3-S2.1 Native/DLAA gate','next.enabled = next.requested && next.profile != 0u')) {
+            if (-not $device.Contains($marker)) { throw "Missing A3-S2.1 marker: $marker" }
+          }
+          if (($device.Split('M3K_SYNC_WVP_FOR_DRAW();').Count - 1) -ne 4) { throw 'Expected A3-S2 sync at exactly four D3D9 draw paths' }
+          if ($device.Contains('M3kApplyJitterToUpload') -or $device.Contains('Redundant game constants still need forwarding')) { throw 'A3-S1 upload-time jitter leaked into A3-S2.1' }
+          foreach ($marker in @('M3kJitterPublishPresent','M3kJitterAdvanceAfterPresent')) {
+            if (-not $swap.Contains($marker)) { throw "Missing Present jitter marker: $marker" }
+          }
+          git -C tools/m3k-nr/_work/bbridge-a3-s21 diff --check
+
+      - name: Setup Meson
+        run: pip install meson==0.64.1
+
+      - name: Build only x86 d3d9 target
+        shell: pwsh
+        working-directory: tools/m3k-nr/_work/bbridge-a3-s21
+        run: |
+          $ErrorActionPreference = 'Stop'
+          . .\build_common.ps1
+          SetupVS -Platform x86
+          meson setup --buildtype release --backend ninja _compA3S21 --debug
+          if ($LASTEXITCODE -ne 0) { throw "meson setup failed: $LASTEXITCODE" }
+          Copy-Item .\Directory.Build.Props -Destination .\_compA3S21 -Force
+          meson compile -C _compA3S21 d3d9
+          if ($LASTEXITCODE -ne 0) { throw "d3d9 target build failed: $LASTEXITCODE" }
+          New-Item -ItemType Directory -Force -Path .\_output | Out-Null
+          $built = '.\_compA3S21\src\client\d3d9.dll'
+          if (-not (Test-Path -LiteralPath $built)) { throw "Missing targeted build output: $built" }
+          Copy-Item -LiteralPath $built -Destination .\_output\d3d9.dll -Force
+
+      - name: Verify x86 output
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $out = 'tools/m3k-nr/_work/bbridge-a3-s21/_output'
+          if (-not (Test-Path "$out/d3d9.dll")) { throw 'Missing x86 client d3d9.dll' }
+          @(
+            'M3K A3-S2.1 b-bridge coherent draw-boundary temporal jitter x86 client',
+            'Base=A3-S2 coherent draw-boundary jitter, hardware-validated extremely steady',
+            'Checkpoint=checkpoint/a3-s2-coherent-jitter @ 6e5d4f3b85399d43d551e3a2557004461b7c3de5',
+            'Only functional change=when SRProfile=0 Native/DLAA, requested TemporalJitter is gated off in the bridge',
+            'Reason=Native Feeder path currently reports NGX jitter=(0,0); raster and NGX must not disagree',
+            'Profiles 1..5 retain A3-S2 coherent draw-boundary jitter unchanged',
+            'Sequence remains fixed 16-phase Halton(2,3); no phase-count experiment mixed into this fix',
+            'Handoff contract remains Local\\M3K_GTAIV_Jitter_v1',
+            'Intended Feeder=A3-S1.1 sign=-1; A3-S1.2 capture lab compatible',
+            ((Get-FileHash -Algorithm SHA256 "$out/d3d9.dll").Hash + '  d3d9.dll')
+          ) | Set-Content "$out/M3K-A3-S2.1-NATIVE-GATE-BUILD.txt"
+          Get-Content "$out/M3K-A3-S2.1-NATIVE-GATE-BUILD.txt"
+
+      - name: Upload x86 A3-S2.1 client
+        uses: actions/upload-artifact@v4
+        with:
+          name: M3K-A3-S2.1-bbridge-native-gate-x86
+          path: |
+            tools/m3k-nr/_work/bbridge-a3-s21/_output/d3d9.dll
+            tools/m3k-nr/_work/bbridge-a3-s21/_output/M3K-A3-S2.1-NATIVE-GATE-BUILD.txt
+          if-no-files-found: error
