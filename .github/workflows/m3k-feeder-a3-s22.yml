@@ -1,0 +1,35 @@
+name: M3K Feeder A3-S2.2 Native DLAA Jitter Sync
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ gtaiv-m3k-a3-jitter-history ]
+    paths:
+      - '.github/workflows/m3k-feeder-a3-s22.yml'
+      - 'tools/m3k-nr/a3-s22-native-dlaa-jitter-sync-stage.ps1'
+      - 'tools/m3k-nr/build-a3-s22.ps1'
+      - 'tools/m3k-nr/a3-s12-capture-lab-stage.ps1'
+      - 'tools/m3k-nr/a3-s11-jitter-sign-stage.ps1'
+      - 'tools/m3k-nr/a3-s1-jitter-stage.ps1'
+      - 'tools/m3k-nr/**'
+
+jobs:
+  build-feeder-a3-s22:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v6
+
+      - name: Build A3-S2.2 Native DLAA synchronized-jitter Feeder
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\tools\m3k-nr\build-a3-s22.ps1
+          Get-Content .\tools\m3k-nr\out-m3k-a3-s22\BUILD-VERIFIED.txt
+
+      - name: Upload A3-S2.2 Feeder build
+        uses: actions/upload-artifact@v7
+        with:
+          name: M3K-A3-S2.2-Native-DLAA-JitterSync-x64
+          path: tools/m3k-nr/out-m3k-a3-s22
+          if-no-files-found: error
