@@ -19,6 +19,23 @@ jobs:
       - name: Checkout project
         uses: actions/checkout@v6
 
+      - name: Install DXVK x64 build toolchain
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y \
+            meson ninja-build glslang-tools \
+            binutils-mingw-w64-x86-64 \
+            gcc-mingw-w64-x86-64-posix \
+            g++-mingw-w64-x86-64-posix
+          sudo update-alternatives --set x86_64-w64-mingw32-gcc /usr/bin/x86_64-w64-mingw32-gcc-posix
+          sudo update-alternatives --set x86_64-w64-mingw32-g++ /usr/bin/x86_64-w64-mingw32-g++-posix
+          x86_64-w64-mingw32-g++ --version
+          meson --version
+          ninja --version
+          glslangValidator --version | head -n 2
+
       - name: Checkout exact DXVK 3.0.2 source
         shell: bash
         run: |
@@ -44,17 +61,17 @@ jobs:
           grep -F "M3kScheduleAutoResize(window, m_presentParams.Windowed);" dxvk/src/d3d9/d3d9_swapchain.cpp
 
       - name: Build patched DXVK x64
-        uses: Joshua-Ashton/arch-mingw-github-action@v8
-        with:
-          command: |
-            set -euxo pipefail
-            cd dxvk
-            ./package-release.sh m3k-s1b ../build --no-package --64-only
-            test -f ../build/dxvk-m3k-s1b/x64/d3d9.dll
-            x86_64-w64-mingw32-objdump -p ../build/dxvk-m3k-s1b/x64/d3d9.dll | grep M3K_QueryPresentSourceV1
-            mkdir -p ../artifact
-            cp ../build/dxvk-m3k-s1b/x64/d3d9.dll ../artifact/d3d9vk_x64.dll
-            sha256sum ../artifact/d3d9vk_x64.dll | tee ../artifact/SHA256.txt
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p build
+          cd dxvk
+          ./package-release.sh m3k-s1b ../build --no-package --64-only
+          test -f ../build/dxvk-m3k-s1b/x64/d3d9.dll
+          x86_64-w64-mingw32-objdump -p ../build/dxvk-m3k-s1b/x64/d3d9.dll | grep M3K_QueryPresentSourceV1
+          mkdir -p ../artifact
+          cp ../build/dxvk-m3k-s1b/x64/d3d9.dll ../artifact/d3d9vk_x64.dll
+          sha256sum ../artifact/d3d9vk_x64.dll | tee ../artifact/SHA256.txt
 
       - name: Upload patched DXVK
         uses: actions/upload-artifact@v7
