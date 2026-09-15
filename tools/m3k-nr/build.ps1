@@ -41,18 +41,88 @@ foreach ($dependency in @($ngx, $vulkan)) {
 }
 
 $patch = Join-Path $toolRoot 'feeder-m3k.patch'
-try { & git -C $feeder apply --check --reverse $patch 2>$null; $applied = $LASTEXITCODE -eq 0 }
-catch { $applied = $false }
-if (-not $applied) {
-    Run git @('-C', $feeder, 'apply', '--check', $patch)
-    Run git @('-C', $feeder, 'apply', $patch)
-}
+
+# The Feeder checkout is generated staging state. Reset only its one patched source
+# file so repeated A2-S0.5 builds are deterministic even after the local proof call
+# sites were injected by a previous build.
+Run git @('-C', $feeder, 'checkout', '--', 'src/dlss5-feed.cpp')
+Run git @('-C', $feeder, 'apply', '--check', $patch)
+Run git @('-C', $feeder, 'apply', $patch)
 Run git @('-C', $feeder, 'apply', '--check', '--reverse', $patch)
+
+# Preserve the existing exact-source validation for the primary M3K patch.
 $patchText = [IO.File]::ReadAllText($patch)
 if ($patchText -notmatch 'index [0-9a-f]{40}\.\.([0-9a-f]{40})') { throw 'Patch must carry full source hashes' }
 $expectedSource = $Matches[1]
 $actualSource = & git -C $feeder hash-object --path=src/dlss5-feed.cpp src/dlss5-feed.cpp
 if ($LASTEXITCODE -ne 0 -or $actualSource -ne $expectedSource) { throw 'Feeder source differs from the exact M3K patch result' }
+
+# A2-S0.5: inject two diagnostic call sites after the exact primary patch was
+# validated. Both points have the real final Vulkan image parked as copy_dest.
+$feedSource = Join-Path $feeder 'src/dlss5-feed.cpp'
+$feedText = [IO.File]::ReadAllText($feedSource)
+
+function Replace-ExactOnce([string]$Text, [string]$Old, [string]$New, [string]$Label) {
+    $count = 0
+    $pos = 0
+    while (($i = $Text.IndexOf($Old, $pos, [StringComparison]::Ordinal)) -ge 0) {
+        $count++
+        $pos = $i + $Old.Length
+    }
+    if ($count -ne 1) { throw "${Label}: expected exactly one source match, found $count" }
+    return $Text.Replace($Old, $New)
+}
+
+$oneSubmitOld = @'
+                if (n > 1)
+                {
+                    const UINT wh1 = g_cfg.half_home != 0 ? w / 2 : w;
+                    FeedVkCopyBufferToImage(&g.vk, cb, g.vk_home_buf, bb_img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                            wh1, h, g.home_pitch / HomeTexelBytes(g.output_fmt),
+                                            g.home_slice * ((n - 1) & 1));
+                }
+                const resource       res1[1]  = { bb_res };
+'@
+$oneSubmitNew = @'
+                if (n > 1)
+                {
+                    const UINT wh1 = g_cfg.half_home != 0 ? w / 2 : w;
+                    FeedVkCopyBufferToImage(&g.vk, cb, g.vk_home_buf, bb_img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                            wh1, h, g.home_pitch / HomeTexelBytes(g.output_fmt),
+                                            g.home_slice * ((n - 1) & 1));
+                }
+                M3kSourceGpuProof(cb, bb_img, w, h);
+                const resource       res1[1]  = { bb_res };
+'@
+
+$normalOld = @'
+                if (g_vk_probe.active)
+                {
+                    cl->barrier(bb_res, resource_usage::copy_dest, resource_usage::copy_source);
+                    FeedVkProbeVk(cb, 3, bb_img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL); // F: actual copy-home target
+                    cl->barrier(bb_res, resource_usage::copy_source, resource_usage::copy_dest);
+                }
+            }
+            {
+                const resource       res[1]  = { bb_res };
+'@
+$normalNew = @'
+                if (g_vk_probe.active)
+                {
+                    cl->barrier(bb_res, resource_usage::copy_dest, resource_usage::copy_source);
+                    FeedVkProbeVk(cb, 3, bb_img, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL); // F: actual copy-home target
+                    cl->barrier(bb_res, resource_usage::copy_source, resource_usage::copy_dest);
+                }
+                M3kSourceGpuProof(cb, bb_img, w, h);
+            }
+            {
+                const resource       res[1]  = { bb_res };
+'@
+
+$feedText = Replace-ExactOnce $feedText $oneSubmitOld $oneSubmitNew 'A2-S0.5 one-submit insertion'
+$feedText = Replace-ExactOnce $feedText $normalOld $normalNew 'A2-S0.5 normal copy-home insertion'
+[IO.File]::WriteAllText($feedSource, $feedText, (New-Object Text.UTF8Encoding($false)))
+
 # Refuse unrelated tracked edits in the staging source.
 $changed = @(& git -C $feeder diff --name-only)
 if ($changed.Count -ne 1 -or $changed[0] -ne 'src/dlss5-feed.cpp') { throw 'Unexpected tracked changes in Feeder staging checkout' }
