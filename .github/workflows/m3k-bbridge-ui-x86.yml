@@ -1,0 +1,68 @@
+name: M3K b-bridge A2-S2.6 UI Resync x86
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ gtaiv-m3k-a2-sr-profiles ]
+    paths:
+      - 'tools/m3k-nr/a2-s21-bbridge-ui.py'
+      - '.github/workflows/m3k-bbridge-ui-x86.yml'
+
+jobs:
+  build-bbridge-ui-x86:
+    runs-on: windows-2022
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Clone pinned b-bridge
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path tools/m3k-nr/_work | Out-Null
+          git clone --filter=blob:none https://github.com/gutbash/b-bridge.git tools/m3k-nr/_work/bbridge-ui-x86
+          git -C tools/m3k-nr/_work/bbridge-ui-x86 checkout 1dad5e6d4dcf8647e354aa9a87f611256fb61142
+          git -C tools/m3k-nr/_work/bbridge-ui-x86 submodule update --init --recursive
+          $head = git -C tools/m3k-nr/_work/bbridge-ui-x86 rev-parse HEAD
+          if ($head -ne '1dad5e6d4dcf8647e354aa9a87f611256fb61142') { throw "Wrong b-bridge revision: $head" }
+
+      - name: Apply M3K UI virtualization + live resync
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python tools/m3k-nr/a2-s21-bbridge-ui.py tools/m3k-nr/_work/bbridge-ui-x86
+          $src = Get-Content tools/m3k-nr/_work/bbridge-ui-x86/src/client/window.cpp -Raw
+          foreach ($marker in @('[M3K-UI] config','NewGetClientRect','DETOURS_ATTACH(GetClientRect)','forwarding WM_SIZE as logical','config-change resync WM_SIZE logical')) {
+            if (-not $src.Contains($marker)) { throw "Missing patch marker: $marker" }
+          }
+          git -C tools/m3k-nr/_work/bbridge-ui-x86 diff --check
+
+      - name: Setup Meson
+        run: pip install meson==0.64.1
+
+      - name: Build release x86 client only
+        shell: cmd
+        working-directory: tools/m3k-nr/_work/bbridge-ui-x86
+        run: powershell -command "& { . .\build_bridge.ps1; Build -Platform x86 -BuildFlavour release -BuildSubDir _compRelease_x86 ; exit $LastExitCode }"
+
+      - name: Verify x86 output
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $out = 'tools/m3k-nr/_work/bbridge-ui-x86/_output'
+          if (-not (Test-Path "$out/d3d9.dll")) { throw 'Missing x86 client d3d9.dll' }
+          @(
+            'M3K A2-S2.6 b-bridge UI resync x86 client',
+            'Upstream b-bridge=1dad5e6d4dcf8647e354aa9a87f611256fb61142',
+            'Patch=32-bit GetClientRect + WM_SIZE logical render-size virtualization + config-change WM_SIZE resync',
+            ((Get-FileHash -Algorithm SHA256 "$out/d3d9.dll").Hash + '  d3d9.dll')
+          ) | Set-Content "$out/M3K-UI-RESYNC-BUILD.txt"
+          Get-Content "$out/M3K-UI-RESYNC-BUILD.txt"
+
+      - name: Upload x86 UI resync client
+        uses: actions/upload-artifact@v4
+        with:
+          name: M3K-A2-S2.6-bbridge-ui-resync-x86
+          path: |
+            tools/m3k-nr/_work/bbridge-ui-x86/_output/d3d9.dll
+            tools/m3k-nr/_work/bbridge-ui-x86/_output/M3K-UI-RESYNC-BUILD.txt
