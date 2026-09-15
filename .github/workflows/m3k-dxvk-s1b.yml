@@ -1,0 +1,64 @@
+name: M3K DXVK A2-S1B
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - gtaiv-m3k-a2-sr-profiles
+    paths:
+      - .github/workflows/m3k-dxvk-s1b.yml
+      - tools/m3k-nr/dxvk-v3.0.2-m3k-source-tap.patch
+      - tools/m3k-nr/a2-s1b-dxvk.py
+      - tools/m3k-nr/m3k-nr.ini
+
+jobs:
+  build-dxvk-s1b:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v6
+
+      - name: Checkout exact DXVK 3.0.2 source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          git clone --recursive https://github.com/doitsujin/dxvk.git dxvk
+          cd dxvk
+          git checkout 6b20f622a77b87b2921fe5d2c1774d2f2ba3e9b7
+          git submodule update --init --recursive
+          test "$(git rev-parse HEAD)" = "6b20f622a77b87b2921fe5d2c1774d2f2ba3e9b7"
+
+      - name: Apply proven A2 source tap and S1B
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd dxvk
+          git apply --check ../tools/m3k-nr/dxvk-v3.0.2-m3k-source-tap.patch
+          git apply ../tools/m3k-nr/dxvk-v3.0.2-m3k-source-tap.patch
+          cd ..
+          python3 tools/m3k-nr/a2-s1b-dxvk.py dxvk
+          grep -R "M3K_QueryPresentSourceV1" dxvk/src/d3d9
+          grep -F "[M3K-S1B] config" dxvk/src/d3d9/d3d9_swapchain.cpp
+          grep -F "M3kApplyRenderOverride(pPresentParams);" dxvk/src/d3d9/d3d9_swapchain.cpp
+          grep -F "M3kScheduleAutoResize(window, m_presentParams.Windowed);" dxvk/src/d3d9/d3d9_swapchain.cpp
+
+      - name: Build patched DXVK x64
+        uses: Joshua-Ashton/arch-mingw-github-action@v8
+        with:
+          command: |
+            set -euxo pipefail
+            cd dxvk
+            ./package-release.sh m3k-s1b ../build --no-package --64-only
+            test -f ../build/dxvk-m3k-s1b/x64/d3d9.dll
+            x86_64-w64-mingw32-objdump -p ../build/dxvk-m3k-s1b/x64/d3d9.dll | grep M3K_QueryPresentSourceV1
+            mkdir -p ../artifact
+            cp ../build/dxvk-m3k-s1b/x64/d3d9.dll ../artifact/d3d9vk_x64.dll
+            sha256sum ../artifact/d3d9vk_x64.dll | tee ../artifact/SHA256.txt
+
+      - name: Upload patched DXVK
+        uses: actions/upload-artifact@v7
+        with:
+          name: M3K-A2-S1B-DXVK-x64
+          path: artifact
+          if-no-files-found: error
