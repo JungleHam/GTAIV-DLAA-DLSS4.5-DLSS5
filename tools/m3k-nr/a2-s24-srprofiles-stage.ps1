@@ -26,15 +26,7 @@ if (-not (Test-Path -LiteralPath $FeederSource)) { throw "Missing Feeder source:
 $vk = [IO.File]::ReadAllText($vkPath)
 $feed = [IO.File]::ReadAllText($FeederSource)
 
-# ---------------------------------------------------------------------------
-# State + live UI API
-# 0 = presenter-space DLAA baseline, 1..5 = SR perf-quality profile.
-# The true DXVK source remains 1600x900 for SR profiles; we do not fake a
-# different render resolution merely because a quality label normally implies one.
-# ---------------------------------------------------------------------------
-$stateAnchor = @'
-static UINT M3kRequestedNrPasses() { return g_m3kNrPasses; }
-'@
+$stateAnchor = 'static UINT M3kRequestedNrPasses() { return g_m3kNrPasses; }'
 $stateNew = @'
 static UINT g_m3kSrProfileRequested = 2; // Quality
 static UINT g_m3kSrProfileApplied = 0xFFFFFFFFu;
@@ -88,12 +80,7 @@ static UINT M3kRequestedNrPasses() { return g_m3kNrPasses; }
 '@
 $vk = Replace-ExactOnce $vk $stateAnchor $stateNew 'SR profile state/API'
 
-# ---------------------------------------------------------------------------
-# Read SRProfile from the same hot INI poll used by NRPasses.
-# ---------------------------------------------------------------------------
-$pollAnchor = @'
-        const UINT nrPasses = requestedPasses < 1 ? 1 : (requestedPasses > 5 ? 5 : requestedPasses);
-'@
+$pollAnchor = '        const UINT nrPasses = requestedPasses < 1 ? 1 : (requestedPasses > 5 ? 5 : requestedPasses);'
 $pollNew = @'
         const UINT nrPasses = requestedPasses < 1 ? 1 : (requestedPasses > 5 ? 5 : requestedPasses);
         const UINT requestedSrProfile = GetPrivateProfileIntW(L"M3K", L"SRProfile", 2, path);
@@ -112,11 +99,6 @@ $pollNew = @'
 '@
 $vk = Replace-ExactOnce $vk $pollAnchor $pollNew 'SRProfile INI poll'
 
-# ---------------------------------------------------------------------------
-# Replace SR feature creation with an explicit requested-profile query.
-# NVIDIA's optimal-settings callback is used as a safety gate: if the fixed true
-# source is outside a profile's supported range, keep the current working feature.
-# ---------------------------------------------------------------------------
 $swapStart = $vk.IndexOf('static bool M3kSwapToSrFeature(', [StringComparison]::Ordinal)
 $swapEnd = $vk.IndexOf('static bool M3kRestoreDlaaFeature()', $swapStart, [StringComparison]::Ordinal)
 if ($swapStart -lt 0 -or $swapEnd -le $swapStart) { throw 'A2-S2.4 could not locate M3kSwapToSrFeature boundaries' }
@@ -167,6 +149,10 @@ static bool M3kSwapToSrFeature(UINT renderW, UINT renderH, UINT targetW, UINT ta
 {
     if (!g.ngx_inited || g.feature == nullptr || g.dev12 == nullptr || g.queue == nullptr)
         return false;
+
+    const int oldQuality = g.sr_quality;
+    const char *oldQualityName = g.sr_quality_name;
+    const char *oldQualityHint = g.sr_quality_hint;
     if (!M3kSelectRequestedSrQuality(g_m3kSrProfileRequested, renderW, renderH, targetW, targetH))
         return false;
 
@@ -174,9 +160,6 @@ static bool M3kSwapToSrFeature(UINT renderW, UINT renderH, UINT targetW, UINT ta
     const bool oldSrActive = g.sr_active;
     const bool oldSrRequested = g.sr_requested;
     const UINT oldOutW = g.output_width, oldOutH = g.output_height;
-    const int oldQuality = g.sr_quality;
-    const char *oldQualityName = g.sr_quality_name;
-    const char *oldQualityHint = g.sr_quality_hint;
 
     g.feature = nullptr;
     g.sr_requested = true;
@@ -223,7 +206,6 @@ static bool M3kSwapToSrFeature(UINT renderW, UINT renderH, UINT targetW, UINT ta
 '@
 $vk = $vk.Substring(0, $swapStart) + $swapNew + $vk.Substring($swapEnd)
 
-# A successful baseline restore means profile 0 is now the applied reconstruction mode.
 $restoreAnchor = @'
     g_m3kSrW = g_m3kSrH = g_m3kSrOutW = g_m3kSrOutH = 0;
     Log("M3K-A2-S1: restored baseline %ux%u DLAA", g.width, g.height);
@@ -235,10 +217,6 @@ $restoreNew = @'
 '@
 $vk = Replace-ExactOnce $vk $restoreAnchor $restoreNew 'DLAA applied state'
 
-# ---------------------------------------------------------------------------
-# Replace the SR state machine so same-resolution profile changes swap only the
-# DLSS feature and preserve the proven DXVK/NR plumbing.
-# ---------------------------------------------------------------------------
 $updateStart = $vk.IndexOf('static void M3kSrUpdate()', [StringComparison]::Ordinal)
 $updateEnd = $vk.IndexOf('// Called while ReShade still has the final MV/depth resources parked as copy_source.', $updateStart, [StringComparison]::Ordinal)
 if ($updateStart -lt 0 -or $updateEnd -le $updateStart) { throw 'A2-S2.4 could not locate M3kSrUpdate boundaries' }
@@ -261,8 +239,6 @@ static void M3kSrUpdate()
         return;
     }
 
-    // Profile 0 is a live A/B baseline. It is DLAA over the presenter image, not a
-    // native 2560x1440 GTA render; the S1B true source intentionally stays 1600x900.
     if (g_m3kSrProfileRequested == 0)
     {
         if (g_m3kSrFeatureActive) M3kRestoreDlaaFeature();
@@ -281,7 +257,7 @@ static void M3kSrUpdate()
         return;
     }
 
-    if (g_m3kMode == 1) return; // create-only diagnostic mode; never alter its downstream feature
+    if (g_m3kMode == 1) return;
     if (g_cfg.mode != 2 || g_cfg.passthrough || !g.frame_ready) return;
 
     if (!M3kBgra8SourceCompatible())
@@ -332,8 +308,6 @@ static void M3kSrUpdate()
 '@
 $vk = $vk.Substring(0, $updateStart) + $updateNew + $vk.Substring($updateEnd)
 
-# DLAA-only must really mean no feature18 pass. The baseline DLAA operates on the
-# presenter image; NR is re-armed automatically as soon as an SR profile is selected.
 $prepareAnchor = @'
 #if defined(VK_VERSION_1_0)
     M3kSrUpdate();
@@ -353,14 +327,9 @@ $prepareNew = @'
 '@
 $vk = Replace-ExactOnce $vk $prepareAnchor $prepareNew 'DLAA NR bypass'
 
-# ---------------------------------------------------------------------------
-# Extend the existing permanent M3K ReShade section with a compact live combo.
-# ---------------------------------------------------------------------------
-$overlayAnchor = @'
-        ImGui::TextWrapped("First use of a higher count may hitch briefly while its independent NR feature is created. Click 5 once to warm all five, then 1-5 comparisons are immediate without restarting GTA.");
-        ImGui::Separator();
-'@
-$overlayNew = @'
+# Insert after one unique sentence instead of matching its surrounding newlines/Separator.
+$overlaySentence = '        ImGui::TextWrapped("First use of a higher count may hitch briefly while its independent NR feature is created. Click 5 once to warm all five, then 1-5 comparisons are immediate without restarting GTA.");'
+$overlayReplacement = @'
         ImGui::TextWrapped("First use of a higher count may hitch briefly while its independent NR feature is created. Click 5 once to warm all five, then 1-5 comparisons are immediate without restarting GTA.");
 
         ImGui::Spacing();
@@ -374,9 +343,8 @@ $overlayNew = @'
             ImGui::TextWrapped("DLAA-only is a presenter-space A/B baseline. GTA's true S1B render remains 1600x900; it is not native-rendered 1440p DLAA.");
         else
             ImGui::TextWrapped("SR profiles keep the true DXVK source resolution fixed and change NVIDIA's DLSS perf-quality profile. Unsupported profiles at this input size are rejected safely.");
-        ImGui::Separator();
 '@
-$feed = Replace-ExactOnce $feed $overlayAnchor $overlayNew 'ReShade SR profile controls'
+$feed = Replace-ExactOnce $feed $overlaySentence $overlayReplacement 'ReShade SR profile controls'
 
 [IO.File]::WriteAllText($vkPath, $vk, (New-Object Text.UTF8Encoding($false)))
 [IO.File]::WriteAllText($FeederSource, $feed, (New-Object Text.UTF8Encoding($false)))
