@@ -249,8 +249,8 @@ $nativeLogNew = @'
 '@
 $vk = Replace-ExactOnce $vk $nativeLogOld $nativeLogNew 'native NR -> DLAA log'
 
-# S2.5's escaped combo replacement was intentionally non-fatal and does not match the
-# actual C++ literal produced by a2-s24-overlay-stage.ps1, so normalize it here.
+# S2.5's escaped combo replacement does not match the actual C++ literal produced by
+# a2-s24-overlay-stage.ps1, so normalize that actual selector here.
 $feed = Replace-ExactOnce $feed `
     'const char *srItems = "DLAA only (presenter)' `
     'const char *srItems = "Native + NR + DLAA' `
@@ -276,7 +276,7 @@ $feed = Replace-ExactOnce $feed $overlayOld $overlayNew 'ReShade status'
 
 [IO.File]::WriteAllText($vkPath, $vk, (New-Object Text.UTF8Encoding($false)))
 [IO.File]::WriteAllText($FeederSource, $feed, (New-Object Text.UTF8Encoding($false)))
-$verify = $vk + $feed
+$verify = $vk + $feed + [IO.File]::ReadAllText((Join-Path $GeneratedRoot 'm3k_nr.h'))
 foreach ($marker in @(
     'Native + NR + DLAA',
     'M3K-A2-S2.6: NR18 -> DLAA running',
