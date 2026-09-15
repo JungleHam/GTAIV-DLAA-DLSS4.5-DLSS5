@@ -35,16 +35,16 @@ Write-Host '=== A2-S2.3 gate 3/5: layer proven independent multi-pass source ===
 
 Write-Host '=== A2-S2.3 gate 4/5: add live 1..5 switching + ReShade submenu ==='
 $feedSource = Join-Path $feeder 'src\dlss5-feed.cpp'
-& (Join-Path $toolRoot 'a2-s23-live-stage.ps1') -GeneratedRoot $generated -FeederSource $feedSource
+& (Join-Path $toolRoot 'a2-s23-live-simple-stage.ps1') -GeneratedRoot $generated -FeederSource $feedSource
 
 $vkText = [IO.File]::ReadAllText((Join-Path $generated 'm3k_vk.h'))
 $nrText = [IO.File]::ReadAllText((Join-Path $generated 'm3k_nr.h'))
 $feedText = [IO.File]::ReadAllText($feedSource)
 foreach ($marker in @(
     'static constexpr unsigned MaxPasses = 5;',
-    'M3K-LIVE: ACTIVE NR passes',
     'M3kRequestNrPassesLive',
     'M3K Neural Rendering',
+    'Changes apply without restarting GTA',
     'M3K-A2-S2.3: %s passes=%u -> DLSS SR running')) {
     if (($vkText + $nrText + $feedText).IndexOf($marker, [StringComparison]::Ordinal) -lt 0) {
         throw "Generated live source missing marker: $marker"
@@ -71,8 +71,8 @@ $hashes = Get-FileHash -Algorithm SHA256 -LiteralPath `
     'M3K A2-S2.3 x64 build passed compile and CPU-only contract/fallback/shim tests.',
     'Functional target: live 1..5 independent feature18 passes -> DLSS SR.',
     'ReShade overlay contains an M3K Neural Rendering submenu with pass-count radio buttons.',
-    'Higher pass counts are created lazily once; switching among already warmed counts does not rebuild or restart GTA.',
-    'Pass-count changes reset NR histories and downstream SR history.',
+    'Changing pass count rebuilds the independent NR chain in-process on the next frame; GTA does not restart.',
+    'A brief hitch is expected during the in-process feature rebuild.',
     'Jitter remains 0; temporal-quality work is still a later milestone.',
     'Feeder=3f624855276c4bde55145c712782477639b30e85',
     'NGX SDK=374959484e79a640feaba44c93ac8cfb0a03f5b5',
