@@ -43,22 +43,20 @@ foreach ($dependency in @($ngx, $vulkan)) {
 $patch = Join-Path $toolRoot 'feeder-m3k.patch'
 
 # The Feeder checkout is generated staging state. Reset only its one patched source
-# file so repeated A2-S0.5 builds are deterministic even after the local proof call
-# sites were injected by a previous build.
+# file so repeated A2 builds are deterministic even after local staging edits were
+# injected by a previous build.
 Run git @('-C', $feeder, 'checkout', '--', 'src/dlss5-feed.cpp')
 Run git @('-C', $feeder, 'apply', '--check', $patch)
 Run git @('-C', $feeder, 'apply', $patch)
 Run git @('-C', $feeder, 'apply', '--check', '--reverse', $patch)
 
-# Preserve the existing exact-source validation for the primary M3K patch.
+# Preserve exact-source validation for the primary M3K patch before any A2 staging edits.
 $patchText = [IO.File]::ReadAllText($patch)
 if ($patchText -notmatch 'index [0-9a-f]{40}\.\.([0-9a-f]{40})') { throw 'Patch must carry full source hashes' }
 $expectedSource = $Matches[1]
 $actualSource = & git -C $feeder hash-object --path=src/dlss5-feed.cpp src/dlss5-feed.cpp
 if ($LASTEXITCODE -ne 0 -or $actualSource -ne $expectedSource) { throw 'Feeder source differs from the exact M3K patch result' }
 
-# A2-S0.5: inject two diagnostic call sites after the exact primary patch was
-# validated. Both points have the real final Vulkan image parked as copy_dest.
 $feedSource = Join-Path $feeder 'src/dlss5-feed.cpp'
 $feedText = [IO.File]::ReadAllText($feedSource)
 
@@ -73,6 +71,8 @@ function Replace-ExactOnce([string]$Text, [string]$Old, [string]$New, [string]$L
     return $Text.Replace($Old, $New)
 }
 
+# A2-S0.5: two diagnostic call sites. Both points have the final Vulkan image parked
+# as copy_dest; SourceProof=0 makes them a no-op.
 $oneSubmitOld = @'
                 if (n > 1)
                 {
@@ -121,6 +121,15 @@ $normalNew = @'
 
 $feedText = Replace-ExactOnce $feedText $oneSubmitOld $oneSubmitNew 'A2-S0.5 one-submit insertion'
 $feedText = Replace-ExactOnce $feedText $normalOld $normalNew 'A2-S0.5 normal copy-home insertion'
+
+# A2-S1: deterministic true-source SR staging edits live separately so this build file
+# remains a small orchestration layer. They are applied only after the pinned primary
+# patch and S0.5 edits validated above.
+$a2s1Stage = Join-Path $toolRoot 'a2-s1-stage.ps1'
+if (-not (Test-Path -LiteralPath $a2s1Stage)) { throw "Missing A2-S1 staging script: $a2s1Stage" }
+. $a2s1Stage
+$feedText = Invoke-M3kA2S1Stage -FeedText $feedText
+
 [IO.File]::WriteAllText($feedSource, $feedText, (New-Object Text.UTF8Encoding($false)))
 
 # Refuse unrelated tracked edits in the staging source.
