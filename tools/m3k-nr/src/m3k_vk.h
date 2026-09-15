@@ -6,8 +6,8 @@
 #pragma once
 
 // A2-S0 source-tap ABI exported by the instrumented vanilla DXVK 3.0.2 runtime.
-// A2-S0.5 can optionally use the same handle for a visible 1:1 GPU copy proof.
-// A2-S1A reuses that same source as the real low-resolution DLSS-SR colour input.
+// A2-S0.5 uses the handle for a visible 1:1 GPU copy proof; A2-S1 reuses it as
+// the genuine low-resolution colour input for DLSS Super Resolution.
 struct M3kDxvkPresentSourceV1
 {
     UINT size;
@@ -28,6 +28,8 @@ using M3kQueryPresentSourceV1 = int (__cdecl *)(M3kDxvkPresentSourceV1 *);
 static M3kDxvkPresentSourceV1 g_m3kPresentSource = {};
 static bool g_m3kSourceTapReady = false;
 static bool g_m3kSourceProof = false;
+static int g_m3kMode = 0;
+static bool g_m3kArmed = false, g_m3kWasUsed = false;
 
 #if defined(VK_VERSION_1_0)
 static bool g_m3kSrRequested = false;
@@ -96,9 +98,8 @@ static bool M3kBgra8SourceCompatible()
     return sourceBgra8 && feederBgra8;
 }
 
-// A2-S0.5: visible proof that the Feeder can actually issue a GPU read from the
-// true low-resolution D3D9 source image exported by DXVK. This is deliberately
-// diagnostic-only: no scaling, no NR, no SR, and it is OFF by default.
+// A2-S0.5: visible proof that Feeder can actually issue a GPU read from the true
+// low-resolution D3D9 source exported by DXVK. Diagnostic only; OFF by default.
 static void M3kSourceGpuProof(VkCommandBuffer cb, VkImage finalImage, UINT finalW, UINT finalH)
 {
     if (!g_m3kSourceProof || !g_m3kSourceTapReady || !g.vk.ok ||
@@ -120,6 +121,9 @@ static void M3kSourceGpuProof(VkCommandBuffer cb, VkImage finalImage, UINT final
         return;
     }
 
+    // DXVK exports VK_FORMAT_B8G8R8A8_UNORM (44); ReShade reports GTA IV's final
+    // surface as a BGRA8 DXGI view, often TYPELESS (90). Same byte layout is enough
+    // for this raw proof copy.
     const bool sourceBgra8 = info.format == static_cast<UINT>(VK_FORMAT_B8G8R8A8_UNORM);
     const bool finalBgra8 = g.bb_fmt == DXGI_FORMAT_B8G8R8A8_UNORM ||
                             g.bb_fmt == DXGI_FORMAT_B8G8R8A8_TYPELESS ||
@@ -174,6 +178,8 @@ static void M3kSourceGpuProof(VkCommandBuffer cb, VkImage finalImage, UINT final
             info.width, info.height, copyW, copyH, finalW, finalH);
 }
 
+// A2-S1A uses nearest guide scaling on purpose. The colour is NEVER resampled here:
+// it comes straight from the proven DXVK source. Temporal quality comes after SR works.
 static void M3kVkBlitScale(VkCommandBuffer cb, VkImage src, VkImageLayout srcLayout,
                            VkImage dst, VkImageLayout dstLayout,
                            UINT srcW, UINT srcH, UINT dstW, UINT dstH)
@@ -186,6 +192,8 @@ static void M3kVkBlitScale(VkCommandBuffer cb, VkImage src, VkImageLayout srcLay
     g.vk.CmdBlitImage(cb, src, srcLayout, dst, dstLayout, 1, &bl, VK_FILTER_NEAREST);
 }
 
+// Reuse Feeder's already-proven preset query and feature-create contract, but point it
+// at the actual DXVK render size and the independent presenter size.
 static bool M3kSwapToSrFeature(UINT renderW, UINT renderH, UINT targetW, UINT targetH)
 {
     if (!g.ngx_inited || g.feature == nullptr || g.dev12 == nullptr || g.queue == nullptr)
@@ -294,6 +302,7 @@ static bool M3kRestoreDlaaFeature()
 
 static void M3kSrUpdate()
 {
+    // Any ordinary Feeder rebuild releases the feature and clears g.sr_active. Mirror it.
     if (g_m3kSrFeatureActive && !g.sr_active)
     {
         g_m3kSrFeatureActive = false;
@@ -308,7 +317,6 @@ static void M3kSrUpdate()
             M3kRestoreDlaaFeature();
         return;
     }
-
     if (g_m3kSrLatchedFail)
         return;
 
@@ -372,6 +380,8 @@ static void M3kSrUpdate()
     }
 }
 
+// Called while ReShade still has the final MV/depth resources parked as copy_source.
+// The colour path is a raw 1:1 copy from DXVK; ONLY the temporal guides are resampled.
 static void M3kSrCaptureVk(VkCommandBuffer cb, VkImage mvImage, VkImage depthImage, UINT finalW, UINT finalH)
 {
     if (!g_m3kSrFeatureActive || !g_m3kSourceTapReady || cb == VK_NULL_HANDLE)
@@ -395,7 +405,6 @@ static void M3kSrCaptureVk(VkCommandBuffer cb, VkImage mvImage, VkImage depthIma
     FeedVkCopyImage(&g.vk, cb, sourceImage, sourceLayout,
                     g.vk_img[SLOT_COLOR], VK_IMAGE_LAYOUT_GENERAL, info.width, info.height);
 
-    // Guides are the only things resampled in A2-S1A. The GTA colour source is not.
     M3kVkBlitScale(cb, mvImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                    g.vk_img[SLOT_MV], VK_IMAGE_LAYOUT_GENERAL,
                    finalW, finalH, info.width, info.height);
@@ -411,9 +420,6 @@ static void M3kSrCaptureVk(VkCommandBuffer cb, VkImage mvImage, VkImage depthIma
             static_cast<unsigned long long>(info.sequence));
 }
 #endif
-
-static int g_m3kMode = 0;
-static bool g_m3kArmed = false, g_m3kWasUsed = false;
 
 static void M3kPrepareFrame()
 {
@@ -465,6 +471,7 @@ static void M3kPrepareFrame()
 #endif
     }
 
+    // The source query is independent of NR/SR so Mode0 can validate and drive A2.
     M3kProbeDxvkPresentSource();
 #if defined(VK_VERSION_1_0)
     M3kSrUpdate();
@@ -472,6 +479,7 @@ static void M3kPrepareFrame()
 
     g_m3kArmed = false;
     if (!g_m3kMode || g_cfg.mode != 2 || g_cfg.passthrough || !g.ngx_inited || !g.feature) return;
+    // Native feature18 remains intentionally isolated from the SR experiment.
     const auto out = g.tex12[SLOT_OUTPUT]->GetDesc();
     if (g.sr_active || g_cfg.work_resolution != 100 || out.Width != g.width || out.Height != g.height) {
         static bool said = false;
@@ -486,6 +494,8 @@ static NVSDK_NGX_Result M3kEvaluateBeforeDlaa(NVSDK_NGX_D3D12_DLSS_Eval_Params *
 #if defined(VK_VERSION_1_0)
     if (g_m3kSrFeatureActive)
     {
+        // A2-S1A functional proof. True 1080 colour + 1080 guide subrect go to a
+        // genuine SR feature whose Output resource remains the native 1440 target.
         auto sr = *ep;
         sr.InRenderSubrectDimensions.Width  = g_m3kSrW;
         sr.InRenderSubrectDimensions.Height = g_m3kSrH;
@@ -500,11 +510,7 @@ static NVSDK_NGX_Result M3kEvaluateBeforeDlaa(NVSDK_NGX_D3D12_DLSS_Eval_Params *
         if (*code || NVSDK_NGX_FAILED(result))
         {
             g_m3kSrLatchedFail = true;
-            g_m3kSrFeatureActive = false;
-            g.sr_active = false;
-            g.sr_requested = false;
-            g.output_width = g.output_height = 0;
-            Log("M3K-A2-S1: SR evaluate failed result=0x%08X exception=0x%08X; latched off until SRProof toggles 0->1",
+            Log("M3K-A2-S1: SR evaluate failed result=0x%08X exception=0x%08X; Feeder will discard/rebuild this frame",
                 result, *code);
             return result;
         }
@@ -521,6 +527,8 @@ static NVSDK_NGX_Result M3kEvaluateBeforeDlaa(NVSDK_NGX_D3D12_DLSS_Eval_Params *
     }
 #endif
 
+    // Existing A1 path: copy the whole baseline contract. Only Color/reset at the
+    // A/B boundary may differ; temporal guides/exposure/scale/mask stay identical.
     auto dlaa = *ep;
     int nr = g_m3kMode == 2 && g_m3kArmed ? g_m3k.Evaluate(g.list, *ep) : 0;
     if (nr < 0) {
