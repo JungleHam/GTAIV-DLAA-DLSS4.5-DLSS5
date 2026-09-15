@@ -302,10 +302,11 @@ $nativeLogNew = @'
 '@
 $vk = Replace-ExactOnce $vk $nativeLogOld $nativeLogNew 'native NR to DLAA runtime log'
 
-# ReShade naming/status. Keep the permanent 1..5 NR selector untouched.
+# ReShade naming/status. Keep the permanent 1..5 NR selector untouched. Match only
+# the beginning of the combo declaration so C++ \0 escaping cannot break the transform.
 $feed = Replace-ExactOnce $feed `
-    'DLAA native\\0Ultra Quality' `
-    'Native + NR + DLAA\\0Ultra Quality' `
+    'const char *srItems = "DLAA native' `
+    'const char *srItems = "Native + NR + DLAA' `
     'native combo label'
 
 $overlayOld = @'
