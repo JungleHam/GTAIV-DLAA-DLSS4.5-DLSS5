@@ -5,6 +5,81 @@
 // and NIGos. The build patch defines it before including this header.
 #pragma once
 
+// A2-S0 source-tap ABI exported by the instrumented vanilla DXVK 3.0.2 runtime.
+// This stage is intentionally read-only: it only proves that the Feeder process can
+// see the exact low-resolution D3D9 present source that DXVK later scales to the WSI
+// image. No NGX contract or displayed pixels are changed here.
+struct M3kDxvkPresentSourceV1
+{
+    UINT size;
+    UINT version;
+    UINT64 sequence;
+    UINT64 image;
+    UINT64 view;
+    UINT64 device;
+    UINT width;
+    UINT height;
+    UINT format;
+    UINT layout;
+    UINT presenterWidth;
+    UINT presenterHeight;
+};
+using M3kQueryPresentSourceV1 = int (__cdecl *)(M3kDxvkPresentSourceV1 *);
+
+static M3kDxvkPresentSourceV1 g_m3kPresentSource = {};
+static bool g_m3kSourceTapReady = false;
+
+static void M3kProbeDxvkPresentSource()
+{
+    static HMODULE dxvk = nullptr;
+    static M3kQueryPresentSourceV1 query = nullptr;
+    static bool missingExportReported = false;
+    static UINT64 samples = 0;
+    static UINT lastW = 0, lastH = 0, lastPW = 0, lastPH = 0;
+
+    if (!dxvk)
+        dxvk = GetModuleHandleW(L"d3d9vk_x64.dll");
+    if (dxvk && !query)
+        query = reinterpret_cast<M3kQueryPresentSourceV1>(GetProcAddress(dxvk, "M3K_QueryPresentSourceV1"));
+
+    if (!query)
+    {
+        g_m3kSourceTapReady = false;
+        if (dxvk && !missingExportReported)
+        {
+            missingExportReported = true;
+            Log("M3K-A2-S0: d3d9vk_x64.dll has no M3K_QueryPresentSourceV1 export; source tap inactive");
+        }
+        return;
+    }
+
+    M3kDxvkPresentSourceV1 info = {};
+    info.size = sizeof(info);
+    if (!query(&info) || info.version != 1 || info.size < sizeof(info) || !info.image || !info.width || !info.height)
+    {
+        g_m3kSourceTapReady = false;
+        return;
+    }
+
+    g_m3kPresentSource = info;
+    g_m3kSourceTapReady = true;
+    ++samples;
+
+    const bool changed = info.width != lastW || info.height != lastH ||
+                         info.presenterWidth != lastPW || info.presenterHeight != lastPH;
+    if (samples == 1 || changed || (samples % 300) == 0)
+    {
+        Log("M3K-A2-S0: DXVK source tap OK seq=%llu source=%ux%u presenter=%ux%u fmt=%u layout=%u image=0x%llX device=0x%llX",
+            static_cast<unsigned long long>(info.sequence),
+            info.width, info.height, info.presenterWidth, info.presenterHeight,
+            info.format, info.layout,
+            static_cast<unsigned long long>(info.image),
+            static_cast<unsigned long long>(info.device));
+        lastW = info.width; lastH = info.height;
+        lastPW = info.presenterWidth; lastPH = info.presenterHeight;
+    }
+}
+
 static int g_m3kMode = 0;
 static bool g_m3kArmed = false, g_m3kWasUsed = false;
 
@@ -31,6 +106,12 @@ static void M3kPrepareFrame()
             g_m3kMode = mode; first = false;
         }
     }
+
+    // A2-S0 is deliberately independent of NR Mode 0/1/2. Querying the DXVK
+    // export is read-only and lets us validate the future SR source path while
+    // keeping the known-good DLAA baseline untouched.
+    M3kProbeDxvkPresentSource();
+
     g_m3kArmed = false;
     if (!g_m3kMode || g_cfg.mode != 2 || g_cfg.passthrough || !g.ngx_inited || !g.feature) return;
     // This branch is a native real-frame experiment; reject any resampled or
