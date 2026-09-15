@@ -1,0 +1,41 @@
+name: M3K Feeder A2-S2.2 MultiPass
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - gtaiv-m3k-a2-sr-profiles
+    paths:
+      - .github/workflows/m3k-feeder-s22.yml
+      - tools/m3k-nr/a2-s22-multipass-stage.ps1
+      - tools/m3k-nr/build-s22.ps1
+      - tools/m3k-nr/a2-s2-stage.ps1
+      - tools/m3k-nr/compile-s2.bat
+      - tools/m3k-nr/build.ps1
+      - tools/m3k-nr/a2-s1-stage.ps1
+      - tools/m3k-nr/feeder-m3k.patch
+      - tools/m3k-nr/m3k-nr.ini
+      - tools/m3k-nr/src/**
+      - tools/m3k-nr/tests/**
+
+jobs:
+  build-feeder-s22:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v6
+
+      - name: Build A2-S2.2 multi-pass Feeder
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\tools\m3k-nr\build-s22.ps1
+          Get-Content .\tools\m3k-nr\out-m3k-s22\BUILD-VERIFIED.txt
+
+      - name: Upload A2-S2.2 build
+        uses: actions/upload-artifact@v7
+        with:
+          name: M3K-A2-S2.2-MultiPass-Feeder-x64
+          path: tools/m3k-nr/out-m3k-s22
+          if-no-files-found: error
