@@ -1,0 +1,94 @@
+name: M3K b-bridge A3-S1 Temporal Jitter x86
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ gtaiv-m3k-a3-jitter-history ]
+    paths:
+      - 'tools/m3k-nr/a2-s21-bbridge-ui.py'
+      - 'tools/m3k-nr/a3-s1-bbridge-temporal-jitter.py'
+      - '.github/workflows/m3k-bbridge-a3-s1-jitter.yml'
+
+jobs:
+  build-bbridge-a3-s1:
+    runs-on: windows-2022
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Clone pinned b-bridge
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path tools/m3k-nr/_work | Out-Null
+          git clone --filter=blob:none https://github.com/gutbash/b-bridge.git tools/m3k-nr/_work/bbridge-a3-s1
+          git -C tools/m3k-nr/_work/bbridge-a3-s1 checkout 1dad5e6d4dcf8647e354aa9a87f611256fb61142
+          git -C tools/m3k-nr/_work/bbridge-a3-s1 submodule update --init --recursive
+          $head = git -C tools/m3k-nr/_work/bbridge-a3-s1 rev-parse HEAD
+          if ($head -ne '1dad5e6d4dcf8647e354aa9a87f611256fb61142') { throw "Wrong b-bridge revision: $head" }
+
+      - name: Apply proven UI resync + A3-S1 real temporal jitter
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python tools/m3k-nr/a2-s21-bbridge-ui.py tools/m3k-nr/_work/bbridge-a3-s1
+          python tools/m3k-nr/a3-s1-bbridge-temporal-jitter.py tools/m3k-nr/_work/bbridge-a3-s1
+          $window = Get-Content tools/m3k-nr/_work/bbridge-a3-s1/src/client/window.cpp -Raw
+          $device = Get-Content tools/m3k-nr/_work/bbridge-a3-s1/src/client/d3d9_device.cpp -Raw
+          $swap = Get-Content tools/m3k-nr/_work/bbridge-a3-s1/src/client/d3d9_swapchain.cpp -Raw
+          foreach ($marker in @('[M3K-UI] config-change resync WM_SIZE','NewGetClientRect')) {
+            if (-not $window.Contains($marker)) { throw "Missing UI marker: $marker" }
+          }
+          foreach ($marker in @('[M3K-JITTER] config enabled=','M3kWvpProjective','M3K_GTAIV_Jitter_v1','Redundant game constants still need forwarding')) {
+            if (-not $device.Contains($marker)) { throw "Missing jitter marker: $marker" }
+          }
+          foreach ($marker in @('M3kJitterPublishPresent','M3kJitterAdvanceAfterPresent')) {
+            if (-not $swap.Contains($marker)) { throw "Missing Present jitter marker: $marker" }
+          }
+          git -C tools/m3k-nr/_work/bbridge-a3-s1 diff --check
+
+      - name: Setup Meson
+        run: pip install meson==0.64.1
+
+      - name: Build only x86 d3d9 target
+        shell: pwsh
+        working-directory: tools/m3k-nr/_work/bbridge-a3-s1
+        run: |
+          $ErrorActionPreference = 'Stop'
+          . .\build_common.ps1
+          SetupVS -Platform x86
+          meson setup --buildtype release --backend ninja _compA3S1 --debug
+          if ($LASTEXITCODE -ne 0) { throw "meson setup failed: $LASTEXITCODE" }
+          Copy-Item .\Directory.Build.Props -Destination .\_compA3S1 -Force
+          meson compile -C _compA3S1 d3d9
+          if ($LASTEXITCODE -ne 0) { throw "d3d9 target build failed: $LASTEXITCODE" }
+          New-Item -ItemType Directory -Force -Path .\_output | Out-Null
+          $built = '.\_compA3S1\src\client\d3d9.dll'
+          if (-not (Test-Path -LiteralPath $built)) { throw "Missing targeted build output: $built" }
+          Copy-Item -LiteralPath $built -Destination .\_output\d3d9.dll -Force
+
+      - name: Verify x86 output
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $out = 'tools/m3k-nr/_work/bbridge-a3-s1/_output'
+          if (-not (Test-Path "$out/d3d9.dll")) { throw 'Missing x86 client d3d9.dll' }
+          @(
+            'M3K A3-S1 b-bridge real temporal jitter x86 client',
+            'Stable base=S2.7 Custom UQ 77% + proven UI resync',
+            'Upstream b-bridge=1dad5e6d4dcf8647e354aa9a87f611256fb61142',
+            'Gate=projective c8-c11 WVP + viewport equals active true render size',
+            'Sequence=16-phase Halton(2,3), phase 0 unshifted',
+            'Handoff=Local\\M3K_GTAIV_Jitter_v1 published before Present',
+            'Build=targeted Meson d3d9 target only',
+            ((Get-FileHash -Algorithm SHA256 "$out/d3d9.dll").Hash + '  d3d9.dll')
+          ) | Set-Content "$out/M3K-A3-S1-JITTER-BUILD.txt"
+          Get-Content "$out/M3K-A3-S1-JITTER-BUILD.txt"
+
+      - name: Upload x86 A3-S1 jitter client
+        uses: actions/upload-artifact@v4
+        with:
+          name: M3K-A3-S1-bbridge-jitter-x86
+          path: |
+            tools/m3k-nr/_work/bbridge-a3-s1/_output/d3d9.dll
+            tools/m3k-nr/_work/bbridge-a3-s1/_output/M3K-A3-S1-JITTER-BUILD.txt
