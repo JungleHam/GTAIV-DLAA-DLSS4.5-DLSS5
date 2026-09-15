@@ -80,9 +80,11 @@ static void M3kProbeDxvkPresentSource()
     }
 }
 
+#if defined(VK_VERSION_1_0)
 // A2-S0.5: visible proof that the Feeder can actually issue a GPU read from the
 // true low-resolution D3D9 source image exported by DXVK. This is deliberately
 // diagnostic-only: no scaling, no NR, no SR, and it is OFF by default.
+// CPU contract tests intentionally do not include Vulkan; keep this runtime-only.
 static void M3kSourceGpuProof(VkCommandBuffer cb, VkImage finalImage, UINT finalW, UINT finalH)
 {
     if (!g_m3kSourceProof || !g_m3kSourceTapReady || !g.vk.ok ||
@@ -160,6 +162,7 @@ static void M3kSourceGpuProof(VkCommandBuffer cb, VkImage finalImage, UINT final
             static_cast<unsigned long long>(info.sequence),
             info.width, info.height, copyW, copyH, finalW, finalH);
 }
+#endif
 
 static int g_m3kMode = 0;
 static bool g_m3kArmed = false, g_m3kWasUsed = false;
@@ -178,7 +181,11 @@ static void M3kPrepareFrame()
         }
         const UINT requested = GetPrivateProfileIntW(L"M3K", L"Mode", 0, path);
         const int mode = requested <= 2 ? int(requested) : 0;
+#if defined(VK_VERSION_1_0)
         const bool sourceProof = GetPrivateProfileIntW(L"M3K", L"SourceProof", 0, path) != 0;
+#else
+        const bool sourceProof = false;
+#endif
         static bool first = true;
         if (first || mode != g_m3kMode) {
             Log("M3K: mode=%d (%s); config=%ls", mode,
