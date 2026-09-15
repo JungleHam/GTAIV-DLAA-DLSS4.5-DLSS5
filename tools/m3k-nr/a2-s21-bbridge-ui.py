@@ -80,6 +80,23 @@ static M3kUiConfig M3kGetUiConfig() {
   if (first || changed) {
     Logger::info(format_string("[M3K-UI] config enabled=%d logicalClient=%ux%u",
       config.enabled ? 1 : 0, config.width, config.height));
+
+    // M3K A2-S2.6 UI resync: the Feeder can post its logical WM_SIZE before this
+    // 32-bit process notices the rewritten INI. If the true source reaches its
+    // target quickly there may be no second Feeder retry, leaving GTA's HUD and
+    // mouse state at the previous logical size while GetClientRect already
+    // reports the new size. Whenever a live logical extent change is observed,
+    // enqueue one fresh WM_SIZE from this process so the game WndProc consumes
+    // the same dimensions that GetClientRect now exposes. PostMessage keeps this
+    // asynchronous and does not physically resize the presenter-sized HWND.
+    if (!first && changed && config.enabled && g_hwnd && g_gameWndProc &&
+        config.width && config.height) {
+      const BOOL posted = PostMessageW(g_hwnd, WM_SIZE, SIZE_RESTORED,
+        MAKELPARAM(config.width, config.height));
+      Logger::info(format_string("[M3K-UI] config-change resync WM_SIZE logical %ux%u posted=%d",
+        config.width, config.height, posted ? 1 : 0));
+    }
+
     last = config;
     first = false;
   }
@@ -176,6 +193,7 @@ for marker in (
     "NewGetClientRect",
     "DETOURS_ATTACH(GetClientRect)",
     "forwarding WM_SIZE as logical",
+    "config-change resync WM_SIZE logical",
 ):
     if marker not in text:
         raise SystemExit(f"verification failed: {marker}")
