@@ -33,17 +33,15 @@ Copy-Item -LiteralPath $s23Generated -Destination $generated -Recurse
 
 Write-Host '=== A2-S2.4 gate 3/4: add live DLSS reconstruction profiles ==='
 $feedSource = Join-Path $feeder 'src\dlss5-feed.cpp'
-
-# The main S2.4 transform owns all M3K/DLSS state changes. Give its overlay-only
-# verification a tiny deterministic scratch file, then patch the real ReShade panel
-# with the separate robust inserter below.
 $dummyFeed = Join-Path $workRoot 's24-overlay-dummy.cpp'
 '        ImGui::TextWrapped("First use of a higher count may hitch briefly while its independent NR feature is created. Click 5 once to warm all five, then 1-5 comparisons are immediate without restarting GTA.");' | Set-Content -Encoding UTF8 -LiteralPath $dummyFeed
 & (Join-Path $toolRoot 'a2-s24-srprofiles-stage.ps1') -GeneratedRoot $generated -FeederSource $dummyFeed
 & (Join-Path $toolRoot 'a2-s24-overlay-stage.ps1') -FeederSource $feedSource
 
+$nrText = [IO.File]::ReadAllText((Join-Path $generated 'm3k_nr.h'))
 $vkText = [IO.File]::ReadAllText((Join-Path $generated 'm3k_vk.h'))
 $feedText = [IO.File]::ReadAllText($feedSource)
+$allText = $nrText + $vkText + $feedText
 foreach ($marker in @(
     'static constexpr unsigned MaxPasses = 5;',
     'M3K-LIVE: ACTIVE NR passes',
@@ -51,7 +49,7 @@ foreach ($marker in @(
     'DLSS reconstruction (live)',
     'DLAA only (presenter)',
     'Ultra Performance')) {
-    if (($vkText + $feedText).IndexOf($marker, [StringComparison]::Ordinal) -lt 0) { throw "Generated S2.4 source missing marker: $marker" }
+    if ($allText.IndexOf($marker, [StringComparison]::Ordinal) -lt 0) { throw "Generated S2.4 source missing marker: $marker" }
 }
 
 if (Test-Path -LiteralPath $out) { Remove-Item -LiteralPath $out -Recurse -Force }
