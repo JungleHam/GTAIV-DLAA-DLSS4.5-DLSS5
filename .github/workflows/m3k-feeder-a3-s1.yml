@@ -1,0 +1,50 @@
+name: M3K Feeder A3-S1 Bridge-Synchronized Jitter
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - gtaiv-m3k-a3-jitter-history
+    paths:
+      - .github/workflows/m3k-feeder-a3-s1.yml
+      - tools/m3k-nr/a3-s1-jitter-stage.ps1
+      - tools/m3k-nr/build-a3-s1.ps1
+      - tools/m3k-nr/m3k-nr.ini
+      - tools/m3k-nr/a2-s27-custom-uq-stage.ps1
+      - tools/m3k-nr/build-s27.ps1
+      - tools/m3k-nr/a2-s26-native-uq-stage.ps1
+      - tools/m3k-nr/build-s26.ps1
+      - tools/m3k-nr/a2-s25-dynamicres-stage.ps1
+      - tools/m3k-nr/build-s25.ps1
+      - tools/m3k-nr/a2-s24-srprofiles-stage.ps1
+      - tools/m3k-nr/a2-s24-overlay-stage.ps1
+      - tools/m3k-nr/build-s24.ps1
+      - tools/m3k-nr/a2-s23-live-stage.ps1
+      - tools/m3k-nr/build-s23.ps1
+      - tools/m3k-nr/a2-s22-multipass-stage.ps1
+      - tools/m3k-nr/build-s22.ps1
+      - tools/m3k-nr/a2-s2-stage.ps1
+      - tools/m3k-nr/compile-s2.bat
+      - tools/m3k-nr/src/**
+      - tools/m3k-nr/tests/**
+
+jobs:
+  build-feeder-a3-s1:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v6
+
+      - name: Build A3-S1 synchronized-jitter Feeder
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\tools\m3k-nr\build-a3-s1.ps1
+          Get-Content .\tools\m3k-nr\out-m3k-a3-s1\BUILD-VERIFIED.txt
+
+      - name: Upload A3-S1 Feeder build
+        uses: actions/upload-artifact@v7
+        with:
+          name: M3K-A3-S1-Feeder-Jitter-x64
+          path: tools/m3k-nr/out-m3k-a3-s1
+          if-no-files-found: error
