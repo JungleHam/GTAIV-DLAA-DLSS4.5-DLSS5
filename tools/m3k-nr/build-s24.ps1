@@ -44,8 +44,8 @@ $feedText = [IO.File]::ReadAllText($feedSource)
 $allText = $nrText + $vkText + $feedText
 foreach ($marker in @(
     'static constexpr unsigned MaxPasses = 5;',
-    'M3K-LIVE: ACTIVE NR passes',
     'M3K-SR-LIVE: ACTIVE',
+    'M3kRequestNrPassesLive',
     'DLSS reconstruction (live)',
     'DLAA only (presenter)',
     'Ultra Performance')) {
