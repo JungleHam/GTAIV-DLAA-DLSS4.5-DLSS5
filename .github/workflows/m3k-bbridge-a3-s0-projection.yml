@@ -1,0 +1,76 @@
+name: M3K b-bridge A3-S0 Projection Probe x86
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ gtaiv-m3k-a3-jitter-history ]
+    paths:
+      - 'tools/m3k-nr/a2-s21-bbridge-ui.py'
+      - 'tools/m3k-nr/a3-s0-bbridge-projection-probe.py'
+      - '.github/workflows/m3k-bbridge-a3-s0-projection.yml'
+
+jobs:
+  build-bbridge-a3-s0:
+    runs-on: windows-2022
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Clone pinned b-bridge
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path tools/m3k-nr/_work | Out-Null
+          git clone --filter=blob:none https://github.com/gutbash/b-bridge.git tools/m3k-nr/_work/bbridge-a3-s0
+          git -C tools/m3k-nr/_work/bbridge-a3-s0 checkout 1dad5e6d4dcf8647e354aa9a87f611256fb61142
+          git -C tools/m3k-nr/_work/bbridge-a3-s0 submodule update --init --recursive
+          $head = git -C tools/m3k-nr/_work/bbridge-a3-s0 rev-parse HEAD
+          if ($head -ne '1dad5e6d4dcf8647e354aa9a87f611256fb61142') { throw "Wrong b-bridge revision: $head" }
+
+      - name: Apply proven UI resync + read-only projection probe
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python tools/m3k-nr/a2-s21-bbridge-ui.py tools/m3k-nr/_work/bbridge-a3-s0
+          python tools/m3k-nr/a3-s0-bbridge-projection-probe.py tools/m3k-nr/_work/bbridge-a3-s0
+          $window = Get-Content tools/m3k-nr/_work/bbridge-a3-s0/src/client/window.cpp -Raw
+          $device = Get-Content tools/m3k-nr/_work/bbridge-a3-s0/src/client/d3d9_device.cpp -Raw
+          foreach ($marker in @('[M3K-UI] config-change resync WM_SIZE','NewGetClientRect')) {
+            if (-not $window.Contains($marker)) { throw "Missing UI marker: $marker" }
+          }
+          foreach ($marker in @('[M3K-JITTER-PROBE] enabled=','M3kProjectionProbeConstants','ProjectionProbe','read-only vertex constant discovery')) {
+            if (-not $device.Contains($marker)) { throw "Missing probe marker: $marker" }
+          }
+          git -C tools/m3k-nr/_work/bbridge-a3-s0 diff --check
+
+      - name: Setup Meson
+        run: pip install meson==0.64.1
+
+      - name: Build release x86 client only
+        shell: cmd
+        working-directory: tools/m3k-nr/_work/bbridge-a3-s0
+        run: powershell -command "& { . .\build_bridge.ps1; Build -Platform x86 -BuildFlavour release -BuildSubDir _compRelease_x86 ; exit $LastExitCode }"
+
+      - name: Verify x86 output
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $out = 'tools/m3k-nr/_work/bbridge-a3-s0/_output'
+          if (-not (Test-Path "$out/d3d9.dll")) { throw 'Missing x86 client d3d9.dll' }
+          @(
+            'M3K A3-S0 b-bridge read-only projection probe x86 client',
+            'Stable base=S2.7 Custom UQ 77%',
+            'Upstream b-bridge=1dad5e6d4dcf8647e354aa9a87f611256fb61142',
+            'Includes=proven UI virtualization/resync + read-only SetVertexShaderConstantF probe',
+            'No shader constants are modified in A3-S0.',
+            ((Get-FileHash -Algorithm SHA256 "$out/d3d9.dll").Hash + '  d3d9.dll')
+          ) | Set-Content "$out/M3K-A3-S0-PROJECTION-BUILD.txt"
+          Get-Content "$out/M3K-A3-S0-PROJECTION-BUILD.txt"
+
+      - name: Upload x86 projection probe client
+        uses: actions/upload-artifact@v4
+        with:
+          name: M3K-A3-S0-bbridge-projection-probe-x86
+          path: |
+            tools/m3k-nr/_work/bbridge-a3-s0/_output/d3d9.dll
+            tools/m3k-nr/_work/bbridge-a3-s0/_output/M3K-A3-S0-PROJECTION-BUILD.txt
