@@ -247,10 +247,10 @@ $feed = Replace-ExactOnce $feed $unregisterOld $unregisterNew 'capture overlay u
 foreach ($marker in @(
     'M3K A3-S1.2 Controlled Capture Lab',
     'M3K-A3-S1.2-CAP: SAVED',
-    'M3K_NR_OFF_UQ',
-    'M3K_NR_ON_UQ',
-    'M3K_NR_OFF_UP',
-    'M3K_NR_ON_UP',
+    'M3K_CAP_NR_OFF_UQ',
+    'M3K_CAP_NR_ON_UQ',
+    'M3K_CAP_NR_OFF_UP',
+    'M3K_CAP_NR_ON_UP',
     'save_screenshot(postfix)',
     'reshade::register_overlay("M3K Capture Lab", M3kCaptureOverlay)')) {
     if ($feed.IndexOf($marker, [StringComparison]::Ordinal) -lt 0) {
