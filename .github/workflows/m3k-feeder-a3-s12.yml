@@ -1,0 +1,35 @@
+name: M3K Feeder A3-S1.2 Capture Lab
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ gtaiv-m3k-a3-jitter-history ]
+    paths:
+      - '.github/workflows/m3k-feeder-a3-s12.yml'
+      - 'tools/m3k-nr/a3-s12-capture-lab-stage.ps1'
+      - 'tools/m3k-nr/build-a3-s12.ps1'
+      - 'tools/m3k-nr/a3-s11-jitter-sign-stage.ps1'
+      - 'tools/m3k-nr/build-a3-s11.ps1'
+      - 'tools/m3k-nr/**'
+
+jobs:
+  build-feeder-a3-s12:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v6
+
+      - name: Build A3-S1.2 controlled capture-lab Feeder
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          .\tools\m3k-nr\build-a3-s12.ps1
+          Get-Content .\tools\m3k-nr\out-m3k-a3-s12\BUILD-VERIFIED.txt
+
+      - name: Upload A3-S1.2 Feeder build
+        uses: actions/upload-artifact@v7
+        with:
+          name: M3K-A3-S1.2-Capture-Lab-x64
+          path: tools/m3k-nr/out-m3k-a3-s12
+          if-no-files-found: error
