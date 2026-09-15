@@ -24,7 +24,7 @@ function Replace-ExactOnce([string]$Text, [string]$Old, [string]$New, [string]$L
 if (-not (Test-Path -LiteralPath $SourceRoot)) { throw "Missing M3K source root: $SourceRoot" }
 if (Test-Path -LiteralPath $GeneratedRoot) { Remove-Item -LiteralPath $GeneratedRoot -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $GeneratedRoot | Out-Null
-Copy-Item -LiteralPath (Join-Path $SourceRoot '*') -Destination $GeneratedRoot -Recurse -Force
+Copy-Item -Path (Join-Path $SourceRoot '*') -Destination $GeneratedRoot -Recurse -Force
 
 $nrPath = Join-Path $GeneratedRoot 'm3k_nr.h'
 $vkPath = Join-Path $GeneratedRoot 'm3k_vk.h'
