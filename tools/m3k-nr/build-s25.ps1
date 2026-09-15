@@ -45,7 +45,7 @@ foreach ($marker in @(
     'M3K-RES-LIVE: profile %s requests TRUE GTA render',
     'M3K-RES-LIVE: TRUE source confirmed',
     'M3K-SR-LIVE: ACTIVE',
-    'M3K-LIVE: ACTIVE NR passes',
+    'static constexpr unsigned MaxPasses = 5;',
     'True render target:',
     'DLAA native')) {
     if ($allText.IndexOf($marker, [StringComparison]::Ordinal) -lt 0) {
