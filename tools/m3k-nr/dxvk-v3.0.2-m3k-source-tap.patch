@@ -1,0 +1,212 @@
+diff --git a/src/d3d9/d3d9_device.cpp b/src/d3d9/d3d9_device.cpp
+index 8ee0555..6195f2e 100644
+--- a/src/d3d9/d3d9_device.cpp
++++ b/src/d3d9/d3d9_device.cpp
+@@ -1246,6 +1246,37 @@ namespace dxvk {
+ 
+     VkExtent3D srcExtent = srcImage->mipLevelExtent(srcSubresource.mipLevel);
+     VkExtent3D dstExtent = dstImage->mipLevelExtent(dstSubresource.mipLevel);
++    if (srcExtent.width != dstExtent.width || srcExtent.height != dstExtent.height) {
++      static uint32_t m3kStretchSeen[32][4] = {};
++      bool m3kStretchKnown = false;
++      uint32_t m3kStretchFree = 32;
++      for (uint32_t i = 0; i < 32; i++) {
++        if (m3kStretchSeen[i][0] == srcExtent.width
++         && m3kStretchSeen[i][1] == srcExtent.height
++         && m3kStretchSeen[i][2] == dstExtent.width
++         && m3kStretchSeen[i][3] == dstExtent.height) {
++          m3kStretchKnown = true;
++          break;
++        }
++        if (m3kStretchFree == 32
++         && m3kStretchSeen[i][0] == 0
++         && m3kStretchSeen[i][1] == 0
++         && m3kStretchSeen[i][2] == 0
++         && m3kStretchSeen[i][3] == 0)
++          m3kStretchFree = i;
++      }
++      if (!m3kStretchKnown) {
++        if (m3kStretchFree < 32) {
++          m3kStretchSeen[m3kStretchFree][0] = srcExtent.width;
++          m3kStretchSeen[m3kStretchFree][1] = srcExtent.height;
++          m3kStretchSeen[m3kStretchFree][2] = dstExtent.width;
++          m3kStretchSeen[m3kStretchFree][3] = dstExtent.height;
++        }
++        Logger::info(str::format(
++          "[M3K-STRETCH] src=", srcExtent.width, "x", srcExtent.height,
++          " dst=", dstExtent.width, "x", dstExtent.height));
++      }
++    }
+ 
+     D3D9Format srcFormat = srcTextureInfo->Desc()->Format;
+     D3D9Format dstFormat = dstTextureInfo->Desc()->Format;
+@@ -1666,6 +1697,24 @@ namespace dxvk {
+ 
+       if (likely(rt != nullptr)) {
+         auto rtSize = rt->GetSurfaceExtent();
++        static uint32_t m3kRt0Seen[32][2] = {};
++        bool m3kRt0Known = false;
++        uint32_t m3kRt0Free = 32;
++        for (uint32_t i = 0; i < 32; i++) {
++          if (m3kRt0Seen[i][0] == rtSize.width && m3kRt0Seen[i][1] == rtSize.height) {
++            m3kRt0Known = true;
++            break;
++          }
++          if (m3kRt0Free == 32 && m3kRt0Seen[i][0] == 0 && m3kRt0Seen[i][1] == 0)
++            m3kRt0Free = i;
++        }
++        if (!m3kRt0Known) {
++          if (m3kRt0Free < 32) {
++            m3kRt0Seen[m3kRt0Free][0] = rtSize.width;
++            m3kRt0Seen[m3kRt0Free][1] = rtSize.height;
++          }
++          Logger::info(str::format("[M3K-RT0] extent=", rtSize.width, "x", rtSize.height));
++        }
+         viewport.Width  = rtSize.width;
+         viewport.Height = rtSize.height;
+         scissorRect.right  = rtSize.width;
+@@ -2104,6 +2153,26 @@ namespace dxvk {
+ 
+     if (m_state.viewport == *pViewport)
+       return D3D_OK;
++    static uint32_t m3kViewportSeen[32][2] = {};
++    bool m3kViewportKnown = false;
++    uint32_t m3kViewportFree = 32;
++    for (uint32_t i = 0; i < 32; i++) {
++      if (m3kViewportSeen[i][0] == pViewport->Width && m3kViewportSeen[i][1] == pViewport->Height) {
++        m3kViewportKnown = true;
++        break;
++      }
++      if (m3kViewportFree == 32 && m3kViewportSeen[i][0] == 0 && m3kViewportSeen[i][1] == 0)
++        m3kViewportFree = i;
++    }
++    if (!m3kViewportKnown) {
++      if (m3kViewportFree < 32) {
++        m3kViewportSeen[m3kViewportFree][0] = pViewport->Width;
++        m3kViewportSeen[m3kViewportFree][1] = pViewport->Height;
++      }
++      Logger::info(str::format(
++        "[M3K-VIEWPORT] extent=", pViewport->Width, "x", pViewport->Height,
++        " xy=", pViewport->X, ",", pViewport->Y));
++    }
+ 
+     m_state.viewport.X = pViewport->X;
+     m_state.viewport.Y = pViewport->Y;
+diff --git a/src/d3d9/d3d9_swapchain.cpp b/src/d3d9/d3d9_swapchain.cpp
+index 30f905c..c11383b 100644
+--- a/src/d3d9/d3d9_swapchain.cpp
++++ b/src/d3d9/d3d9_swapchain.cpp
+@@ -5,6 +5,39 @@
+ #include "d3d9_hud.h"
+ #include "d3d9_window.h"
+ 
++#include <cstdint>
++#include <mutex>
++
++struct M3KPresentSourceV1 {
++  uint32_t size;
++  uint32_t version;
++  uint64_t sequence;
++  uint64_t image;
++  uint64_t view;
++  uint64_t device;
++  uint32_t width;
++  uint32_t height;
++  uint32_t format;
++  uint32_t layout;
++  uint32_t presenterWidth;
++  uint32_t presenterHeight;
++};
++
++static std::mutex g_m3kPresentSourceMutex;
++static M3KPresentSourceV1 g_m3kPresentSource = { sizeof(M3KPresentSourceV1), 1u };
++
++extern "C" __declspec(dllexport) int __cdecl M3K_QueryPresentSourceV1(M3KPresentSourceV1* out) {
++  if (!out || out->size < sizeof(M3KPresentSourceV1))
++    return 0;
++
++  std::lock_guard<std::mutex> lock(g_m3kPresentSourceMutex);
++  if (!g_m3kPresentSource.sequence)
++    return 0;
++
++  *out = g_m3kPresentSource;
++  return 1;
++}
++
+ namespace dxvk {
+ 
+   static uint16_t MapGammaControlPoint(float x) {
+@@ -816,9 +849,39 @@ namespace dxvk {
+     pPresentParams->BackBufferCount    = std::max(pPresentParams->BackBufferCount, 1u);
+ 
+     if (pPresentParams->Windowed) {
+-      wsi::getWindowSize(pPresentParams->hDeviceWindow,
+-        pPresentParams->BackBufferWidth  ? nullptr : &pPresentParams->BackBufferWidth,
+-        pPresentParams->BackBufferHeight ? nullptr : &pPresentParams->BackBufferHeight);
++      UINT windowWidth = 0;
++      UINT windowHeight = 0;
++      wsi::getWindowSize(pPresentParams->hDeviceWindow, &windowWidth, &windowHeight);
++
++      const UINT requestedWidth = pPresentParams->BackBufferWidth;
++      const UINT requestedHeight = pPresentParams->BackBufferHeight;
++      const UINT previousWidth = m_presentParams.BackBufferWidth;
++      const UINT previousHeight = m_presentParams.BackBufferHeight;
++
++      // M3K: A zero-sized windowed reset normally means "use current client size".
++      // For our render/present split experiment, preserve the previous D3D9
++      // backbuffer resolution instead, while UpdatePresentRegion still follows
++      // the real window size for the Vulkan presenter.
++      if (!pPresentParams->BackBufferWidth)
++        pPresentParams->BackBufferWidth = previousWidth ? previousWidth : windowWidth;
++
++      if (!pPresentParams->BackBufferHeight)
++        pPresentParams->BackBufferHeight = previousHeight ? previousHeight : windowHeight;
++
++      if (previousWidth == 1920 && previousHeight == 1080
++       && requestedWidth == 2560 && requestedHeight == 1440
++       && windowWidth == 2560 && windowHeight == 1440) {
++        pPresentParams->BackBufferWidth = 1920;
++        pPresentParams->BackBufferHeight = 1080;
++
++        Logger::info(str::format(
++          "[M3K-SPLIT] forcing render=1920x1080 present-window=2560x1440"));
++      }
++      Logger::info(str::format(
++        "[M3K-NORMALIZE] requested=", requestedWidth, "x", requestedHeight,
++        " previous=", previousWidth, "x", previousHeight,
++        " window=", windowWidth, "x", windowHeight,
++        " resolved=", pPresentParams->BackBufferWidth, "x", pPresentParams->BackBufferHeight));
+     }
+     else {
+       wsi::getMonitorClientSize(wsi::getDefaultMonitor(),
+@@ -862,6 +925,30 @@ namespace dxvk {
+         {  int32_t(m_dstRect.left),                    int32_t(m_dstRect.top)                    },
+         { uint32_t(m_dstRect.right - m_dstRect.left), uint32_t(m_dstRect.bottom - m_dstRect.top) } };
+ 
++      static uint64_t m3kPresentProbeFrame = 0;
++      if ((++m3kPresentProbeFrame % 300) == 1) {
++        Logger::info(str::format(
++          "[M3K-PRESENT] source=", srcRect.extent.width, "x", srcRect.extent.height,
++          " dest=", dstRect.extent.width, "x", dstRect.extent.height,
++          " presenter=", backBuffer->info().extent.width, "x", backBuffer->info().extent.height));
++      }
++      // M3K A2-S0: publish the real D3D9 present source to the in-process
++      // ReShade/Feeder add-on. Read-only metadata/handles only at this stage.
++      {
++        std::lock_guard<std::mutex> lock(g_m3kPresentSourceMutex);
++        g_m3kPresentSource.size = sizeof(M3KPresentSourceV1);
++        g_m3kPresentSource.version = 1u;
++        g_m3kPresentSource.sequence += 1;
++        g_m3kPresentSource.image = (uint64_t)swapImage->handle();
++        g_m3kPresentSource.view = (uint64_t)swapImageView->handle();
++        g_m3kPresentSource.device = (uint64_t)m_device->handle();
++        g_m3kPresentSource.width = srcRect.extent.width;
++        g_m3kPresentSource.height = srcRect.extent.height;
++        g_m3kPresentSource.format = uint32_t(swapImage->info().format);
++        g_m3kPresentSource.layout = uint32_t(swapImageView->getLayout());
++        g_m3kPresentSource.presenterWidth = backBuffer->info().extent.width;
++        g_m3kPresentSource.presenterHeight = backBuffer->info().extent.height;
++      }
+       // Bump frame ID
+       m_wctx->frameId += 1;
+ 
