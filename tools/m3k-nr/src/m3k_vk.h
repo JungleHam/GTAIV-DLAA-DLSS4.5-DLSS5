@@ -106,14 +106,21 @@ static void M3kSourceGpuProof(VkCommandBuffer cb, VkImage finalImage, UINT final
         return;
     }
 
-    if (info.format != static_cast<UINT>(VK_FORMAT_B8G8R8A8_UNORM) ||
-        g.bb_fmt != DXGI_FORMAT_B8G8R8A8_UNORM)
+    // DXVK exports the source as VK_FORMAT_B8G8R8A8_UNORM (44). ReShade reports
+    // GTA IV's final BGRA8 resource as DXGI_FORMAT_B8G8R8A8_TYPELESS (90), even
+    // though its concrete Vulkan image is in the same BGRA8 texel family. Treat
+    // UNORM/TYPELESS/SRGB DXGI views as byte-compatible for this diagnostic copy.
+    const bool sourceBgra8 = info.format == static_cast<UINT>(VK_FORMAT_B8G8R8A8_UNORM);
+    const bool finalBgra8 = g.bb_fmt == DXGI_FORMAT_B8G8R8A8_UNORM ||
+                            g.bb_fmt == DXGI_FORMAT_B8G8R8A8_TYPELESS ||
+                            g.bb_fmt == DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+    if (!sourceBgra8 || !finalBgra8)
     {
         static bool said = false;
         if (!said)
         {
             said = true;
-            Log("M3K-A2-S0.5: GPU proof blocked: source VkFormat=%u, final DXGI format=%u",
+            Log("M3K-A2-S0.5: GPU proof blocked: incompatible source VkFormat=%u, final DXGI format=%u",
                 info.format, static_cast<UINT>(g.bb_fmt));
         }
         return;
