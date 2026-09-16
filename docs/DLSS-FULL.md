@@ -14,8 +14,8 @@ and the A3-S5 automatic startup-prime fix. It does **not** add ray tracing or pa
 
 ## What it installs
 
-The installer builds the frozen source checkpoint locally and verifies the exact runtime
-hashes before copying anything into the game:
+The installer builds the frozen source checkpoint locally, runs the existing build/test
+gates, and then installs:
 
 ```text
 A3-S2 coherent-jitter b-bridge client d3d9.dll
@@ -24,13 +24,18 @@ S2.7 stable m3k-nvngx.dll shim
 m3k-nr.ini with Mode=0 (NR disabled)
 ```
 
-Expected SHA256 values:
+The hardware-validated CI reference SHA256 values are:
 
 ```text
 6DD40F145A5D503624E3E05ECF0ADBAA094CF83B24278C0BB333318E3C52A912  d3d9.dll
 C73D8D54271F55F8931F00D62A4CDF605118BEA71D7C6BEE0B61D0CA7C1CCE4B  dlss5-feed.addon64
 A2E4BEDACE8D99BC60B5D18E958BD7E98F8887FF40EC45A8674B892E2D1FCBBC  m3k-nvngx.dll
 ```
+
+A local MSVC build may not be byte-identical to CI because compiler/toolchain revisions can
+change PE output. The installer therefore prints reference-hash matches when they occur,
+but its correctness gates are the exact frozen source revisions, patch validation, successful
+compilation and the existing CPU contract tests.
 
 The frozen project checkpoint used for the build is:
 
@@ -110,13 +115,13 @@ beside `GTAIV.exe` and run it.
 The installer:
 
 1. verifies the existing DLAA/b-bridge baseline,
-2. creates a rollback backup,
-3. checks out the exact frozen project checkpoint,
-4. builds A3-S5 and the A3-S2 x86 b-bridge client,
-5. verifies all expected hashes,
+2. checks out the exact frozen project and b-bridge revisions,
+3. builds A3-S5 and the A3-S2 x86 b-bridge client,
+4. runs the existing source/build/CPU verification gates,
+5. creates a rollback backup,
 6. installs the three runtime binaries,
 7. writes `Mode=0`, `SRProof=1`, synchronized jitter and startup-prime configuration,
-8. creates `DLSS-Full-Control.bat` in the game directory.
+8. installs `DLSS-Full-Control.bat` in the game directory.
 
 Use `DLSS-Full-Control.bat` to choose the saved SR mode and launch GTA with `1485x835`
 written before process start. That launcher is the recommended path because it guarantees
