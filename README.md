@@ -6,7 +6,7 @@ The supported install order is:
 
 **FusionFix → DLAA → ReShade controls fix → DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering**
 
-Neural Rendering is installed in the final step but stays **OFF by default** until you choose to enable it.
+Neural Rendering is installed in the final step but stays **OFF by default** until you enable it in ReShade.
 
 > **Tested hardware:** RTX 4070 Ti SUPER. DLSS Super Resolution has been tested in Custom Ultra Quality, Quality, Balanced, Performance and Ultra Performance. The current startup-stabilization system also fixes the low-resolution vibration that previously appeared on a cold launch.
 
@@ -17,7 +17,7 @@ Neural Rendering is installed in the final step but stays **OFF by default** unt
 | **[1](#step-1)** | **FusionFix** | FusionFix 5.0.1 installer/files | Gives GTA IV the modern renderer fixes this project builds on. | GTA IV launches normally with FusionFix installed. |
 | **[2](#step-2)** | **DLAA baseline** | `Install-DLAA.bat` | Installs the bridge, ReShade, motion/depth helpers and NVIDIA DLSS runtime, then enables high-quality native-resolution anti-aliasing. | GTA IV launches and the DLSS log reports DLAA frames being delivered. |
 | **[3](#step-3)** | **ReShade controls fix** | `BUILD.bat`, then `INSTALL.bat` | Makes the ReShade overlay usable even though GTA IV and the modern renderer run in different processes. | Pressing **Home** opens ReShade and the mouse/keyboard work inside it. |
-| **[4](#step-4)** | **DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering** | `Install-DLSS-Full.bat` | Adds real DLSS resolution scaling, automatic startup stabilization, and installs Neural Rendering. Neural Rendering remains OFF initially. | GTA IV launches through startup stabilization and automatically switches to your saved DLSS quality mode. |
+| **[4](#step-4)** | **DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering** | `Install-DLSS-Full.bat` | Adds real DLSS resolution scaling, automatic startup stabilization, Neural Rendering, and the in-game **GTA IV DLSS** settings panel. | GTA IV starts stably and `Home → Add-ons → DLSS 5 Feed → GTA IV DLSS` lets you change quality and Neural Rendering. |
 
 ### What you get after all four steps
 
@@ -25,7 +25,8 @@ Neural Rendering is installed in the final step but stays **OFF by default** unt
 - DLSS 4.5 Super Resolution with five selectable quality modes.
 - Automatic startup stabilization before low-resolution DLSS modes are used.
 - DLSS 5 Neural Rendering already installed and ready to turn ON/OFF.
-- A single `DLSS-Full-Control.bat` helper for quality selection, Neural Rendering control and recommended launching.
+- **One normal settings surface inside ReShade** for DLSS quality and Neural Rendering.
+- `DLSS-Full-Control.bat` only for launch, startup repair, status and diagnostics.
 
 This repository contains the installers, integration code, configuration and validation. Third-party components are fetched from pinned upstream sources and verified where practical.
 
@@ -56,14 +57,14 @@ GTA IV internal render resolution
   -> display/output resolution
 ```
 
-Available saved quality modes:
+Available quality modes:
 
 ```text
-1  Custom Ultra Quality (77% render scale)
-2  Quality
-3  Balanced
-4  Performance
-5  Ultra Performance
+Custom Ultra Quality (77% render scale)
+Quality
+Balanced
+Performance
+Ultra Performance
 ```
 
 ### Automatic startup stabilization
@@ -99,7 +100,7 @@ GTA IV internal image
   -> display/output resolution
 ```
 
-The current tested configuration uses one Neural Rendering pass.
+The public default is **one Neural Rendering pass**. Higher pass counts remain available as an advanced/experimental ReShade control.
 
 ## Prerequisites
 
@@ -208,7 +209,7 @@ Read [`docs/RESHade-INPUT-PATCH.md`](docs/RESHade-INPUT-PATCH.md).
 
 ## STEP 4 — Install DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering
 
-**Purpose:** add DLSS resolution scaling, automatic startup stabilization, and the Neural Rendering runtime.
+**Purpose:** add DLSS resolution scaling, automatic startup stabilization, the Neural Rendering runtime, and the in-game DLSS settings panel.
 
 Copy:
 
@@ -226,58 +227,48 @@ The installer:
 - keeps `nvngx_dlss.dll` 310.9.1 as the DLSS 4.5 Super Resolution/DLAA runtime;
 - downloads and verifies `nvngx_dlssnr.dll` 310.8.0-RTX40;
 - installs the Neural Rendering runtime;
-- installs `DLSS-Full-Control.bat`;
-- leaves **Neural Rendering OFF by default**.
+- adds **Neural Rendering ON/OFF** and **DLSS quality** controls to ReShade;
+- defaults to **Quality**, **Neural Rendering OFF**, and **1 NR pass**;
+- installs `DLSS-Full-Control.bat` only as a launch/repair/diagnostics helper.
 
-**Done when:** a recommended launch starts through the brief stabilization phase and then switches automatically to your saved DLSS quality mode without the old vibration.
+**Done when:** GTA IV starts through the brief stabilization phase, switches cleanly to the saved quality mode, and the **GTA IV DLSS** ReShade panel is available.
 
 Read [`docs/DLSS-FULL.md`](docs/DLSS-FULL.md).
 
-### Choose your DLSS quality mode
+### Configure DLSS in ReShade
 
-Close GTA IV and run:
-
-```text
-DLSS-Full-Control.bat
-```
-
-Choose `1`–`5` for:
+Press **Home**, then open:
 
 ```text
-1  Custom Ultra Quality (77%)
-2  Quality
-3  Balanced
-4  Performance
-5  Ultra Performance
+Add-ons -> DLSS 5 Feed -> GTA IV DLSS
 ```
 
-Choose `L` to launch GTA IV through the recommended automatic startup stabilization.
+That panel is the normal settings interface for this project.
 
-### Turn DLSS 5 Neural Rendering ON
+It contains:
 
-Close GTA IV, run `DLSS-Full-Control.bat`, then choose:
+- **Neural Rendering** — OFF / ON. Changes are saved automatically.
+- **Neural Rendering passes (advanced)** — defaults to **1**, which is the tested public configuration. Higher values are experimental and more expensive.
+- **DLSS Super Resolution quality** — Custom Ultra Quality (77%), Quality, Balanced, Performance or Ultra Performance. Changes apply live and are saved automatically.
+
+You do **not** need to close GTA IV or run a BAT file to change DLSS quality or Neural Rendering.
+
+### DLSS tools helper
+
+`DLSS-Full-Control.bat` is no longer a second settings menu. Use it only for:
 
 ```text
-N  Turn Neural Rendering ON
+L  Launch GTA IV with startup stabilization pre-armed
+R  Repair / re-arm startup stabilization settings
+S  Show current DLSS / Neural Rendering status
+D  Open the DLSS diagnostic log
 ```
 
-Internally this enables the project's one-pass Neural Rendering path.
-
-Then choose `L` to launch.
-
-### Turn Neural Rendering OFF
-
-Close GTA IV, run `DLSS-Full-Control.bat`, then choose:
-
-```text
-O  Turn Neural Rendering OFF
-```
-
-DLSS 4.5 Super Resolution remains active; only Neural Rendering is disabled.
+The repair option preserves your saved DLSS quality, Neural Rendering state and NR pass count.
 
 ## DLSS model / preset selector
 
-After Step 3 you can open:
+The upstream DLSS model/preset control is in the same ReShade add-on:
 
 ```text
 Home -> Add-ons -> DLSS 5 Feed -> DLSS render preset -> Preset
@@ -299,7 +290,7 @@ For ordinary users, the easiest checks are visual:
 
 - DLAA: stable native-resolution image with improved anti-aliasing.
 - DLSS Super Resolution: the game switches from the brief startup-stabilization resolution to your selected quality mode.
-- Neural Rendering ON: the game still completes the same stable startup sequence and the log reports successful Neural Rendering initialization/evaluation.
+- Neural Rendering ON: the game continues through the same stable startup sequence and the log reports successful Neural Rendering initialization/evaluation.
 
 The log contains internal engineering labels such as `M3K-A3-S5`, `M3K-SR-LIVE`, `M3K-A0` and `M3K-A1`. These are **debug labels**, not extra install stages.
 
@@ -332,9 +323,10 @@ These internal labels are retained only where they help with debugging or reprod
 | LumeniteFX | pinned project version |
 | DLSS 4.5 Super Resolution / DLAA runtime | `nvngx_dlss.dll` 310.9.1 |
 | DLSS 5 Neural Rendering runtime | `nvngx_dlssnr.dll` 310.8.0-RTX40 |
+| DLSS settings | ReShade `Add-ons -> DLSS 5 Feed -> GTA IV DLSS` |
 | Startup stabilization | 1485×835 for 180 synchronized frames, then saved DLSS mode |
 | Neural Rendering default | OFF |
-| Neural Rendering when enabled | one native Neural Rendering pass before Super Resolution |
+| Neural Rendering passes | 1 by default; higher counts advanced/experimental |
 
 Exact source commits, package URLs and hashes are kept in [`manifests/versions.json`](manifests/versions.json) for reproducibility.
 
@@ -352,7 +344,7 @@ Exact source commits, package URLs and hashes are kept in [`manifests/versions.j
 ## Repository layout
 
 ```text
-install/                         Current installers and DLSS control helper
+install/                         Current installers, ReShade-control build stage, and DLSS tools helper
 config/                          Baseline configuration fragments
 manifests/versions.json          Exact technical versions, source checkpoints and hashes
 input/                           Developer-only local experiment area; normal install needs no files here
@@ -377,9 +369,3 @@ tools/debug/                     Historical/debugging tools
 See [`docs/THIRD-PARTY.md`](docs/THIRD-PARTY.md).
 
 Grand Theft Auto, Rockstar Games, NVIDIA, GeForce, RTX, DLSS and other product names are trademarks of their respective owners. This is an independent community project and is not affiliated with, endorsed by, or sponsored by Rockstar Games, NVIDIA, or the upstream projects listed above.
-
-## License
-
-Original scripts, patching glue and documentation in this repository are licensed under the MIT License unless a file says otherwise.
-
-Third-party projects, source code and binaries keep their original licenses. This repository does not relicense them.
