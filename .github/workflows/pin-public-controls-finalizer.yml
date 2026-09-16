@@ -1,0 +1,60 @@
+name: One-shot public controls pin finalizer
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/pin-public-controls-finalizer.yml
+
+permissions:
+  contents: write
+
+jobs:
+  pin-public-controls:
+    runs-on: windows-2022
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Pin validated raw public-controls stage
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $oldCommit = '4f80efdacccc7a65ffa735e931f34a0ac5f46d35'
+          $newCommit = 'cb3d3635ab746b603d1155b92424d24a9469eb2c'
+          $oldHashUpper = '913CCB9568BA9FB1738DB88B539FF96D600394CD08895E11CF4743720FB943D3'
+          $newHashUpper = '2AAAD1F94477BB16874F2047B65950B5C678759B8772FC566C4708E19B812EAE'
+          $oldHashLower = $oldHashUpper.ToLowerInvariant()
+          $newHashLower = $newHashUpper.ToLowerInvariant()
+
+          function Replace-Once([string]$Path,[string]$Old,[string]$New,[string]$Label) {
+            $text = [IO.File]::ReadAllText($Path)
+            $count = ([regex]::Matches($text,[regex]::Escape($Old))).Count
+            if ($count -ne 1) { throw "${Label}: expected exactly one '$Old', found $count" }
+            [IO.File]::WriteAllText($Path,$text.Replace($Old,$New),(New-Object Text.UTF8Encoding($false)))
+          }
+
+          Replace-Once 'install/Install-DLSS-Full.bat' $oldCommit $newCommit 'installer commit pin'
+          Replace-Once 'install/Install-DLSS-Full.bat' $oldHashUpper $newHashUpper 'installer raw hash pin'
+          Replace-Once 'manifests/versions.json' $oldCommit $newCommit 'manifest commit pin'
+          Replace-Once 'manifests/versions.json' $oldHashLower $newHashLower 'manifest raw hash pin'
+
+          $installer = [IO.File]::ReadAllText('install/Install-DLSS-Full.bat')
+          $manifest = Get-Content manifests/versions.json -Raw | ConvertFrom-Json
+          if (-not $installer.Contains($newCommit) -or -not $installer.Contains($newHashUpper)) { throw 'Installer pin verification failed' }
+          if ($manifest.components.'dlss-full'.public_reshade_controls_commit -ne $newCommit) { throw 'Manifest commit pin verification failed' }
+          if ($manifest.components.'dlss-full'.public_reshade_controls_sha256.ToUpperInvariant() -ne $newHashUpper) { throw 'Manifest hash pin verification failed' }
+          git diff --check
+
+      - name: Commit pins
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add install/Install-DLSS-Full.bat manifests/versions.json
+          git commit -m 'Pin line-ending-independent public controls stage'
+          git push origin HEAD:main
