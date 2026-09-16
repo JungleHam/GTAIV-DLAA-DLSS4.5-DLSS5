@@ -1,0 +1,89 @@
+name: TEMP Steam Overlay Fix Validation
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/tmp-steam-overlay-fix-validation.yml'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: windows-2022
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download immutable Steam stage and print raw SHA256
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $commit = '0d201b70d05dc24ad5867770ba7901f92b546fc4'
+          $url = "https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/$commit/install/Public-BBridge-Steam-Overlay-Fix.py"
+          $out = Join-Path $env:RUNNER_TEMP 'Public-BBridge-Steam-Overlay-Fix.py'
+          Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $out
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $out).Hash.ToUpperInvariant()
+          Write-Host "STEAM_FIX_RAW_SHA256=$hash"
+          "STEAM_STAGE=$out" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Checkout frozen project and pinned bridge
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git clone --filter=blob:none https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5.git _project
+          git -C _project checkout 57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f
+          git clone --filter=blob:none https://github.com/gutbash/b-bridge.git _bbridge
+          git -C _bbridge checkout 1dad5e6d4dcf8647e354aa9a87f611256fb61142
+          git -C _bbridge submodule update --init --recursive
+
+      - name: Apply proven bridge patches plus Steam-only exception
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python .\_project\tools\m3k-nr\a2-s21-bbridge-ui.py .\_bbridge
+          if ($LASTEXITCODE -ne 0) { throw 'UI virtualization patch failed' }
+          python .\_project\tools\m3k-nr\a3-s2-bbridge-coherent-draw-jitter.py .\_bbridge
+          if ($LASTEXITCODE -ne 0) { throw 'Temporal synchronization patch failed' }
+          python $env:STEAM_STAGE .\_bbridge
+          if ($LASTEXITCODE -ne 0) { throw 'Steam overlay exception patch failed' }
+          git -C _bbridge diff --check
+          if ($LASTEXITCODE -ne 0) { throw 'Patched bridge diff check failed' }
+          $window = Get-Content .\_bbridge\src\client\window.cpp -Raw
+          foreach ($marker in @('[M3K-STEAM]','gameoverlayrenderer.dll','_ReturnAddress()','!steamOverlay && M3kUiVirtualActive')) {
+            if (-not $window.Contains($marker)) { throw "Steam fix source marker missing: $marker" }
+          }
+          if ($window.Contains('[M3K-UI-STARTUP]')) { throw 'Rejected first-launch WM_SIZE patch is present' }
+
+      - name: Setup pinned Meson
+        shell: pwsh
+        run: python -m pip install --disable-pip-version-check --no-cache-dir meson==0.64.1 ninja==1.11.1.1
+
+      - name: Build matched x86/x64 bridge pair
+        shell: pwsh
+        working-directory: _bbridge
+        run: |
+          $ErrorActionPreference = 'Stop'
+          . .\build_common.ps1
+          SetupVS -Platform x86
+          meson setup --buildtype release --backend ninja _steam32 --debug
+          Copy-Item .\Directory.Build.Props -Destination .\_steam32 -Force
+          meson compile -C _steam32 d3d9
+          if ($LASTEXITCODE -ne 0) { throw 'x86 bridge build failed' }
+
+          SetupVS -Platform x64
+          meson setup --buildtype release --backend ninja _steam64 --debug
+          Copy-Item .\Directory.Build.Props -Destination .\_steam64 -Force
+          meson compile -C _steam64 NvRemixBridge
+          if ($LASTEXITCODE -ne 0) { throw 'x64 bridge build failed' }
+
+          $client = '.\_steam32\src\client\d3d9.dll'
+          $server = '.\_steam64\src\server\NvRemixBridge.exe'
+          if (-not (Test-Path $client) -or -not (Test-Path $server)) { throw 'Bridge output missing' }
+          $clientText = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($client))
+          $serverText = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($server))
+          if (-not $clientText.Contains('remix-main+1dad5e6d')) { throw 'Client version marker mismatch' }
+          if (-not $serverText.Contains('remix-main+1dad5e6d')) { throw 'Server version marker mismatch' }
+          if (-not $clientText.Contains('[M3K-STEAM]')) { throw 'Compiled client lacks Steam bypass marker' }
+          Write-Host ('CLIENT_SHA256=' + (Get-FileHash -Algorithm SHA256 $client).Hash.ToUpperInvariant())
+          Write-Host ('SERVER_SHA256=' + (Get-FileHash -Algorithm SHA256 $server).Hash.ToUpperInvariant())
+          Write-Host 'Steam overlay bridge exception build passed.' -ForegroundColor Green
