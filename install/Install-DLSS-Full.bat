@@ -31,6 +31,12 @@ $DxvkPresenterUpstreamCommit = '6b20f622a77b87b2921fe5d2c1774d2f2ba3e9b7'
 $PublicControlsCommit = '11ac957138d4c6376d1e6ee6413f32cf9826b422'
 $PublicControlsUrl = "https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/$PublicControlsCommit/install/Public-ReShade-Controls-Stage.ps1"
 $PublicControlsHash = '0C602D710F62EB6DF15C86B7B5473A7F3E9F2E1CF3270AEA3976EA512F5907A3'
+$StartupPrimeFixCommit = 'dfc68aea19a295ca09f68c3a7ee07eb19068f41b'
+$StartupPrimeFixUrl = "https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/$StartupPrimeFixCommit/install/Public-Startup-Prime-Fix-Stage.ps1"
+$StartupPrimeFixHash = 'B98BF323C3F454C2B7DB70FDCDE05B0F67954EA9507EA957F8E1A58A6A4BFBDB'
+$StartupUiFixCommit = 'd4e4c18ae1c4f0907c58b8cdd88813e19985e798'
+$StartupUiFixUrl = "https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/$StartupUiFixCommit/install/Public-BBridge-Startup-UI-Fix.py"
+$StartupUiFixHash = '45F4C4B7957D32BDFDC203375F1B66F500F57B8BD36419D25659BFB342435544'
 $ControlCommit = 'a6bd0080982398046b20cf39e858f3e016c03492'
 $ControlUrl = "https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/$ControlCommit/install/DLSS-Full-Control.bat"
 $ControlHash = 'F209610F26970939D5B12EFCC13BEE84BB08348B045B2C4442D3177ED142661D'
@@ -231,6 +237,16 @@ try {
     Download-File $PublicControlsUrl $publicStage
     Assert-SHA256 $publicStage $PublicControlsHash
 
+    Write-Host 'Adding the public startup-prime release fix...' -ForegroundColor Cyan
+    $primeFixStage = Join-Path $Project 'tools\m3k-nr\public-startup-prime-fix-stage.ps1'
+    Download-File $StartupPrimeFixUrl $primeFixStage
+    Assert-SHA256 $primeFixStage $StartupPrimeFixHash
+
+    Write-Host 'Adding the public first-launch GTA UI resync fix...' -ForegroundColor Cyan
+    $startupUiFix = Join-Path $Project 'tools\m3k-nr\public-bbridge-startup-ui-fix.py'
+    Download-File $StartupUiFixUrl $startupUiFix
+    Assert-SHA256 $startupUiFix $StartupUiFixHash
+
     $buildScript = Join-Path $Project 'tools\m3k-nr\build-a3-s5.ps1'
     $buildText = [IO.File]::ReadAllText($buildScript)
     $buildAnchor = @'
@@ -239,6 +255,7 @@ try {
     $buildReplacement = @'
 & (Join-Path $toolRoot 'a3-s5-startup-prime-stage.ps1') -GeneratedRoot $generated
 & (Join-Path $toolRoot 'public-reshade-controls-stage.ps1') -GeneratedRoot $generated -FeederSource (Join-Path $feeder 'src\dlss5-feed.cpp')
+& (Join-Path $toolRoot 'public-startup-prime-fix-stage.ps1') -GeneratedRoot $generated -FeederSource (Join-Path $feeder 'src\dlss5-feed.cpp')
 '@
     $count = ([regex]::Matches($buildText,[regex]::Escape($buildAnchor))).Count
     if ($count -ne 1) { Fail "Could not attach public ReShade controls stage to frozen build; anchor count=$count" }
@@ -269,6 +286,8 @@ try {
     if ($LASTEXITCODE -ne 0) { Fail 'Bridge window/resolution patch failed.' }
     & $Python (Join-Path $Project 'tools\m3k-nr\a3-s2-bbridge-coherent-draw-jitter.py') $BBridge
     if ($LASTEXITCODE -ne 0) { Fail 'Temporal-synchronization patch failed.' }
+    & $Python $startupUiFix $BBridge
+    if ($LASTEXITCODE -ne 0) { Fail 'First-launch GTA UI resync patch failed.' }
     & $Git -C $BBridge diff --check
     if ($LASTEXITCODE -ne 0) { Fail 'Patched b-bridge source failed git diff --check.' }
 

@@ -1,5 +1,5 @@
 {
-  "project_status": "tested-core-with-public-reshade-controls-2026-09-16",
+  "project_status": "tested-core-with-public-startup-runtime-fixes-2026-09-16",
   "components": {
     "fusionfix": {
       "version": "5.0.1",
@@ -49,7 +49,13 @@
       "uninstaller_sha256": "0af505444e966fb61ab9c83eb7f4d8874a436e4302ab935caa2dba0039656733",
       "uninstaller_path": "Uninstall-DLSS-Full.bat",
       "rollback_target": "DLAA-only baseline + ReShade input patch",
-      "uninstaller_legacy_backup_support": "Pre-presenter backups may omit .trex/d3d9vk_x64.dll; restore it from pinned b-bridge 0.1.0 package. Hashing uses .NET SHA-256 and does not depend on Get-FileHash."
+      "uninstaller_legacy_backup_support": "Pre-presenter backups may omit .trex/d3d9vk_x64.dll; restore it from pinned b-bridge 0.1.0 package. Hashing uses .NET SHA-256 and does not depend on Get-FileHash.",
+      "startup_prime_public_fix_commit": "dfc68aea19a295ca09f68c3a7ee07eb19068f41b",
+      "startup_prime_public_fix_sha256": "b98bf323c3f454c2b7db70fdcde05b0f67954ea9507ea957f8e1a58a6a4bfbdb",
+      "startup_stabilization_frame_policy": "180 valid synchronized frames cumulative; explicit live DLSS/DLAA mode change cancels startup prime immediately",
+      "startup_ui_resync_commit": "d4e4c18ae1c4f0907c58b8cdd88813e19985e798",
+      "startup_ui_resync_sha256": "45f4c4b7957d32bdfdc203375f1b66f500f57b8bd36419d25659bfb342435544",
+      "startup_ui_resync_behavior": "Posts one logical WM_SIZE when b-bridge first attaches to GTA IV so HUD/map/weapon-wheel layout is initialized without forcing a display resolution."
     },
     "reshade": {
       "version": "6.8.0",
