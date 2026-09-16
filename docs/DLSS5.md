@@ -1,112 +1,123 @@
-# DLSS 5 Neural Rendering / Deep Fried Chicken
+# DLSS 5 Neural Rendering — native M3K path
 
-This is an **upgrade to the working DLAA installation**, not a replacement installer.
+The current project does **not** use Deep Fried Chicken.
+
+DLSS 5 Neural Rendering is integrated directly into the project’s A3-S5 Feeder/M3K path and is installed together with DLSS 4.5 Super Resolution by:
+
+```text
+install/Install-DLSS-Full.bat
+```
 
 ## Required base
 
-Complete `Install-DLAA.bat` first and verify that genuine NGX DLAA is active.
-
-The upgrade script checks for:
+Complete the normal flow first:
 
 ```text
-.trex\NvRemixBridge.exe
-.trex\ReShade.ini
-.trex\dlss5-feed.addon64
-.trex\dlss5-feed.cfg
-.trex\nvngx_dlss.dll
+FusionFix -> DLAA -> ReShade input fix -> combined SR + NR module
 ```
 
-It also verifies that the installed `nvngx_dlss.dll` is the tested 310.9.1 runtime.
-
-## User-supplied files
-
-See `../input/README.md`.
-
-The tested files are identified by SHA256, not filename:
+The combined installer places the NR runtime at:
 
 ```text
-Deep Fried Chicken 1.7.4 checkpoint 70 archive:
-91dc4137b1f2d7cdbd7f9eb4de9d33848b59e3af7a747d5d798271ee262eab09
-
-nvngx_dlssnr.dll 310.8.0:
-4b8d19bc3eff58a084f5eca7489c921501c203450169fb82ff4f649a4482ba05
+GTAIV\.trex\m3k\nvngx_dlssnr.dll
 ```
 
-## Install
+and verifies the tested RTX40-compatible DLL hash:
 
-Copy `install/Upgrade-DLSS5-DFC.bat` beside `GTAIV.exe` and run it.
+```text
+4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05
+```
 
-The script:
+## Default state
 
-- searches beside the BAT, Desktop and Downloads for the exact tested files;
-- creates `.trex\_PRE_DFC_BACKUP_<timestamp>`;
-- extracts DFC using password `chicken`;
-- removes known conflicting neural-provider add-ons;
-- installs DFC and `nvngx_dlssnr.dll`;
-- adds DFC to ReShade's `LoadFromDllMain` early-load list;
-- sets the safe known-good initial DFC state;
-- leaves Feeder in the proven native DLAA configuration.
-
-## Known-good first-run state
+NR is installed but **OFF** after Step 4:
 
 ```ini
-arm=1
-enabled=1
-safe_neutral_start=0
+Mode=0
+NRPasses=1
 ```
 
-Feeder remains:
+This means DLSS 4.5 Super Resolution can run normally while Feature 18 remains disabled.
 
-```ini
-enabled=1
-mode=2
-work_resolution=100
-```
+## Enable Neural Rendering
 
-## DLAA-only mode
-
-Do not disable Feeder.
-
-Set:
-
-```ini
-enabled=0
-```
-
-in `deep-fried-chicken.cfg`, or toggle the DFC `Enabled` control in the ReShade interface.
-
-That produces:
+Close GTA IV and run:
 
 ```text
-DLAA only
+DLSS-Full-Control.bat
 ```
 
-Set `enabled=1` again for:
+Choose:
 
 ```text
-DLAA -> DLSS 5 Neural Rendering
+N  Turn NR ON
 ```
 
-For complete DFC disarming, set:
+That sets:
 
 ```ini
-arm=0
+Mode=2
+NRPasses=1
 ```
 
-and restart the game/bridge process.
-
-## Conflicts
-
-Use exactly one Neural Rendering provider. The upgrade script retires known conflicting add-ons such as:
+The production rendering order is:
 
 ```text
-renodx-dlss5.addon64
-renodx-dlss.addon64
-alexs-toolkit.addon64
-dlssnr-cascade*.addon64
-dlss5-dx11-bridge.addon64
+GTA IV true source color
+ -> native DLSS 5 Neural Rendering / NGX Feature 18
+ -> DLSS 4.5 Super Resolution
+ -> presenter resolution
 ```
 
-Avoid OptiScaler acting as another feature-1/NR consumer at the same time.
+The NR pass uses the same source-resolution depth/motion-vector/jitter domain as the SR stage.
 
-If alternating-frame flicker/cadence problems appear, disable NVIDIA Smooth Motion before changing the core bridge configuration.
+## Disable Neural Rendering
+
+Close GTA IV, run the same control helper, and choose:
+
+```text
+O  Turn NR OFF
+```
+
+That writes:
+
+```ini
+Mode=0
+```
+
+SR remains enabled.
+
+## Runtime / GPU notes
+
+The current tested runtime is:
+
+```text
+nvngx_dlssnr.dll 310.8.0-RTX40
+```
+
+It is the community RTX 40/50-compatible build with Ada (`sm_89`) support. The project’s direct hardware validation is on an RTX 4070 Ti SUPER.
+
+The runtime reports a minimum NVIDIA driver of **615.00**. Use 615.00 or newer before enabling NR.
+
+The current validated installer does not automatically select the RTX 20/30 SF variants; those are outside this project’s tested path.
+
+## Verification
+
+Open:
+
+```text
+GTAIV\.trex\dlss5-feed.log
+```
+
+Successful native NR validation has produced evidence such as:
+
+```text
+M3K-A0: DLSS NR runtime found
+M3K-A0: feature 18 creation SUCCESS
+M3K-A1: feature 18 evaluation SUCCESS
+M3K-A2-S2.6: NR18 -> DLAA running ...
+```
+
+A healthy Mode 2 session should continue evaluating NR rather than repeatedly failing/recreating Feature 18.
+
+There is no `deep-fried-chicken.log`, DFC config, DFC add-on, or DFC ReShade tab in the current implementation.
