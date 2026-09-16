@@ -56,7 +56,8 @@ jobs:
             if (-not $control.Contains($marker)) { throw "Control helper missing marker: $marker" }
           }
 
-          if ($control -notmatch 'function Set-NrMode') { throw 'Control helper has no NR ON/OFF function' }
+          if ($control -notmatch 'function Set-NeuralRendering') { throw 'Control helper has no Neural Rendering ON/OFF function' }
+          if ($control -notmatch 'function Prepare-StartupStabilization') { throw 'Control helper has no startup-stabilization function' }
           if ($control -notmatch 'nvngx_dlssnr\.dll') { throw 'Control helper does not validate the NR runtime before enabling it' }
 
           $full = $manifest.components.'dlss-full'
@@ -74,7 +75,7 @@ jobs:
           if ($manifest.components.PSObject.Properties.Name -contains 'deep-fried-chicken') { throw 'Legacy DFC component is still present in manifest' }
           Write-Host 'Static combined-module checks passed.'
 
-      - name: Checkout frozen A3-S5 project source
+      - name: Checkout frozen startup-stabilization source (A3-S5)
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -83,7 +84,7 @@ jobs:
           $head = git -C _verify_project rev-parse HEAD
           if ($head.Trim() -ne '57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f') { throw "Wrong frozen project revision: $head" }
 
-      - name: Build and test frozen A3-S5 Feeder chain
+      - name: Build and test startup-stabilization Feeder (A3-S5)
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -91,14 +92,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "A3-S5 build failed: $LASTEXITCODE" }
           $feeder = '.\_verify_project\tools\m3k-nr\out-m3k-a3-s5\dlss5-feed.addon64'
           $shim = '.\_verify_project\tools\m3k-nr\out-m3k-s27\m3k\m3k-nvngx.dll'
-          if (-not (Test-Path $feeder)) { throw 'Missing A3-S5 Feeder output' }
-          if (-not (Test-Path $shim)) { throw 'Missing stable S2.7 shim output' }
+          if (-not (Test-Path $feeder)) { throw 'Missing startup-stabilization Feeder output' }
+          if (-not (Test-Path $shim)) { throw 'Missing integration shim output' }
           $fh = (Get-FileHash -Algorithm SHA256 $feeder).Hash
           $sh = (Get-FileHash -Algorithm SHA256 $shim).Hash
-          Write-Host "Current runner A3-S5 Feeder: $fh"
-          Write-Host "Hardware-reference Feeder:       C73D8D54271F55F8931F00D62A4CDF605118BEA71D7C6BEE0B61D0CA7C1CCE4B"
-          Write-Host "Current runner S2.7 shim:         $sh"
-          Write-Host "Hardware-reference shim:          A2E4BEDACE8D99BC60B5D18E958BD7E98F8887FF40EC45A8674B892E2D1FCBBC"
+          Write-Host "Current runner startup-stabilization Feeder: $fh"
+          Write-Host "Hardware-reference Feeder:                    C73D8D54271F55F8931F00D62A4CDF605118BEA71D7C6BEE0B61D0CA7C1CCE4B"
+          Write-Host "Current runner integration shim:              $sh"
+          Write-Host "Hardware-reference shim:                      A2E4BEDACE8D99BC60B5D18E958BD7E98F8887FF40EC45A8674B892E2D1FCBBC"
           if ($fh -ne 'C73D8D54271F55F8931F00D62A4CDF605118BEA71D7C6BEE0B61D0CA7C1CCE4B') {
             Write-Host 'Feeder PE hash differs from the hardware-tested CI image; frozen source build and CPU tests still passed.' -ForegroundColor Yellow
           }
@@ -106,7 +107,7 @@ jobs:
             Write-Host 'Shim PE hash differs from the hardware-tested CI image; frozen source build and CPU tests still passed.' -ForegroundColor Yellow
           }
 
-      - name: Clone and patch frozen b-bridge
+      - name: Clone and patch temporal-synchronization bridge (A3-S2)
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -118,17 +119,17 @@ jobs:
           python .\_verify_project\tools\m3k-nr\a2-s21-bbridge-ui.py .\_verify_bbridge
           if ($LASTEXITCODE -ne 0) { throw 'UI patch failed' }
           python .\_verify_project\tools\m3k-nr\a3-s2-bbridge-coherent-draw-jitter.py .\_verify_bbridge
-          if ($LASTEXITCODE -ne 0) { throw 'A3-S2 patch failed' }
+          if ($LASTEXITCODE -ne 0) { throw 'Temporal-synchronization patch failed' }
           git -C _verify_bbridge diff --check
           if ($LASTEXITCODE -ne 0) { throw 'Patched b-bridge diff check failed' }
           $device = Get-Content .\_verify_bbridge\src\client\d3d9_device.cpp -Raw
           $swap = Get-Content .\_verify_bbridge\src\client\d3d9_swapchain.cpp -Raw
           foreach ($marker in @('M3K_SYNC_WVP_FOR_DRAW','[M3K-JITTER2] DRAW','[M3K-JITTER2] RESTORE','M3K_GTAIV_Jitter_v1')) {
-            if (-not $device.Contains($marker)) { throw "A3-S2 source marker missing: $marker" }
+            if (-not $device.Contains($marker)) { throw "Temporal-sync source marker missing: $marker" }
           }
           if (($device.Split('M3K_SYNC_WVP_FOR_DRAW();').Count - 1) -ne 4) { throw 'Expected exactly four synchronized D3D9 draw paths' }
           foreach ($marker in @('M3kJitterPublishPresent','M3kJitterAdvanceAfterPresent')) {
-            if (-not $swap.Contains($marker)) { throw "A3-S2 Present marker missing: $marker" }
+            if (-not $swap.Contains($marker)) { throw "Temporal-sync Present marker missing: $marker" }
           }
 
       - name: Setup pinned Meson
@@ -136,7 +137,7 @@ jobs:
         run: |
           python -m pip install --disable-pip-version-check meson==0.64.1 ninja==1.11.1.1
 
-      - name: Build frozen A3-S2 x86 client
+      - name: Build temporal-synchronization x86 bridge (A3-S2)
         shell: pwsh
         working-directory: _verify_bbridge
         run: |
@@ -149,10 +150,10 @@ jobs:
           meson compile -C _compVerify d3d9
           if ($LASTEXITCODE -ne 0) { throw "d3d9 build failed: $LASTEXITCODE" }
           $bridge = '.\_compVerify\src\client\d3d9.dll'
-          if (-not (Test-Path $bridge)) { throw 'Missing A3-S2 d3d9.dll' }
+          if (-not (Test-Path $bridge)) { throw 'Missing temporal-synchronization d3d9.dll' }
           $bh = (Get-FileHash -Algorithm SHA256 $bridge).Hash
-          Write-Host "Current runner A3-S2 bridge: $bh"
-          Write-Host 'Hardware-reference bridge:       6DD40F145A5D503624E3E05ECF0ADBAA094CF83B24278C0BB333318E3C52A912'
+          Write-Host "Current runner temporal-sync bridge: $bh"
+          Write-Host 'Hardware-reference bridge:           6DD40F145A5D503624E3E05ECF0ADBAA094CF83B24278C0BB333318E3C52A912'
           if ($bh -ne '6DD40F145A5D503624E3E05ECF0ADBAA094CF83B24278C0BB333318E3C52A912') {
             Write-Host 'Bridge PE hash differs from the hardware-tested CI image; frozen source/patch/build validation still passed.' -ForegroundColor Yellow
           }
@@ -160,5 +161,5 @@ jobs:
       - name: Module validation summary
         shell: pwsh
         run: |
-          Write-Host 'Combined module validated: installer/control/manifest contracts passed, frozen A3-S5 source built with CPU tests, and frozen A3-S2 source patched all four draw paths and built x86.' -ForegroundColor Green
-          Write-Host 'NR is bundled by the installer but defaults to Mode=0; control helper explicitly toggles Mode=2/0.' -ForegroundColor Green
+          Write-Host 'Combined module validated: user-facing installer/control contract passed; frozen startup-stabilization source built with CPU tests; temporal-synchronization source patched all four draw paths and built x86.' -ForegroundColor Green
+          Write-Host 'Neural Rendering is bundled but defaults to OFF; the control helper explicitly toggles the underlying Mode=2/0 setting.' -ForegroundColor Green
