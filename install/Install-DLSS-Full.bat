@@ -223,24 +223,38 @@ try {
     try {
         . .\build_common.ps1
         SetupVS -Platform x86
-        & meson setup --buildtype release --backend ninja _compDLSSFull --debug
-        if ($LASTEXITCODE -ne 0) { Fail "Meson setup failed: $LASTEXITCODE" }
-        Copy-Item .\Directory.Build.Props -Destination .\_compDLSSFull -Force
-        & meson compile -C _compDLSSFull d3d9
-        if ($LASTEXITCODE -ne 0) { Fail "Temporal-synchronization bridge build failed: $LASTEXITCODE" }
+        & meson setup --buildtype release --backend ninja _compDLSSFull32 --debug
+        if ($LASTEXITCODE -ne 0) { Fail "x86 bridge client Meson setup failed: $LASTEXITCODE" }
+        Copy-Item .\Directory.Build.Props -Destination .\_compDLSSFull32 -Force
+        & meson compile -C _compDLSSFull32 d3d9
+        if ($LASTEXITCODE -ne 0) { Fail "Temporal-synchronization x86 bridge client build failed: $LASTEXITCODE" }
+
+        # b-bridge requires the 32-bit client and 64-bit server to report the same
+        # source version. Build the server from this exact pinned checkout too;
+        # keeping the older DLAA release server causes an immediate startup abort.
+        SetupVS -Platform x64
+        & meson setup --buildtype release --backend ninja _compDLSSFull64 --debug
+        if ($LASTEXITCODE -ne 0) { Fail "x64 bridge server Meson setup failed: $LASTEXITCODE" }
+        Copy-Item .\Directory.Build.Props -Destination .\_compDLSSFull64 -Force
+        & meson compile -C _compDLSSFull64 NvRemixBridge
+        if ($LASTEXITCODE -ne 0) { Fail "Matched x64 NvRemixBridge server build failed: $LASTEXITCODE" }
     } finally {
         Pop-Location
         $env:PATH = $oldPath
     }
-    $Bridge = Join-Path $BBridge '_compDLSSFull\src\client\d3d9.dll'
-    if (-not (Test-Path -LiteralPath $Bridge)) { Fail 'Temporal-synchronization bridge d3d9.dll output is missing.' }
+    $Bridge = Join-Path $BBridge '_compDLSSFull32\src\client\d3d9.dll'
+    $BridgeServer = Join-Path $BBridge '_compDLSSFull64\src\server\NvRemixBridge.exe'
+    if (-not (Test-Path -LiteralPath $Bridge)) { Fail 'Temporal-synchronization x86 bridge d3d9.dll output is missing.' }
+    if (-not (Test-Path -LiteralPath $BridgeServer)) { Fail 'Matched x64 NvRemixBridge.exe output is missing.' }
 
     $bridgeHash = Hash $Bridge
+    $serverHash = Hash $BridgeServer
     $feederHash = Hash $Feeder
     $shimHash = Hash $Shim
     Write-Host ''
     Write-Host 'Build/runtime outputs:' -ForegroundColor Cyan
     Write-Host "  d3d9.dll             $bridgeHash"
+    Write-Host "  NvRemixBridge.exe    $serverHash  (same pinned b-bridge commit)"
     Write-Host "  dlss5-feed.addon64   $feederHash"
     Write-Host "  m3k-nvngx.dll        $shimHash"
     Write-Host "  nvngx_dlssnr.dll     $NrDllHash"
@@ -255,13 +269,16 @@ try {
     $Backup = Join-Path $Game ("_DLSS_FULL_PREINSTALL_BACKUP_" + $stamp)
     New-Item -ItemType Directory -Path $Backup -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $Backup '.trex\m3k') -Force | Out-Null
-    foreach ($rel in @('d3d9.dll','.trex\dlss5-feed.addon64','.trex\dlss5-feed.cfg','.trex\m3k-nr.ini','.trex\m3k\m3k-nvngx.dll','.trex\m3k\nvngx_dlssnr.dll')) {
+    foreach ($rel in @('d3d9.dll','.trex\NvRemixBridge.exe','.trex\dlss5-feed.addon64','.trex\dlss5-feed.cfg','.trex\m3k-nr.ini','.trex\m3k\m3k-nvngx.dll','.trex\m3k\nvngx_dlssnr.dll')) {
         Copy-IfExists (Join-Path $Game $rel) (Join-Path $Backup $rel)
     }
 
     Write-Host ''
     Write-Host 'Installing DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering...' -ForegroundColor Cyan
     Copy-Item -LiteralPath $Bridge -Destination (Join-Path $Game 'd3d9.dll') -Force
+    Copy-Item -LiteralPath $BridgeServer -Destination (Join-Path $Trex 'NvRemixBridge.exe') -Force
+    if ((Hash (Join-Path $Game 'd3d9.dll')) -ne $bridgeHash) { Fail 'Installed x86 bridge client hash verification failed.' }
+    if ((Hash (Join-Path $Trex 'NvRemixBridge.exe')) -ne $serverHash) { Fail 'Installed x64 bridge server hash verification failed.' }
     Copy-Item -LiteralPath $Feeder -Destination (Join-Path $Trex 'dlss5-feed.addon64') -Force
     New-Item -ItemType Directory -Path (Join-Path $Trex 'm3k') -Force | Out-Null
     Copy-Item -LiteralPath $Shim -Destination (Join-Path $Trex 'm3k\m3k-nvngx.dll') -Force
@@ -322,6 +339,7 @@ try {
         "PublicControlsCommit=$PublicControlsCommit",
         "PublicControlsSHA256=$PublicControlsHash",
         "d3d9.dll=$bridgeHash",
+        "NvRemixBridge.exe=$serverHash",
         "dlss5-feed.addon64=$feederHash",
         "m3k-nvngx.dll=$shimHash",
         "nvngx_dlssnr.dll=$NrDllHash",
