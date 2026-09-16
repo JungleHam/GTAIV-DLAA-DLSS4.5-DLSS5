@@ -45,11 +45,11 @@
         "Performance",
         "Ultra Performance"
       ],
-      "uninstaller_commit": "62af76739c06c0915b64d293d623ec1f591cb0b7",
-      "uninstaller_sha256": "948acf211a23ee411b0d823663de7774c3ee35ffc137caf0268240cf6d3c14de",
+      "uninstaller_commit": "e4c600a96e1b3682d7004dbd04dffc1abace7b90",
+      "uninstaller_sha256": "0af505444e966fb61ab9c83eb7f4d8874a436e4302ab935caa2dba0039656733",
       "uninstaller_path": "Uninstall-DLSS-Full.bat",
       "rollback_target": "DLAA-only baseline + ReShade input patch",
-      "uninstaller_legacy_backup_support": "Pre-presenter backups may omit .trex/d3d9vk_x64.dll; restore it from pinned b-bridge 0.1.0 package."
+      "uninstaller_legacy_backup_support": "Pre-presenter backups may omit .trex/d3d9vk_x64.dll; restore it from pinned b-bridge 0.1.0 package. Hashing uses .NET SHA-256 and does not depend on Get-FileHash."
     },
     "reshade": {
       "version": "6.8.0",
