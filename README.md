@@ -1,10 +1,10 @@
-# GTA IV — DLAA + DLSS 5 Neural Rendering
+# GTA IV — DLAA + DLSS Full + DLSS 5 Neural Rendering
 
-A reproducible, version-pinned setup for running **real NVIDIA NGX DLAA** in GTA IV, with an optional **DLSS 5 Neural Rendering / NGX Feature 18** stage through Deep Fried Chicken.
+A reproducible, version-pinned setup for running **real NVIDIA NGX DLAA** in GTA IV, with an optional hardware-validated **DLSS Super Resolution** module and an optional **DLSS 5 Neural Rendering / NGX Feature 18** stage.
 
 This repository is intentionally **not a modpack**. It contains the integration logic, configuration, verification notes, installers, and the ReShade/b-bridge input patch. Third-party projects are fetched from pinned upstream locations, while files that should not be redistributed here are supplied by the user.
 
-> **Status:** tested working stack as of 2026-09-12. Back up your game before using it.
+> **Status:** DLAA baseline tested working; DLSS Full A3-S2/A3-S5 path hardware-validated on 2026-09-16. Back up your game before using it.
 
 ## What works
 
@@ -25,7 +25,35 @@ GTAIV.exe (32-bit)
 
 The tested setup runs DLAA at native output resolution. The successful reference test used **2560×1440**.
 
+### DLSS Full — Super Resolution
+
+The new `Install-DLSS-Full.bat` module upgrades the working DLAA baseline to true low-resolution GTA/DXVK rendering followed by NVIDIA DLSS Super Resolution.
+
+```text
+GTA IV true low-resolution render
+  -> Lumenite depth + motion guides
+  -> A3-S2 coherent draw-boundary temporal jitter
+  -> DLSS Super Resolution
+  -> presenter / monitor resolution
+```
+
+Available saved profiles:
+
+```text
+Custom Ultra Quality (77%)
+Quality
+Balanced
+Performance
+Ultra Performance
+```
+
+Cold-start vibration is handled by the hardware-validated A3-S5 startup primer: the game starts at **1485×835**, waits for **180 synchronized SR frames** with the A3-S2 jitter handoff active, then automatically switches to the saved profile. The automatic prime -> Ultra Performance transition was validated at 2560×1440 output on the reference RTX 4070 Ti SUPER.
+
+Read [`docs/DLSS-FULL.md`](docs/DLSS-FULL.md).
+
 ### DLAA + DLSS 5 Neural Rendering
+
+The repository also contains the older DFC-based Neural Rendering integration:
 
 ```text
 ... -> NVIDIA NGX DLAA
@@ -34,7 +62,9 @@ The tested setup runs DLAA at native output resolution. The successful reference
       -> NVIDIA NGX Feature 18 / Neural Rendering
 ```
 
-In this integration, DFC receives the **resolved DLAA output**. Neural Rendering is therefore an additional stage; it does not replace DLAA.
+In that integration, DFC receives the **resolved DLAA output**. Neural Rendering is therefore an additional stage; it does not replace DLAA.
+
+The newer native M3K Feature-18 path is being packaged as a separate module after DLSS Full. The older DFC upgrade has **not yet been revalidated on top of the new DLSS Full module**, so treat it as a separate legacy NR path until its documentation explicitly says otherwise.
 
 ### Fully interactive ReShade + DFC UI through b-bridge
 
@@ -64,9 +94,9 @@ Before starting, provide the following:
 | Base DLAA install | A legitimate PC installation of **GTA IV** with `GTAIV.exe` present. The reference setup was GTA IV: Complete Edition | [GTA IV: Complete Edition on Steam](https://store.steampowered.com/app/12210/Grand_Theft_Auto_IV_The_Complete_Edition/) |
 | Base DLAA install | A **clean, working FusionFix 5.0.1 installation**. Launch the game once and confirm FusionFix works before running this project's installer | [FusionFix v5.0.1](https://github.com/ThirteenAG/GTAIV.EFLC.FusionFix/releases/tag/v5.0.1) |
 | Base DLAA install | No previous `.trex` / b-bridge attempt in the GTA IV folder. The installer intentionally expects a clean FusionFix baseline | — |
-| Interactive ReShade/DFC UI patch | **Git for Windows** | [Git for Windows](https://git-scm.com/install/windows) |
-| Interactive ReShade/DFC UI patch | **Python 3** available in `PATH` | [Python for Windows](https://www.python.org/downloads/windows/) |
-| Interactive ReShade/DFC UI patch | **Visual Studio 2022 Build Tools** with **Desktop development with C++ / MSVC x64 tools** | [Visual Studio 2022 Build Tools](https://aka.ms/vs/17/release/vs_BuildTools.exe) |
+| ReShade input patch / DLSS Full local build | **Git for Windows** | [Git for Windows](https://git-scm.com/install/windows) |
+| ReShade input patch / DLSS Full local build | **Python 3** available in `PATH` | [Python for Windows](https://www.python.org/downloads/windows/) |
+| ReShade input patch / DLSS Full local build | **Visual Studio 2022 Build Tools** with **Desktop development with C++ / MSVC x86+x64 tools** and a Windows SDK | [Visual Studio 2022 Build Tools](https://aka.ms/vs/17/release/vs_BuildTools.exe) |
 | Optional DLSS 5 Neural Rendering | `Deep-Fried-Chicken-v1.7.4-checkpoint-70-chicken-assist-reliability.7z` | [Deep Fried Chicken community / Discord](https://discord.gg/g2v2XGqvR) |
 | Optional DLSS 5 Neural Rendering | The tested **RTX 40-compatible `nvngx_dlssnr.dll` 310.8.0** matching the SHA256 listed in [`input/README.md`](input/README.md) | [DLSS5 Autopilot](https://github.com/Kizzuwatnaa/DLSS5-Autopilot) · [releases](https://github.com/Kizzuwatnaa/DLSS5-Autopilot/releases) |
 
@@ -80,9 +110,9 @@ See [`input/README.md`](input/README.md) for the exact hash and placement instru
 
 ### Driver notes
 
-The pinned `nvngx_dlss.dll` 310.9.1 used for DLAA reports a minimum NVIDIA driver of **512.15**. The tested RTX 40-compatible `nvngx_dlssnr.dll` 310.8.0 used for Neural Rendering reports a minimum driver of **615.00**.
+The pinned `nvngx_dlss.dll` 310.9.1 used for DLAA/DLSS Full reports a minimum NVIDIA driver of **512.15**. The tested RTX 40-compatible `nvngx_dlssnr.dll` 310.8.0 used for Neural Rendering reports a minimum driver of **615.00**.
 
-For the optional DLSS 5 path, **615.00 or newer is therefore required by the tested NR DLL**. Neural Rendering compatibility has only been directly confirmed by this project on the tested RTX 4070 Ti SUPER setup, so other RTX generations should be treated as unverified until reported working.
+For the optional Neural Rendering path, **615.00 or newer is therefore required by the tested NR DLL**. Neural Rendering compatibility has only been directly confirmed by this project on the tested RTX 4070 Ti SUPER setup, so other RTX generations should be treated as unverified until reported working.
 
 ### You do not need to bring
 
@@ -153,7 +183,7 @@ This builds ReShade from the exact 6.8.0 source tag, applies the cross-process i
 
 **Step 3 is not considered complete just because the installer copied its files.** It is only verified when **Home actually opens ReShade and the overlay accepts mouse/keyboard input**.
 
-If **Home does nothing**, stop here and do **not** continue to the DLSS 5 step yet. Keep these two files for troubleshooting:
+If **Home does nothing**, stop here and do **not** continue yet. Keep these two files for troubleshooting:
 
 ```text
 GTAIV\.trex\bridge.conf
@@ -182,32 +212,54 @@ The choices mean:
 
 There is no simple `E < F < J < K` quality ladder for every scene. **Start with K**, try J for ghosting, and treat E/F as troubleshooting alternatives. Changing the preset briefly rebuilds the DLSS feature, so a small hitch is normal.
 
-This selector changes the **DLAA render model only**. It does **not** enable DLSS Super Resolution Quality/Balanced/Performance; GTA IV still renders at native resolution and DLAA remains a 1:1 anti-aliasing pass.
+This selector changes the **DLAA render model only**. It does **not** enable DLSS Super Resolution Quality/Balanced/Performance by itself.
 
-> **The DLAA rendering setup itself is already present after Step 2; Step 3 adds the interactive Home-menu controls.** For the documented full DLAA setup, do not consider Step 3 finished until Home works. Everything below is optional and only adds **DLSS 5 Neural Rendering** on top.
+### 4. Install DLSS Full
 
-### 4. Optional: upgrade to DLSS 5 Neural Rendering
+After the DLAA baseline works, copy:
 
-Supply the two tested files described in [`input/README.md`](input/README.md):
+```text
+install/Install-DLSS-Full.bat
+```
+
+beside `GTAIV.exe` and run it.
+
+The installer checks out the frozen A3-S5 checkpoint, reproduces the accepted A3-S2 coherent-jitter b-bridge client and A3-S5 Feeder from pinned sources, runs the build/CPU gates, backs up the current runtime, then installs DLSS Super Resolution with Neural Rendering explicitly left off (`Mode=0`).
+
+It also installs:
+
+```text
+DLSS-Full-Control.bat
+```
+
+beside `GTAIV.exe`. Use that helper to select UQ77 / Quality / Balanced / Performance / Ultra Performance and to launch GTA through the recommended **1485×835 startup prime -> saved mode** path.
+
+Read [`docs/DLSS-FULL.md`](docs/DLSS-FULL.md) first.
+
+### 5. Optional: Neural Rendering
+
+Neural Rendering remains a separate optional layer after DLSS Full.
+
+The existing:
+
+```text
+install/Upgrade-DLSS5-DFC.bat
+```
+
+is the repository's older DFC-based NR path. It has not yet been revalidated on top of the new DLSS Full module, so do **not** treat it as the final modular NR step yet. The newer native M3K Feature-18 installer is being packaged separately.
+
+If you are intentionally following the older DFC-only path, supply the two tested files described in [`input/README.md`](input/README.md):
 
 ```text
 Deep-Fried-Chicken-v1.7.4-checkpoint-70-chicken-assist-reliability.7z
 nvngx_dlssnr.dll
 ```
 
-Then copy:
-
-```text
-install/Upgrade-DLSS5-DFC.bat
-```
-
-beside `GTAIV.exe` and **double-click it**.
-
 ## Switching to DLAA only
 
-Do **not** disable Feeder.
+For a pure DLAA baseline, restore the pre-DLSS-Full backup or use the existing DLAA installation before applying the Full module.
 
-Turn off DFC neural processing:
+For the older DFC path, do **not** disable Feeder. Turn off DFC neural processing with:
 
 ```ini
 enabled=0
@@ -221,47 +273,51 @@ GTAIV\.trex\deep-fried-chicken.cfg
 
 or toggle it through the Deep Fried Chicken ReShade tab.
 
-Effective modes:
-
-```text
-DFC Enabled OFF = DLAA only
-DFC Enabled ON  = DLAA -> DLSS 5 Neural Rendering
-```
-
-`arm=0` fully disarms DFC and requires a restart. That is useful for troubleshooting, but not necessary for ordinary DLAA/NR A/B testing.
-
 ## Known-good pinned stack
 
 | Component | Tested version |
 |---|---|
 | FusionFix | 5.0.1 |
-| b-bridge | 0.1.0 |
+| b-bridge base | 0.1.0 / pinned source `1dad5e6d4dcf8647e354aa9a87f611256fb61142` |
+| DLSS Full bridge | A3-S2 coherent draw-boundary jitter |
+| DLSS Full Feeder | A3-S5 automatic startup prime |
+| DLSS Full project checkpoint | `57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f` |
 | ReShade | 6.8.0 Full Add-On Support |
-| DLSS5-Feeder | 0.15.1 |
+| DLSS5-Feeder upstream | 0.15.1 |
 | LumeniteFX | `f8cbbb4eccfcb7adf0d74bb358ba349272e3c1e9` |
 | ReShade shader headers | `6db142b4b1a05c764222e5b0bd9a644b7ccfe1dc` |
 | `nvngx_dlss.dll` | 310.9.1 |
 | Deep Fried Chicken | 1.7.4 checkpoint 70 |
 | `nvngx_dlssnr.dll` | 310.8.0 RTX 40-compatible community build (`sm_89`), sourced through DLSS5 Autopilot |
 
-Exact package URLs and hashes are in [`manifests/versions.json`](manifests/versions.json).
+Exact package URLs, source commits and reference hashes are in [`manifests/versions.json`](manifests/versions.json).
 
 ## Verification
 
-For DLAA, inspect:
+For DLAA / DLSS Full, inspect:
 
 ```text
 GTAIV\.trex\dlss5-feed.log
 ```
 
-Expected evidence includes:
+DLAA baseline evidence includes:
 
 ```text
 DLSS5_MV_PROVIDER=3
 feature ready: ... DLAA
 ```
 
-For Neural Rendering, inspect:
+DLSS Full cold-start evidence should include:
+
+```text
+M3K-A3-S5: STARTUP PRIME armed 1485x835
+M3K-SR-LIVE: STARTUP PRIME: Quality contract ... true-source=1485x835 ACCEPTED
+M3K-A3-S5: prime synchronized to A3-S2 jitter ... at 1485x835
+M3K-A3-S5: STARTUP PRIME COMPLETE after 180 synchronized SR frames
+M3K-SR-LIVE: ACTIVE <saved mode> ...
+```
+
+For the older DFC Neural Rendering path, inspect:
 
 ```text
 GTAIV\.trex\deep-fried-chicken.log
@@ -281,17 +337,20 @@ See [`docs/VERIFY.md`](docs/VERIFY.md).
 
 - GTA IV is 32-bit, while this rendering path runs inside 64-bit `NvRemixBridge.exe`.
 - LumeniteFX supplies estimated/optical-flow motion vectors, not engine-native GTA IV motion vectors.
-- DLSS 5 Neural Rendering is substantially more expensive than DLAA alone in this stack.
+- DLSS Full currently uses the hardware-discovered 1485×835 startup-prime workaround before releasing to the saved SR mode.
+- The DLSS Full installer's local MSVC-built PE files may not be byte-identical to the reference CI binaries even when built from the exact same frozen source; the installer reports reference hashes and relies on pinned-source/build/test gates.
+- DLSS 5 Neural Rendering is substantially more expensive than DLAA/SR alone in this stack.
 - The ReShade input patch replaces a **global Vulkan ReShade DLL** under `C:\ProgramData\ReShade`. Restore the original DLL before using software where a custom global graphics layer is inappropriate, especially anti-cheat titles.
 - DFC and `nvngx_dlssnr.dll` are not redistributed here.
+- No ray-tracing or path-tracing code is part of the DLSS Full module.
 - The project intentionally pins versions instead of automatically following latest releases.
 
 ## Repository layout
 
 ```text
-install/                         Working installation / backup scripts
+install/                         Modular installation / backup scripts
 config/                          Known-good configuration fragments
-manifests/versions.json          Pinned versions, URLs and hashes
+manifests/versions.json          Pinned versions, source commits and reference hashes
 input/                           Instructions for user-supplied files
 docs/                            Architecture, install, verification and troubleshooting
 tools/reshade-bbridge-input/     ReShade 6.8.0 cross-process input patch
