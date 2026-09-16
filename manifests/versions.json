@@ -18,7 +18,7 @@
       "bbridge_source_commit": "1dad5e6d4dcf8647e354aa9a87f611256fb61142",
       "a3s2_reference_d3d9_sha256": "6dd40f145a5d503624e3e05ecf0adbaa094cf83b24278c0bb333318e3c52a912",
       "a3s5_reference_feeder_sha256": "c73d8d54271f55f8931f00d62a4cdf605118bea71d7c6bee0b61d0ca7c1cce4b",
-      "s27_reference_shim_sha256": "a2e4bedace8d99bc60b5d18e958bd7e98f8887ff40ec45a8674b892e2d1fcbBc",
+      "s27_reference_shim_sha256": "a2e4bedace8d99bc60b5d18e958bd7e98f8887ff40ec45a8674b892e2d1fcbbc",
       "startup_prime": "1485x835",
       "startup_prime_synchronized_frames": 180,
       "hardware_validation": "RTX 4070 Ti SUPER, 2560x1440 presenter; automatic prime -> Ultra Performance confirmed steady",
