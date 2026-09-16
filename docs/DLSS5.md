@@ -20,22 +20,20 @@ GTAIV\.trex\m3k\nvngx_dlssnr.dll
 
 The runtime is installed automatically, but Neural Rendering starts **OFF by default**.
 
-## Turn Neural Rendering ON
+## Turn Neural Rendering ON or OFF
 
-1. Close GTA IV.
-2. Run:
-
-```text
-DLSS-Full-Control.bat
-```
-
-3. Choose:
+Open ReShade with **Home**, then go to:
 
 ```text
-N  Turn NR ON
+Add-ons -> DLSS 5 Feed -> GTA IV DLSS
 ```
 
-4. Choose `L` to launch GTA IV through the recommended startup-stabilization path.
+Use the **Neural Rendering** checkbox.
+
+- unchecked = Neural Rendering OFF;
+- checked = Neural Rendering ON.
+
+The setting is saved automatically. You do not need to close GTA IV or run a BAT file to change it.
 
 When enabled, the rendering order is:
 
@@ -46,19 +44,17 @@ GTA IV internal image
  -> display/output resolution
 ```
 
-The current validated configuration uses **one Neural Rendering pass**.
+## Neural Rendering passes
 
-## Turn Neural Rendering OFF
-
-1. Close GTA IV.
-2. Run `DLSS-Full-Control.bat`.
-3. Choose:
+The same ReShade panel contains:
 
 ```text
-O  Turn NR OFF
+Neural Rendering passes (advanced)
 ```
 
-DLSS 4.5 Super Resolution remains active.
+The current tested public default is **1 pass**.
+
+Higher pass counts remain available for experimentation, but they may hitch while warming and can cost significant performance.
 
 ## Why it is OFF by default
 
@@ -78,28 +74,43 @@ The runtime reports a minimum NVIDIA driver of **615.00**. Use 615.00 or newer b
 
 Other GPU-generation Neural Rendering variants are outside the current validated install path.
 
-## How the config represents ON/OFF
+## Underlying config
 
-Normal users should use `DLSS-Full-Control.bat`, but for troubleshooting the underlying configuration is:
+Normal users should use the ReShade checkbox. For troubleshooting, the same setting is stored internally as:
 
 ```ini
 Mode=0       ; Neural Rendering OFF
 Mode=2       ; Neural Rendering ON
-NRPasses=1   ; use one NR pass
+NRPasses=1   ; tested public default
 ```
 
 The `Mode` number is an internal project setting, not a DLSS quality level.
+
+The ReShade panel writes this configuration automatically, while the actual runtime transition is applied through the normal safe frame/config path.
+
+## Tools helper
+
+`DLSS-Full-Control.bat` does **not** control Neural Rendering anymore.
+
+It is limited to:
+
+```text
+L  Launch with startup stabilization pre-armed
+R  Repair / re-arm startup stabilization
+S  Show current status
+D  Open the diagnostic log
+```
 
 ## Names you may see in logs
 
 Older engineering notes and runtime logs may use:
 
 - `M3K` — the project's internal DLSS integration namespace;
-- `Feature 18` or `NR18` — NVIDIA's internal NGX identifier for the Neural Rendering feature;
+- `Feature 18` or `NR18` — NVIDIA's internal NGX identifier for Neural Rendering;
 - `A3-S2` — the project's temporal synchronization checkpoint;
 - `A3-S5` — the project's automatic startup-stabilization checkpoint.
 
-For normal use, all of these simply belong to the single **DLSS 4.5 SR + DLSS 5 Neural Rendering** Step 4 installation.
+For normal use, all of these simply belong to the single **DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering** Step 4 installation.
 
 ## Verification
 
