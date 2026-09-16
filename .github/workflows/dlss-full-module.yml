@@ -7,8 +7,11 @@ on:
     paths:
       - 'install/Install-DLSS-Full.bat'
       - 'install/DLSS-Full-Control.bat'
+      - 'install/Public-ReShade-Controls-Stage.ps1'
       - 'docs/DLSS-FULL.md'
       - 'docs/DLSS5.md'
+      - 'README.md'
+      - 'install/README.md'
       - 'input/README.md'
       - 'manifests/versions.json'
       - '.github/workflows/dlss-full-module.yml'
@@ -27,6 +30,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $installer = Get-Content install/Install-DLSS-Full.bat -Raw
           $control = Get-Content install/DLSS-Full-Control.bat -Raw
+          $uiStage = Get-Content install/Public-ReShade-Controls-Stage.ps1 -Raw
           $manifest = Get-Content manifests/versions.json -Raw | ConvertFrom-Json
 
           foreach ($marker in @(
@@ -35,6 +39,8 @@ jobs:
             '6DD40F145A5D503624E3E05ECF0ADBAA094CF83B24278C0BB333318E3C52A912',
             'C73D8D54271F55F8931F00D62A4CDF605118BEA71D7C6BEE0B61D0CA7C1CCE4B',
             'A2E4BEDACE8D99BC60B5D18E958BD7E98F8887FF40EC45A8674B892E2D1FCBBC',
+            'e5c2300128e89d6a16b3eb370f58a7e9b623c145',
+            '8F94C0C8035DC745E39CB4716F8A17E732B7F04689BECF5C6C6A0739253620F6',
             'https://github.com/RankFTW/rhi-repo/releases/download/dlssnr-310.8.0-RTX40/nvngx_dlssnr_310.8.0-RTX40.zip',
             '46124CFAEF532AD5F6DA07494772EA8C1B3E719F934E254385697F38D1289E3F',
             '4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05',
@@ -42,30 +48,43 @@ jobs:
             'StartupPrimeHeight=835',
             'StartupPrimeFrames=180',
             'Mode=0',
-            'NRPasses=1')) {
+            'NRPasses=1',
+            'Home -> Add-ons -> DLSS 5 Feed -> GTA IV DLSS')) {
             if (-not $installer.Contains($marker)) { throw "Installer missing marker: $marker" }
           }
 
           foreach ($marker in @(
-            "Set-Ini 'Mode' '2'",
-            "Set-Ini 'Mode' '0'",
-            "Set-Ini 'NRPasses' '1'",
+            'function Prepare-StartupStabilization',
+            'function Show-Status',
+            'function Repair-StartupStabilization',
+            'function Open-DiagnosticLog',
             "Set-Ini 'RenderWidth' '1485'",
             "Set-Ini 'RenderHeight' '835'",
-            "Set-Ini 'StartupPrimeFrames' '180'")) {
-            if (-not $control.Contains($marker)) { throw "Control helper missing marker: $marker" }
+            "Set-Ini 'StartupPrimeFrames' '180'",
+            'Home -> Add-ons -> DLSS 5 Feed -> GTA IV DLSS')) {
+            if (-not $control.Contains($marker)) { throw "Tools helper missing marker: $marker" }
+          }
+          foreach ($forbidden in @('function Set-DlssQuality','function Set-NeuralRendering','[N] Turn Neural Rendering','[O] Turn Neural Rendering')) {
+            if ($control.Contains($forbidden)) { throw "Tools helper still duplicates ReShade settings: $forbidden" }
           }
 
-          if ($control -notmatch 'function Set-NeuralRendering') { throw 'Control helper has no Neural Rendering ON/OFF function' }
-          if ($control -notmatch 'function Prepare-StartupStabilization') { throw 'Control helper has no startup-stabilization function' }
-          if ($control -notmatch 'nvngx_dlssnr\.dll') { throw 'Control helper does not validate the NR runtime before enabling it' }
+          foreach ($marker in @(
+            'M3kRequestNrEnabledLive',
+            'GTA IV DLSS',
+            'Neural Rendering##M3KNrEnabled',
+            'Neural Rendering passes (advanced)',
+            '1 pass is the tested public default',
+            'DLSS Super Resolution quality',
+            'Custom Ultra Quality (77%)')) {
+            if (-not $uiStage.Contains($marker)) { throw "Public ReShade controls stage missing marker: $marker" }
+          }
 
           $full = $manifest.components.'dlss-full'
           if ($full.project_checkpoint -ne '57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f') { throw 'Manifest checkpoint mismatch' }
           if ($full.nr_default_mode -ne 0 -or $full.nr_enabled_mode -ne 2 -or $full.nr_passes -ne 1) { throw 'Manifest NR mode contract mismatch' }
-          if ($full.a3s2_reference_d3d9_sha256.ToUpperInvariant() -ne '6DD40F145A5D503624E3E05ECF0ADBAA094CF83B24278C0BB333318E3C52A912') { throw 'Manifest A3-S2 reference hash mismatch' }
-          if ($full.a3s5_reference_feeder_sha256.ToUpperInvariant() -ne 'C73D8D54271F55F8931F00D62A4CDF605118BEA71D7C6BEE0B61D0CA7C1CCE4B') { throw 'Manifest A3-S5 reference hash mismatch' }
-          if ($full.s27_reference_shim_sha256.ToUpperInvariant() -ne 'A2E4BEDACE8D99BC60B5D18E958BD7E98F8887FF40EC45A8674B892E2D1FCBBC') { throw 'Manifest S2.7 reference hash mismatch' }
+          if ($full.a3s2_reference_d3d9_sha256.ToUpperInvariant() -ne '6DD40F145A5D503624E3E05ECF0ADBAA094CF83B24278C0BB333318E3C52A912') { throw 'Manifest temporal-sync reference hash mismatch' }
+          if ($full.a3s5_reference_feeder_sha256.ToUpperInvariant() -ne 'C73D8D54271F55F8931F00D62A4CDF605118BEA71D7C6BEE0B61D0CA7C1CCE4B') { throw 'Manifest pre-UI Feeder reference hash mismatch' }
+          if ($full.s27_reference_shim_sha256.ToUpperInvariant() -ne 'A2E4BEDACE8D99BC60B5D18E958BD7E98F8887FF40EC45A8674B892E2D1FCBBC') { throw 'Manifest shim reference hash mismatch' }
 
           $nr = $manifest.components.nvngx_dlssnr
           if ($nr.package_sha256.ToUpperInvariant() -ne '46124CFAEF532AD5F6DA07494772EA8C1B3E719F934E254385697F38D1289E3F') { throw 'Manifest NR package hash mismatch' }
@@ -75,7 +94,7 @@ jobs:
           if ($manifest.components.PSObject.Properties.Name -contains 'deep-fried-chicken') { throw 'Legacy DFC component is still present in manifest' }
           Write-Host 'Static combined-module checks passed.'
 
-      - name: Checkout frozen startup-stabilization source (A3-S5)
+      - name: Checkout frozen startup-stabilization source
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -84,30 +103,53 @@ jobs:
           $head = git -C _verify_project rev-parse HEAD
           if ($head.Trim() -ne '57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f') { throw "Wrong frozen project revision: $head" }
 
-      - name: Build and test startup-stabilization Feeder (A3-S5)
+      - name: Attach public ReShade controls stage
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Copy-Item .\install\Public-ReShade-Controls-Stage.ps1 .\_verify_project\tools\m3k-nr\public-reshade-controls-stage.ps1 -Force
+          $build = '.\_verify_project\tools\m3k-nr\build-a3-s5.ps1'
+          $text = [IO.File]::ReadAllText($build)
+          $anchor = @'
+          & (Join-Path $toolRoot 'a3-s5-startup-prime-stage.ps1') -GeneratedRoot $generated
+          '@
+          $replacement = @'
+          & (Join-Path $toolRoot 'a3-s5-startup-prime-stage.ps1') -GeneratedRoot $generated
+          & (Join-Path $toolRoot 'public-reshade-controls-stage.ps1') -GeneratedRoot $generated -FeederSource (Join-Path $feeder 'src\dlss5-feed.cpp')
+          '@
+          $count = ([regex]::Matches($text,[regex]::Escape($anchor))).Count
+          if ($count -ne 1) { throw "Could not attach public controls stage; anchor count=$count" }
+          [IO.File]::WriteAllText($build,$text.Replace($anchor,$replacement),(New-Object Text.UTF8Encoding($false)))
+
+      - name: Build and test combined Feeder
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\_verify_project\tools\m3k-nr\build-a3-s5.ps1
-          if ($LASTEXITCODE -ne 0) { throw "A3-S5 build failed: $LASTEXITCODE" }
+          if ($LASTEXITCODE -ne 0) { throw "Combined Feeder build failed: $LASTEXITCODE" }
           $feeder = '.\_verify_project\tools\m3k-nr\out-m3k-a3-s5\dlss5-feed.addon64'
           $shim = '.\_verify_project\tools\m3k-nr\out-m3k-s27\m3k\m3k-nvngx.dll'
-          if (-not (Test-Path $feeder)) { throw 'Missing startup-stabilization Feeder output' }
+          if (-not (Test-Path $feeder)) { throw 'Missing combined Feeder output' }
           if (-not (Test-Path $shim)) { throw 'Missing integration shim output' }
+
+          $generatedVk = Get-Content .\_verify_project\tools\m3k-nr\_work\m3k-src-a3-s5\m3k_vk.h -Raw
+          $generatedFeed = Get-Content .\_verify_project\tools\m3k-nr\_work\feeder\src\dlss5-feed.cpp -Raw
+          foreach ($marker in @('M3kRequestNrEnabledLive','GTA IV DLSS','Neural Rendering##M3KNrEnabled','DLSS Super Resolution quality','Custom Ultra Quality (77%)')) {
+            if (-not (($generatedVk + $generatedFeed).Contains($marker))) { throw "Generated public UI marker missing: $marker" }
+          }
+
           $fh = (Get-FileHash -Algorithm SHA256 $feeder).Hash
           $sh = (Get-FileHash -Algorithm SHA256 $shim).Hash
-          Write-Host "Current runner startup-stabilization Feeder: $fh"
-          Write-Host "Hardware-reference Feeder:                    C73D8D54271F55F8931F00D62A4CDF605118BEA71D7C6BEE0B61D0CA7C1CCE4B"
-          Write-Host "Current runner integration shim:              $sh"
-          Write-Host "Hardware-reference shim:                      A2E4BEDACE8D99BC60B5D18E958BD7E98F8887FF40EC45A8674B892E2D1FCBBC"
-          if ($fh -ne 'C73D8D54271F55F8931F00D62A4CDF605118BEA71D7C6BEE0B61D0CA7C1CCE4B') {
-            Write-Host 'Feeder PE hash differs from the hardware-tested CI image; frozen source build and CPU tests still passed.' -ForegroundColor Yellow
-          }
+          Write-Host "Current runner combined Feeder:          $fh"
+          Write-Host "Pre-UI hardware-reference Feeder:        C73D8D54271F55F8931F00D62A4CDF605118BEA71D7C6BEE0B61D0CA7C1CCE4B"
+          Write-Host "Current runner integration shim:         $sh"
+          Write-Host "Hardware-reference shim:                 A2E4BEDACE8D99BC60B5D18E958BD7E98F8887FF40EC45A8674B892E2D1FCBBC"
+          Write-Host 'The Feeder is expected to differ from the pre-UI reference because user-facing ReShade controls are now compiled into it.' -ForegroundColor Yellow
           if ($sh -ne 'A2E4BEDACE8D99BC60B5D18E958BD7E98F8887FF40EC45A8674B892E2D1FCBBC') {
             Write-Host 'Shim PE hash differs from the hardware-tested CI image; frozen source build and CPU tests still passed.' -ForegroundColor Yellow
           }
 
-      - name: Clone and patch temporal-synchronization bridge (A3-S2)
+      - name: Clone and patch temporal-synchronization bridge
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -137,7 +179,7 @@ jobs:
         run: |
           python -m pip install --disable-pip-version-check meson==0.64.1 ninja==1.11.1.1
 
-      - name: Build temporal-synchronization x86 bridge (A3-S2)
+      - name: Build temporal-synchronization x86 bridge
         shell: pwsh
         working-directory: _verify_bbridge
         run: |
@@ -161,5 +203,5 @@ jobs:
       - name: Module validation summary
         shell: pwsh
         run: |
-          Write-Host 'Combined module validated: user-facing installer/control contract passed; frozen startup-stabilization source built with CPU tests; temporal-synchronization source patched all four draw paths and built x86.' -ForegroundColor Green
-          Write-Host 'Neural Rendering is bundled but defaults to OFF; the control helper explicitly toggles the underlying Mode=2/0 setting.' -ForegroundColor Green
+          Write-Host 'Combined module validated: ReShade is the single normal settings surface; public NR toggle/quality UI compiled successfully; frozen rendering core passed CPU tests; temporal-synchronization bridge built successfully.' -ForegroundColor Green
+          Write-Host 'DLSS-Full-Control.bat is limited to launch, repair, status, and diagnostics.' -ForegroundColor Green
