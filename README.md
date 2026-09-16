@@ -130,15 +130,19 @@ nvngx_dlss.dll 310.9.1
 
 `curl.exe` is optional; the installers fall back to PowerShell downloads when it is unavailable.
 
-## Installation overview
+# Installation overview
 
-### 1. Install FusionFix first
+---
+
+## STEP 1 — Install FusionFix first
 
 Start from a **clean FusionFix 5.0.1** setup. You HAVE TO Launch GTA IV once and verify FusionFix itself works, and so it finishes its own install.
 
 The project does not redistribute FusionFix. The tested upstream package and hash are recorded in [`manifests/versions.json`](manifests/versions.json).
 
-### 2. Install DLAA
+---
+
+## STEP 2 — Install DLAA
 
 Copy:
 
@@ -152,7 +156,9 @@ The installer creates a rollback backup, downloads pinned upstream components, i
 
 Read [`docs/DLAA.md`](docs/DLAA.md) first.
 
-### 3. Recommended: install and verify the interactive ReShade patch
+---
+
+## STEP 3 — Install & verify the interactive ReShade patch
 
 Open:
 
@@ -214,7 +220,9 @@ There is no simple `E < F < J < K` quality ladder for every scene. **Start with 
 
 This selector changes the **DLAA render model only**. It does **not** enable DLSS Super Resolution Quality/Balanced/Performance by itself.
 
-### 4. Install DLSS Full
+---
+
+## STEP 4 — Install DLSS Full
 
 After the DLAA baseline works, copy:
 
@@ -236,7 +244,9 @@ beside `GTAIV.exe`. Use that helper to select UQ77 / Quality / Balanced / Perfor
 
 Read [`docs/DLSS-FULL.md`](docs/DLSS-FULL.md) first.
 
-### 5. Optional: Neural Rendering
+---
+
+## STEP 5 — Optional: Neural Rendering
 
 Neural Rendering remains a separate optional layer after DLSS Full.
 
