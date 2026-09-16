@@ -81,6 +81,18 @@
       "installed_automatically": true,
       "default_enabled": false,
       "notes": "Downloaded and hash-verified automatically by Install-DLSS-Full.bat. Known-good on RTX 4070 Ti SUPER. Installed to .trex/m3k/nvngx_dlssnr.dll and left OFF until the user enables Neural Rendering from Home -> Add-ons -> DLSS 5 Feed -> GTA IV DLSS."
+    },
+    "m3k-dxvk-presenter": {
+      "product": "M3K DXVK render/output presenter for DLSS Super Resolution",
+      "upstream_version": "3.0.2",
+      "upstream_commit": "6b20f622a77b87b2921fe5d2c1774d2f2ba3e9b7",
+      "project_patch_checkpoint": "57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f",
+      "release_tag": "m3k-dxvk-v3.0.2-a2s1b",
+      "url": "https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/m3k-dxvk-v3.0.2-a2s1b/d3d9vk_x64.dll",
+      "dll_sha256": "511e0c2509e1922db2ec38940507ba956908fe6dc5fd9b3db9fec489dc05f297",
+      "installed_path": ".trex/d3d9vk_x64.dll",
+      "installed_automatically": true,
+      "notes": "Frozen M3K source-tap + A2-S1B presenter. Reads m3k-nr.ini, overrides GTA IV D3D9 render extent from RenderWidth/RenderHeight, and resizes the real presenter to OutputWidth/OutputHeight or the monitor when output is 0x0."
     }
   }
 }

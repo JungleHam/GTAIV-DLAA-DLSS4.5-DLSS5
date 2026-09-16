@@ -25,6 +25,9 @@ $ReferenceShimHash = 'A2E4BEDACE8D99BC60B5D18E958BD7E98F8887FF40EC45A8674B892E2D
 $NrPackageUrl = 'https://github.com/RankFTW/rhi-repo/releases/download/dlssnr-310.8.0-RTX40/nvngx_dlssnr_310.8.0-RTX40.zip'
 $NrPackageHash = '46124CFAEF532AD5F6DA07494772EA8C1B3E719F934E254385697F38D1289E3F'
 $NrDllHash = '4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05'
+$DxvkPresenterUrl = 'https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/m3k-dxvk-v3.0.2-a2s1b/d3d9vk_x64.dll'
+$DxvkPresenterHash = '511E0C2509E1922DB2EC38940507BA956908FE6DC5FD9B3DB9FEC489DC05F297'
+$DxvkPresenterUpstreamCommit = '6b20f622a77b87b2921fe5d2c1774d2f2ba3e9b7'
 $PublicControlsCommit = 'cb3d3635ab746b603d1155b92424d24a9469eb2c'
 $PublicControlsUrl = "https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/$PublicControlsCommit/install/Public-ReShade-Controls-Stage.ps1"
 $PublicControlsHash = '2AAAD1F94477BB16874F2047B65950B5C678759B8772FC566C4708E19B812EAE'
@@ -158,6 +161,12 @@ try {
     if (-not $NrDll) { Fail 'nvngx_dlssnr.dll was not found in the pinned NR package.' }
     Assert-SHA256 $NrDll.FullName $NrDllHash
 
+    Write-Host ''
+    Write-Host 'Downloading the tested M3K DXVK 3.0.2 render/output presenter...' -ForegroundColor Cyan
+    $DxvkPresenterTemp = Join-Path $Temp 'd3d9vk_x64.dll'
+    Download-File $DxvkPresenterUrl $DxvkPresenterTemp
+    Assert-SHA256 $DxvkPresenterTemp $DxvkPresenterHash
+
     Write-Host "Downloading/cloning project source into temporary folder: $Project" -ForegroundColor DarkGray
     Write-Host 'This source checkout will be deleted automatically after use, including if installation fails.' -ForegroundColor DarkGray
     Run $Git @('clone','--filter=blob:none',$RepoUrl,$Project) 'Cloning project source'
@@ -255,6 +264,7 @@ try {
     Write-Host 'Build/runtime outputs:' -ForegroundColor Cyan
     Write-Host "  d3d9.dll             $bridgeHash"
     Write-Host "  NvRemixBridge.exe    $serverHash  (same pinned b-bridge commit)"
+    Write-Host "  d3d9vk_x64.dll       $DxvkPresenterHash  (M3K render/output presenter)"
     Write-Host "  dlss5-feed.addon64   $feederHash"
     Write-Host "  m3k-nvngx.dll        $shimHash"
     Write-Host "  nvngx_dlssnr.dll     $NrDllHash"
@@ -269,7 +279,7 @@ try {
     $Backup = Join-Path $Game ("_DLSS_FULL_PREINSTALL_BACKUP_" + $stamp)
     New-Item -ItemType Directory -Path $Backup -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $Backup '.trex\m3k') -Force | Out-Null
-    foreach ($rel in @('d3d9.dll','.trex\NvRemixBridge.exe','.trex\dlss5-feed.addon64','.trex\dlss5-feed.cfg','.trex\m3k-nr.ini','.trex\m3k\m3k-nvngx.dll','.trex\m3k\nvngx_dlssnr.dll')) {
+    foreach ($rel in @('d3d9.dll','.trex\NvRemixBridge.exe','.trex\d3d9vk_x64.dll','.trex\dlss5-feed.addon64','.trex\dlss5-feed.cfg','.trex\m3k-nr.ini','.trex\m3k\m3k-nvngx.dll','.trex\m3k\nvngx_dlssnr.dll')) {
         Copy-IfExists (Join-Path $Game $rel) (Join-Path $Backup $rel)
     }
 
@@ -279,6 +289,8 @@ try {
     Copy-Item -LiteralPath $BridgeServer -Destination (Join-Path $Trex 'NvRemixBridge.exe') -Force
     if ((Hash (Join-Path $Game 'd3d9.dll')) -ne $bridgeHash) { Fail 'Installed x86 bridge client hash verification failed.' }
     if ((Hash (Join-Path $Trex 'NvRemixBridge.exe')) -ne $serverHash) { Fail 'Installed x64 bridge server hash verification failed.' }
+    Copy-Item -LiteralPath $DxvkPresenterTemp -Destination (Join-Path $Trex 'd3d9vk_x64.dll') -Force
+    if ((Hash (Join-Path $Trex 'd3d9vk_x64.dll')) -ne $DxvkPresenterHash) { Fail 'Installed M3K DXVK presenter hash verification failed.' }
     Copy-Item -LiteralPath $Feeder -Destination (Join-Path $Trex 'dlss5-feed.addon64') -Force
     New-Item -ItemType Directory -Path (Join-Path $Trex 'm3k') -Force | Out-Null
     Copy-Item -LiteralPath $Shim -Destination (Join-Path $Trex 'm3k\m3k-nvngx.dll') -Force
@@ -340,6 +352,9 @@ try {
         "PublicControlsSHA256=$PublicControlsHash",
         "d3d9.dll=$bridgeHash",
         "NvRemixBridge.exe=$serverHash",
+        "d3d9vk_x64.dll=$DxvkPresenterHash",
+        "DxvkPresenterUpstreamCommit=$DxvkPresenterUpstreamCommit",
+        "DxvkPresenterURL=$DxvkPresenterUrl",
         "dlss5-feed.addon64=$feederHash",
         "m3k-nvngx.dll=$shimHash",
         "nvngx_dlssnr.dll=$NrDllHash",
