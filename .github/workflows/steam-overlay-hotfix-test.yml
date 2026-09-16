@@ -44,7 +44,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Patched source diff check failed' }
 
           $window = Get-Content .\_bbridge\src\client\window.cpp -Raw
-          foreach ($marker in @('[M3K-UI] config','[M3K-STEAM]','gameoverlayrenderer.dll','_ReturnAddress()','!steamOverlay && M3kUiVirtualActive')) {
+          foreach ($marker in @('[M3K-UI] config','[M3K-STEAM-V2]','gameoverlayrenderer.dll','CaptureStackBackTrace','M3kStackContainsSteamOverlay','!steamOverlay && M3kUiVirtualActive')) {
             if (-not $window.Contains($marker)) { throw "Missing Steam hotfix marker: $marker" }
           }
           if ($window.Contains('[M3K-UI-STARTUP]')) { throw 'Rejected startup-resync patch leaked into hotfix build' }
@@ -69,7 +69,7 @@ jobs:
           if (-not (Test-Path $dll)) { throw 'd3d9.dll missing' }
           $bytes = [IO.File]::ReadAllBytes($dll)
           $ascii = [Text.Encoding]::ASCII.GetString($bytes)
-          foreach ($marker in @('remix-main+1dad5e6d','[M3K-UI] config','[M3K-STEAM]')) {
+          foreach ($marker in @('remix-main+1dad5e6d','[M3K-UI] config','[M3K-STEAM-V2]')) {
             if (-not $ascii.Contains($marker)) { throw "Built DLL missing marker: $marker" }
           }
           if ($ascii.Contains('[M3K-UI-STARTUP]')) { throw 'Built DLL contains rejected startup-resync patch' }
@@ -80,7 +80,7 @@ jobs:
       - name: Upload isolated hotfix binary
         uses: actions/upload-artifact@v4
         with:
-          name: steam-overlay-hotfix-d3d9
+          name: steam-overlay-hotfix-d3d9-v2
           path: |
             _bbridge/_compSteam32/src/client/d3d9.dll
             _bbridge/_compSteam32/src/client/SHA256.txt
