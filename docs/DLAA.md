@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Step 2 creates a clean, known-good DLAA baseline before the ReShade input fix and combined DLSS 4.5 SR + DLSS 5 NR module are added.
+Step 2 creates a clean, known-good DLAA baseline before the ReShade controls fix and the combined DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering module are added.
 
 ## Prerequisites
 
@@ -13,7 +13,7 @@ Before running the project installer:
 1. launch GTA IV once;
 2. verify FusionFix loads normally;
 3. close GTA IV completely;
-4. make sure no old `.trex` folder or previous b-bridge experiment remains.
+4. make sure no old `.trex` folder or previous bridge experiment remains.
 
 The installer is deliberately strict because its rollback logic assumes a clean FusionFix baseline.
 
@@ -36,12 +36,12 @@ It downloads pinned upstream packages and verifies hashes recorded in `manifests
 ```text
 GTAIV\
   dinput8.dll                     FusionFix ASI loader
-  d3d9.dll                        b-bridge client
-  d3d9Hooked.dll                  FusionFix renderer wrapper chained by b-bridge
+  d3d9.dll                        bridge client
+  d3d9Hooked.dll                  FusionFix renderer wrapper chained by the bridge
   dxvk.conf
   commandline.txt
   .trex\
-    NvRemixBridge.exe
+    NvRemixBridge.exe             64-bit renderer process
     d3d9vk_x64.dll
     bridge.conf
     ReShade.ini
@@ -83,7 +83,7 @@ FpsLimitPreset=0
 -windowed
 ```
 
-Feeder:
+DLSS feeder:
 
 ```ini
 enabled=1
@@ -105,9 +105,16 @@ Do not append `\**` to the ReShade shader search paths in this stack.
 
 ## What Step 2 intentionally does not install
 
-The DLAA baseline does not yet install the native M3K NR runtime or A3-S2/A3-S5 SR path.
+Step 2 is only the **DLAA baseline**. It does not yet add:
 
-In particular, after Step 2 you should not yet have:
+- DLSS Super Resolution quality modes;
+- the temporal synchronization used by Super Resolution;
+- automatic startup stabilization;
+- the DLSS 5 Neural Rendering runtime.
+
+Those arrive together in Step 4.
+
+After Step 2 you should therefore not yet have:
 
 ```text
 .trex\m3k-nr.ini
@@ -115,11 +122,11 @@ In particular, after Step 2 you should not yet have:
 .trex\m3k\nvngx_dlssnr.dll
 ```
 
-Those arrive automatically in Step 4.
+The `m3k` name in those paths is only the project's internal integration namespace.
 
 ## DLAA model / preset selector
 
-After completing the ReShade b-bridge input patch in Step 3, press Home and open:
+After completing the **ReShade controls fix** in Step 3, press Home and open:
 
 ```text
 Add-ons -> DLSS 5 Feed -> DLSS render preset -> Preset
@@ -134,7 +141,7 @@ Recommended starting point: **K**.
 
 Changing the preset rebuilds the DLSS feature and may briefly hitch.
 
-At this stage GTA IV still renders at native resolution; this selector does not by itself enable Super Resolution.
+At this stage GTA IV still renders at native/output resolution; this selector does not by itself enable Super Resolution.
 
 ## Verify before continuing
 
