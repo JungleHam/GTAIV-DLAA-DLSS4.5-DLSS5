@@ -2,22 +2,20 @@
 
 See [`../../docs/RESHade-INPUT-PATCH.md`](../../docs/RESHade-INPUT-PATCH.md) for the design and full instructions.
 
-## Easy install
+## Install
 
-No terminal commands are required for the normal flow:
-
-1. Double-click **`BUILD.bat`** and wait for `SUCCESS`.
-2. Double-click **`INSTALL.bat`**.
-3. Paste or drag in the GTA IV folder that contains `GTAIV.exe`, then press Enter.
-4. Windows asks for Administrator/UAC permission — click **Yes**.
-5. Fully launch GTA IV again and wait until a rendered menu or gameplay scene appears.
+1. Double-click **`BUILD.bat`** and wait for `BUILD SUCCESS - PATCH MARKER VERIFIED`.
+2. Close the build window.
+3. **Right-click `INSTALL.bat` -> Run as administrator.**
+4. Paste or drag in the GTA IV folder containing `GTAIV.exe`, then press Enter.
+5. Launch GTA IV and wait for a rendered menu/gameplay scene.
 6. Press **Home**.
 
-The path is requested before elevation so normal Explorer drag-and-drop works.
+> File installation alone is not proof. Step 3 is complete only when Home opens the ReShade overlay and mouse/keyboard input works inside it.
 
-> **Important:** file installation alone does not prove the input patch is working. Step 3 is only verified when **Home actually opens the ReShade overlay and mouse/keyboard input works inside it**. If Home does nothing, stop there and troubleshoot before continuing to the DLSS 5 step.
+If Home does nothing, troubleshoot before continuing to the combined DLSS 4.5 SR + DLSS 5 NR module.
 
-Useful troubleshooting files:
+Useful files:
 
 ```text
 GTAIV\.trex\bridge.conf
@@ -26,6 +24,6 @@ GTAIV\.trex\ReShade.log
 
 ## Rollback
 
-Double-click **`RESTORE_ORIGINAL.bat`**, enter the same GTA IV folder, then approve UAC when Windows asks.
+Double-click **`RESTORE_ORIGINAL.bat`**, enter the same GTA IV folder, and approve UAC when Windows asks.
 
 The build output `ReShade64-bbridge.dll` and cloned `reshade-src/` tree are ignored by Git.
