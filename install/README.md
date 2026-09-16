@@ -1,68 +1,72 @@
-# Install modules
+# Installers
 
-Recommended order:
+For most users, follow these four steps in order:
 
-```text
-1. FusionFix 5.0.1 (external prerequisite)
-2. Install-DLAA.bat
-3. ReShade b-bridge input patch
-4. Install-DLSS-Full.bat
-```
+| Step | What to install | What it gives you |
+|---|---|---|
+| **1** | **FusionFix 5.0.1** | Clean modern GTA IV renderer baseline. |
+| **2** | **`Install-DLAA.bat`** | DLAA plus the bridge/ReShade/motion-data foundation required by the rest of the project. |
+| **3** | **ReShade controls fix** | Makes the Home overlay, mouse and keyboard work through the separate renderer process. |
+| **4** | **`Install-DLSS-Full.bat`** | DLSS 4.5 Super Resolution, automatic startup stabilization, and DLSS 5 Neural Rendering installed OFF by default. |
 
-## DLAA
+The root [`README.md`](../README.md) is the main step-by-step guide.
 
-`Install-DLAA.bat` creates the known-good b-bridge/ReShade/Feeder DLAA baseline from a clean FusionFix installation.
+## Step 2 — DLAA
 
-It installs `nvngx_dlss.dll` 310.9.1 but does not install/enable the DLSS 5 NR runtime yet.
+`Install-DLAA.bat` creates the known-good DLAA baseline from a clean FusionFix installation.
 
-## ReShade input fix
+It installs `nvngx_dlss.dll` 310.9.1 and the required bridge/ReShade/Feeder foundation.
 
-Build `tools/reshade-bbridge-input/BUILD.bat`, then **right-click `INSTALL.bat` → Run as administrator**.
+**Finished when:** GTA IV launches normally and `.trex\dlss5-feed.log` reports DLAA frames being delivered.
 
-Do not continue until Home opens ReShade and mouse/keyboard input works.
+## Step 3 — ReShade controls fix
 
-## DLSS 4.5 SR + DLSS 5 NR
-
-`Install-DLSS-Full.bat` is the current combined module. It adds:
-
-- A3-S2 coherent draw-boundary jitter;
-- UQ77 / Quality / Balanced / Performance / Ultra Performance SR profiles;
-- A3-S5 automatic `1485x835` startup prime;
-- automatic return to the saved SR profile;
-- the pinned RTX40-compatible `nvngx_dlssnr.dll` 310.8.0 runtime;
-- native M3K Feature 18 integration.
-
-Neural Rendering is **installed but OFF by default**:
-
-```ini
-Mode=0
-NRPasses=1
-```
-
-The installer also places `DLSS-Full-Control.bat` beside `GTAIV.exe`.
-
-Use it to:
+Open:
 
 ```text
-1..5  choose the saved DLSS 4.5 SR profile
-N     turn DLSS 5 NR ON  (Mode=2)
-O     turn DLSS 5 NR OFF (Mode=0)
-L     launch through the 1485x835 startup prime
+../tools/reshade-bbridge-input/
 ```
 
-There is no separate Deep Fried Chicken module in the current install path.
+Build the patch, then **right-click `INSTALL.bat` → Run as administrator**.
 
-Read [`../docs/DLSS-FULL.md`](../docs/DLSS-FULL.md) and [`../docs/DLSS5.md`](../docs/DLSS5.md).
+**Finished when:** pressing Home opens ReShade and mouse/keyboard input works inside it.
+
+Do not continue to Step 4 until that works.
+
+## Step 4 — DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering
+
+`Install-DLSS-Full.bat` adds:
+
+- five DLSS Super Resolution quality modes;
+- temporal synchronization needed for stable reconstruction;
+- automatic `1485×835` startup stabilization;
+- automatic return to the saved DLSS quality mode;
+- the tested `nvngx_dlssnr.dll` 310.8.0-RTX40 Neural Rendering runtime;
+- `DLSS-Full-Control.bat` for normal use.
+
+Neural Rendering is **installed but OFF by default**.
+
+Use `DLSS-Full-Control.bat` after installation:
+
+```text
+1..5  Choose DLSS quality mode
+N     Turn Neural Rendering ON
+O     Turn Neural Rendering OFF
+L     Launch GTA IV with automatic startup stabilization
+```
+
+### About names seen in logs/source
+
+The installer source and logs still contain internal engineering labels such as `A3-S2`, `A3-S5` and `M3K`. They are not extra steps:
+
+- `A3-S2` = temporal synchronization fix;
+- `A3-S5` = automatic startup stabilization;
+- `M3K` = internal project integration namespace.
+
+Normal users do not need to configure those directly.
 
 ## Backup
 
-`Backup-Working-Stack.bat` snapshots the current integration, including:
+`Backup-Working-Stack.bat` snapshots the current integration, including the bridge, ReShade configuration, DLSS configuration and Neural Rendering runtime.
 
-- A3-S2 `d3d9.dll`;
-- A3-S5 Feeder/config;
-- `.trex/m3k-nr.ini`;
-- `.trex/m3k/m3k-nvngx.dll`;
-- `.trex/m3k/nvngx_dlssnr.dll`;
-- ReShade/DLAA integration files.
-
-The install scripts also create timestamped rollback backups before replacing runtime files.
+The installation scripts also create timestamped rollback backups before replacing runtime files.
