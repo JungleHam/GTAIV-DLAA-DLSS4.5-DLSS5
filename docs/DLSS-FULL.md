@@ -1,128 +1,119 @@
 # DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering
 
-This is the current combined module installed after the DLAA baseline and ReShade input fix.
+This is **Step 4** of the normal installation.
+
+Before it, complete:
 
 ```text
-FusionFix -> DLAA -> ReShade input fix -> DLSS 4.5 SR + DLSS 5 NR
+1. FusionFix
+2. DLAA
+3. ReShade controls fix
+4. DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering  <- this guide
 ```
 
-The module installs both Super Resolution and the native M3K Neural Rendering runtime. **NR execution is OFF by default.**
+## What Step 4 adds
 
-## What it installs
+The combined installer gives you:
 
-The installer builds the frozen project path and installs:
+- real DLSS Super Resolution from a lower GTA IV internal render resolution to your full output resolution;
+- Custom Ultra Quality, Quality, Balanced, Performance and Ultra Performance modes;
+- the tested temporal synchronization required for stable DLSS reconstruction;
+- automatic startup stabilization to prevent the cold-start vibration seen at low render resolutions;
+- the tested DLSS 5 Neural Rendering runtime;
+- `DLSS-Full-Control.bat` for quality selection, NR ON/OFF and recommended launching.
+
+**Neural Rendering is installed but OFF by default.**
+
+## Install
+
+Copy:
 
 ```text
-A3-S2 coherent-jitter b-bridge client d3d9.dll
-A3-S5 DLSS5-Feeder add-on
-S2.7 m3k-nvngx.dll shim
-nvngx_dlssnr.dll 310.8.0-RTX40
-m3k-nr.ini
+install/Install-DLSS-Full.bat
+```
+
+beside `GTAIV.exe` and run it.
+
+Choose the DLSS Super Resolution quality mode you want to save. **Quality** is the default recommendation.
+
+After installation, use:
+
+```text
 DLSS-Full-Control.bat
 ```
 
-The existing DLAA runtime remains:
+for normal control and launching.
+
+## DLSS quality modes
+
+| Choice | User-facing mode | Meaning |
+|---:|---|---|
+| 1 | Custom Ultra Quality (77%) | Highest internal render resolution of the upscaling modes. |
+| 2 | Quality | Recommended general-purpose default. |
+| 3 | Balanced | Middle ground between image quality and performance. |
+| 4 | Performance | Lower internal render resolution for more GPU headroom. |
+| 5 | Ultra Performance | Lowest internal render resolution; mainly useful when maximum performance is needed. |
+
+The config file stores this as `SRProfile`, but users normally change it through `DLSS-Full-Control.bat` instead of editing the file manually.
+
+## Automatic startup stabilization
+
+During testing, very low DLSS render resolutions could sometimes begin a fresh game session with visible vibration.
+
+The reliable fix was to start briefly at a known-good internal resolution before moving to the requested DLSS mode:
 
 ```text
-nvngx_dlss.dll 310.9.1
+start at 1485×835
+ -> wait for 180 frames with temporal data synchronized
+ -> automatically switch to your saved DLSS quality mode
 ```
 
-This is the project’s DLSS 4.5 SR / DLAA runtime.
-
-## Frozen source checkpoints
-
-Project checkpoint:
+Known test points:
 
 ```text
-57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f
+1472×828  -> vibration remained
+1478×832  -> fixed
+1485×835  -> fixed
+1493×840  -> vibration remained
 ```
 
-Pinned b-bridge source:
+The installer uses `1485×835` automatically. You do not need to change resolutions yourself.
+
+## Temporal synchronization
+
+DLSS uses tiny per-frame image offsets together with previous-frame information. GTA IV was never designed to provide this information to modern DLSS.
+
+The project therefore applies one synchronized temporal sample to both GTA IV's rendered geometry and DLSS itself. This is what eliminated the large wobble/shimmer seen in earlier experimental builds.
+
+Normal users do not need to configure this system.
+
+Internal/source name: `A3-S2`.
+
+## Startup stabilization
+
+The automatic `1485×835` startup sequence described above is the project's cold-start fix.
+
+Internal/source name: `A3-S5`.
+
+These names may appear in logs or source code, but **they are not extra installation steps**.
+
+## Neural Rendering
+
+Step 4 automatically downloads and verifies:
 
 ```text
-1dad5e6d4dcf8647e354aa9a87f611256fb61142
+nvngx_dlssnr.dll 310.8.0-RTX40
 ```
 
-Hardware-reference hashes:
+and installs it to:
 
 ```text
-6DD40F145A5D503624E3E05ECF0ADBAA094CF83B24278C0BB333318E3C52A912  d3d9.dll
-C73D8D54271F55F8931F00D62A4CDF605118BEA71D7C6BEE0B61D0CA7C1CCE4B  dlss5-feed.addon64
-A2E4BEDACE8D99BC60B5D18E958BD7E98F8887FF40EC45A8674B892E2D1FCBBC  m3k-nvngx.dll
-4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05  nvngx_dlssnr.dll
+GTAIV\.trex\m3k\nvngx_dlssnr.dll
 ```
 
-The locally compiled PE files may differ byte-for-byte with newer MSVC revisions even when built from the exact same frozen source. The source/build/test gates are authoritative; the hashes above identify the hardware-tested reference binaries.
+After installation, NR is present but disabled.
 
-## NR runtime package
-
-The installer downloads the exact pinned package automatically:
-
-```text
-https://github.com/RankFTW/rhi-repo/releases/download/dlssnr-310.8.0-RTX40/nvngx_dlssnr_310.8.0-RTX40.zip
-```
-
-Package SHA256:
-
-```text
-46124CFAEF532AD5F6DA07494772EA8C1B3E719F934E254385697F38D1289E3F
-```
-
-The installer then verifies the DLL itself against:
-
-```text
-4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05
-```
-
-No manually downloaded DFC archive or NR DLL is required.
-
-## DLSS 4.5 SR profiles
-
-`SRProfile` in `.trex/m3k-nr.ini` selects the saved mode:
-
-| Value | Mode |
-|---:|---|
-| 1 | Custom Ultra Quality (77%) |
-| 2 | Quality |
-| 3 | Balanced |
-| 4 | Performance |
-| 5 | Ultra Performance |
-
-The installer defaults to **Quality**.
-
-## 1485x835 startup prime
-
-Cold-start testing found a narrow source-resolution band that reliably initializes the session without the low-resolution vibration:
-
-```text
-1472x828  -> vibration remains
-1478x832  -> fixed
-1485x835  -> fixed
-1493x840  -> vibration remains
-```
-
-The final A3-S5 path therefore starts at:
-
-```text
-1485x835
-```
-
-It waits for **180 successful SR frames while the exact A3-S2 synchronized jitter handoff is active**, then automatically returns to the saved SR profile and resets temporal history.
-
-This startup prime was hardware-validated on the RTX 4070 Ti SUPER and fixed the previously observed cold-start vibration, including Ultra Performance.
-
-## Neural Rendering default state
-
-After installation:
-
-```ini
-Mode=0
-NRPasses=1
-```
-
-The NR runtime is present, but Feature 18 is not executed.
-
-### Turn NR ON
+### Turn Neural Rendering ON
 
 Close GTA IV and run:
 
@@ -136,45 +127,32 @@ Choose:
 N  Turn NR ON
 ```
 
-The helper writes:
+Then launch with `L`.
 
-```ini
-Mode=2
-NRPasses=1
-```
-
-The current production path becomes:
+When enabled, the rendering order is:
 
 ```text
-true GTA source color
- -> native NGX Feature 18 / DLSS 5 NR
+GTA IV internal image
+ -> DLSS 5 Neural Rendering
  -> DLSS 4.5 Super Resolution
- -> output
+ -> display/output resolution
 ```
 
-### Turn NR OFF
+The tested configuration uses **one Neural Rendering pass**.
 
-Close GTA IV, run `DLSS-Full-Control.bat`, and choose:
+### Turn Neural Rendering OFF
+
+Close GTA IV, run the control helper and choose:
 
 ```text
 O  Turn NR OFF
 ```
 
-This writes:
-
-```ini
-Mode=0
-```
-
-Super Resolution remains active.
+DLSS Super Resolution remains enabled.
 
 ## Requirements
 
-Complete the first three steps in the root README first:
-
-1. FusionFix 5.0.1;
-2. DLAA baseline;
-3. working ReShade b-bridge input patch.
+Complete Steps 1–3 first.
 
 For the reproducible local build used by this installer you also need:
 
@@ -185,34 +163,38 @@ For the reproducible local build used by this installer you also need:
 - Windows SDK;
 - internet access.
 
-For NR execution, the tested 310.8.0-RTX40 runtime requires NVIDIA driver **615.00 or newer**. The tested project GPU is RTX 4070 Ti SUPER.
+The tested Neural Rendering runtime requires NVIDIA driver **615.00 or newer** when NR is enabled. Direct project hardware validation is on RTX 4070 Ti SUPER.
 
 ## Verification
 
-Main log:
+The main runtime log is:
 
 ```text
 GTAIV\.trex\dlss5-feed.log
 ```
 
-Successful startup-prime evidence includes:
+For an ordinary user, the important result is simple:
+
+1. launch through `DLSS-Full-Control.bat` → `L`;
+2. the game briefly initializes at the stabilization resolution;
+3. it switches automatically to the saved DLSS mode;
+4. the image remains stable instead of vibrating.
+
+If you need log-level proof, see [`VERIFY.md`](VERIFY.md).
+
+## Technical identities
+
+For exact reproduction and debugging, the current validated implementation corresponds to these internal checkpoints:
 
 ```text
-M3K-A3-S5: STARTUP PRIME armed 1485x835
-M3K-A3-S5: STARTUP PRIME COMPLETE after 180 synchronized SR frames
-M3K-SR-LIVE: ACTIVE <saved mode> ...
+Temporal synchronization: A3-S2
+Startup stabilization:    A3-S5
+Project checkpoint:       57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f
 ```
 
-When NR is ON (`Mode=2`), native validation should also show successful Feature 18 creation/evaluation. The proven native path has produced evidence such as:
+Those codes are intentionally kept out of the normal installation instructions because they describe engineering checkpoints, not user-selectable features.
 
-```text
-M3K-A0: DLSS NR runtime found
-M3K-A0: feature 18 creation SUCCESS
-M3K-A1: feature 18 evaluation SUCCESS
-M3K-A2-S2.6: NR18 -> DLAA running ...
-```
-
-See [`VERIFY.md`](VERIFY.md).
+Hardware-reference hashes and pinned source revisions are recorded in `manifests/versions.json`.
 
 ## Rollback
 
@@ -222,6 +204,6 @@ The installer creates:
 _DLSS_FULL_PREINSTALL_BACKUP_<timestamp>
 ```
 
-beside `GTAIV.exe` and records its path in `DLSS_FULL_INSTALLED.txt`.
+beside `GTAIV.exe` and records its location in `DLSS_FULL_INSTALLED.txt`.
 
 Close GTA IV and `NvRemixBridge.exe` before restoring files from that backup.
