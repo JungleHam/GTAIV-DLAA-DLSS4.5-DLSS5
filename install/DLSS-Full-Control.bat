@@ -1,4 +1,4 @@
-@rem GTAIV-DLAA-DLSS4.5-DLSS5 quality, Neural Rendering, and launch helper.
+@rem GTAIV-DLAA-DLSS4.5-DLSS5 launch, repair, and diagnostics helper.
 @echo off
 setlocal
 set "DLSSF_CTL_SELF=%~f0"
@@ -9,8 +9,11 @@ exit /b %errorlevel%
 $ErrorActionPreference = 'Stop'
 $Self = $env:DLSSF_CTL_SELF
 $Game = Split-Path -Parent $Self
-$Ini = Join-Path $Game '.trex\m3k-nr.ini'
-$NrDll = Join-Path $Game '.trex\m3k\nvngx_dlssnr.dll'
+$Trex = Join-Path $Game '.trex'
+$Ini = Join-Path $Trex 'm3k-nr.ini'
+$Log = Join-Path $Trex 'dlss5-feed.log'
+$NrDll = Join-Path $Trex 'm3k\nvngx_dlssnr.dll'
+$Feeder = Join-Path $Trex 'dlss5-feed.addon64'
 
 function Write-NoBom([string]$Path,[string[]]$Lines) {
     [IO.File]::WriteAllLines($Path,$Lines,(New-Object Text.UTF8Encoding($false)))
@@ -52,28 +55,33 @@ function Prepare-StartupStabilization {
     Set-Ini 'BalancedProbe' '0'
 }
 
-function Set-DlssQuality([int]$Profile,[string]$Name) {
-    if (Get-Process GTAIV -ErrorAction SilentlyContinue) { throw 'Close GTA IV before changing the saved DLSS quality mode.' }
-    Set-Ini 'SRProfile' ([string]$Profile)
-    Prepare-StartupStabilization
-    Write-Host "Saved DLSS quality mode: $Name" -ForegroundColor Green
-    Write-Host 'Next launch will use automatic startup stabilization, then switch to this mode.'
+function Show-Status {
+    $names = @{ '1'='Custom Ultra Quality (77%)'; '2'='Quality'; '3'='Balanced'; '4'='Performance'; '5'='Ultra Performance' }
+    $p = Get-Ini 'SRProfile'
+    $mode = Get-Ini 'Mode'
+    $passes = Get-Ini 'NRPasses'
+    $nr = if ($mode -eq '2') { 'ON' } elseif ($mode -eq '0') { 'OFF' } else { "UNKNOWN ($mode)" }
+    Write-Host ''
+    Write-Host 'Current settings' -ForegroundColor Cyan
+    Write-Host ('  DLSS quality:        ' + $(if ($names.ContainsKey($p)) { $names[$p] } else { $p }))
+    Write-Host "  Neural Rendering:    $nr"
+    Write-Host "  NR passes:           $passes"
+    Write-Host '  Startup stabilization: 1485x835 / 180 synchronized frames'
+    Write-Host ''
+    Write-Host 'Runtime files' -ForegroundColor Cyan
+    Write-Host ('  Feeder:              ' + $(if (Test-Path -LiteralPath $Feeder) { 'present' } else { 'MISSING' }))
+    Write-Host ('  Neural Rendering DLL:' + $(if (Test-Path -LiteralPath $NrDll) { ' present' } else { ' MISSING' }))
+    Write-Host ('  Log:                 ' + $(if (Test-Path -LiteralPath $Log) { 'present' } else { 'not created yet' }))
+    Write-Host ''
+    Write-Host 'Change DLSS quality and Neural Rendering in-game:' -ForegroundColor Yellow
+    Write-Host '  Home -> Add-ons -> DLSS 5 Feed -> GTA IV DLSS'
 }
 
-function Set-NeuralRendering([bool]$Enabled) {
-    if (Get-Process GTAIV -ErrorAction SilentlyContinue) { throw 'Close GTA IV before changing Neural Rendering.' }
-    if ($Enabled) {
-        if (-not (Test-Path -LiteralPath $NrDll)) { throw "Missing $NrDll. Re-run Install-DLSS-Full.bat." }
-        Set-Ini 'Mode' '2'
-        Set-Ini 'NRPasses' '1'
-        Write-Host 'DLSS 5 Neural Rendering: ON' -ForegroundColor Green
-        Write-Host 'One Neural Rendering pass will run before DLSS Super Resolution.'
-    } else {
-        Set-Ini 'Mode' '0'
-        Write-Host 'DLSS 5 Neural Rendering: OFF' -ForegroundColor Yellow
-        Write-Host 'DLSS 4.5 Super Resolution remains enabled.'
-    }
+function Repair-StartupStabilization {
+    if (Get-Process GTAIV -ErrorAction SilentlyContinue) { throw 'Close GTA IV before repairing startup settings.' }
     Prepare-StartupStabilization
+    Write-Host 'Startup stabilization settings restored.' -ForegroundColor Green
+    Write-Host 'DLSS quality, Neural Rendering state, and NR pass count were preserved.'
 }
 
 function Launch-WithStartupStabilization {
@@ -87,43 +95,32 @@ function Launch-WithStartupStabilization {
     }
 }
 
-$names = @{ '1'='Custom Ultra Quality (77%)'; '2'='Quality'; '3'='Balanced'; '4'='Performance'; '5'='Ultra Performance' }
+function Open-DiagnosticLog {
+    if (-not (Test-Path -LiteralPath $Log)) { throw "Log not found yet: $Log" }
+    Start-Process notepad.exe -ArgumentList @($Log)
+}
+
 while ($true) {
     Clear-Host
     Write-Host '====================================================================' -ForegroundColor Cyan
-    Write-Host ' GTA IV - DLSS 4.5 SUPER RESOLUTION + DLSS 5 NEURAL RENDERING' -ForegroundColor Cyan
+    Write-Host ' GTA IV - DLSS TOOLS' -ForegroundColor Cyan
+    Write-Host ' Launch / repair / diagnostics only' -ForegroundColor Cyan
     Write-Host '====================================================================' -ForegroundColor Cyan
-    $p = Get-Ini 'SRProfile'
-    $mode = Get-Ini 'Mode'
-    $nr = if ($mode -eq '2') { 'ON' } elseif ($mode -eq '0') { 'OFF' } else { 'UNKNOWN' }
-    Write-Host ("Saved DLSS quality: " + $(if ($names.ContainsKey($p)) { $names[$p] } else { $p }))
-    Write-Host "Neural Rendering: $nr"
-    Write-Host 'Startup stabilization: 1485x835 for 180 synchronized frames'
-    Write-Host ''
-    Write-Host 'DLSS 4.5 Super Resolution quality:'
-    Write-Host '  [1] Custom Ultra Quality (77%)'
-    Write-Host '  [2] Quality'
-    Write-Host '  [3] Balanced'
-    Write-Host '  [4] Performance'
-    Write-Host '  [5] Ultra Performance'
-    Write-Host ''
-    Write-Host 'DLSS 5 Neural Rendering:'
-    Write-Host '  [N] Turn Neural Rendering ON'
-    Write-Host '  [O] Turn Neural Rendering OFF'
+    Write-Host 'DLSS quality and Neural Rendering are controlled inside ReShade.'
+    Write-Host 'Home -> Add-ons -> DLSS 5 Feed -> GTA IV DLSS'
     Write-Host ''
     Write-Host '[L] Launch GTA IV with startup stabilization'
+    Write-Host '[R] Repair / re-arm startup stabilization settings'
+    Write-Host '[S] Show current DLSS / Neural Rendering status'
+    Write-Host '[D] Open DLSS diagnostic log'
     Write-Host '[Q] Quit'
     Write-Host ''
     $choice = (Read-Host 'Choose').Trim()
     switch -Regex ($choice) {
-        '^1$' { Set-DlssQuality 1 $names['1']; Read-Host 'Press Enter' | Out-Null }
-        '^2$' { Set-DlssQuality 2 $names['2']; Read-Host 'Press Enter' | Out-Null }
-        '^3$' { Set-DlssQuality 3 $names['3']; Read-Host 'Press Enter' | Out-Null }
-        '^4$' { Set-DlssQuality 4 $names['4']; Read-Host 'Press Enter' | Out-Null }
-        '^5$' { Set-DlssQuality 5 $names['5']; Read-Host 'Press Enter' | Out-Null }
-        '^[Nn]$' { Set-NeuralRendering $true; Read-Host 'Press Enter' | Out-Null }
-        '^[Oo]$' { Set-NeuralRendering $false; Read-Host 'Press Enter' | Out-Null }
         '^[Ll]$' { Launch-WithStartupStabilization; exit 0 }
+        '^[Rr]$' { Repair-StartupStabilization; Read-Host 'Press Enter' | Out-Null }
+        '^[Ss]$' { Show-Status; Read-Host 'Press Enter' | Out-Null }
+        '^[Dd]$' { Open-DiagnosticLog; Read-Host 'Press Enter' | Out-Null }
         '^[Qq]$' { exit 0 }
     }
 }
