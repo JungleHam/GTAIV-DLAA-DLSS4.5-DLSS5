@@ -1,0 +1,111 @@
+name: One-shot matched bridge pair installer fix
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/fix-matched-bridge-pair.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-installer:
+    runs-on: windows-2022
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch combined installer for matched client/server bridge pair
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $path = 'install/Install-DLSS-Full.bat'
+          $text = [IO.File]::ReadAllText($path)
+
+          function Replace-Once([string]$Old,[string]$New,[string]$Label) {
+            $script:count = ([regex]::Matches($script:text,[regex]::Escape($Old))).Count
+            if ($script:count -ne 1) { throw "${Label}: expected exactly one source match, found $script:count" }
+            $script:text = $script:text.Replace($Old,$New)
+          }
+
+          $oldBuild = @'
+        SetupVS -Platform x86
+        & meson setup --buildtype release --backend ninja _compDLSSFull --debug
+        if ($LASTEXITCODE -ne 0) { Fail "Meson setup failed: $LASTEXITCODE" }
+        Copy-Item .\Directory.Build.Props -Destination .\_compDLSSFull -Force
+        & meson compile -C _compDLSSFull d3d9
+        if ($LASTEXITCODE -ne 0) { Fail "Temporal-synchronization bridge build failed: $LASTEXITCODE" }
+'@
+          $newBuild = @'
+        SetupVS -Platform x86
+        & meson setup --buildtype release --backend ninja _compDLSSFull32 --debug
+        if ($LASTEXITCODE -ne 0) { Fail "x86 bridge client Meson setup failed: $LASTEXITCODE" }
+        Copy-Item .\Directory.Build.Props -Destination .\_compDLSSFull32 -Force
+        & meson compile -C _compDLSSFull32 d3d9
+        if ($LASTEXITCODE -ne 0) { Fail "Temporal-synchronization x86 bridge client build failed: $LASTEXITCODE" }
+
+        # b-bridge requires the 32-bit client and 64-bit server to report the same
+        # source version. Build the server from this exact pinned checkout too;
+        # keeping the older DLAA release server causes an immediate startup abort.
+        SetupVS -Platform x64
+        & meson setup --buildtype release --backend ninja _compDLSSFull64 --debug
+        if ($LASTEXITCODE -ne 0) { Fail "x64 bridge server Meson setup failed: $LASTEXITCODE" }
+        Copy-Item .\Directory.Build.Props -Destination .\_compDLSSFull64 -Force
+        & meson compile -C _compDLSSFull64 NvRemixBridge
+        if ($LASTEXITCODE -ne 0) { Fail "Matched x64 NvRemixBridge server build failed: $LASTEXITCODE" }
+'@
+          Replace-Once $oldBuild $newBuild 'dual-architecture bridge build'
+
+          $oldOutputs = @'
+    $Bridge = Join-Path $BBridge '_compDLSSFull\src\client\d3d9.dll'
+    if (-not (Test-Path -LiteralPath $Bridge)) { Fail 'Temporal-synchronization bridge d3d9.dll output is missing.' }
+
+    $bridgeHash = Hash $Bridge
+    $feederHash = Hash $Feeder
+'@
+          $newOutputs = @'
+    $Bridge = Join-Path $BBridge '_compDLSSFull32\src\client\d3d9.dll'
+    $BridgeServer = Join-Path $BBridge '_compDLSSFull64\src\server\NvRemixBridge.exe'
+    if (-not (Test-Path -LiteralPath $Bridge)) { Fail 'Temporal-synchronization x86 bridge d3d9.dll output is missing.' }
+    if (-not (Test-Path -LiteralPath $BridgeServer)) { Fail 'Matched x64 NvRemixBridge.exe output is missing.' }
+
+    $bridgeHash = Hash $Bridge
+    $serverHash = Hash $BridgeServer
+    $feederHash = Hash $Feeder
+'@
+          Replace-Once $oldOutputs $newOutputs 'bridge outputs'
+
+          Replace-Once '    Write-Host "  d3d9.dll             $bridgeHash"' "    Write-Host \"  d3d9.dll             `$bridgeHash\"`r`n    Write-Host \"  NvRemixBridge.exe    `$serverHash  (same pinned b-bridge commit)\"" 'server hash output'
+
+          Replace-Once "@('d3d9.dll','.trex\\dlss5-feed.addon64'" "@('d3d9.dll','.trex\\NvRemixBridge.exe','.trex\\dlss5-feed.addon64'" 'server backup inclusion'
+
+          $oldInstall = '    Copy-Item -LiteralPath $Bridge -Destination (Join-Path $Game ''d3d9.dll'') -Force'
+          $newInstall = @'
+    Copy-Item -LiteralPath $Bridge -Destination (Join-Path $Game 'd3d9.dll') -Force
+    Copy-Item -LiteralPath $BridgeServer -Destination (Join-Path $Trex 'NvRemixBridge.exe') -Force
+    if ((Hash (Join-Path $Game 'd3d9.dll')) -ne $bridgeHash) { Fail 'Installed x86 bridge client hash verification failed.' }
+    if ((Hash (Join-Path $Trex 'NvRemixBridge.exe')) -ne $serverHash) { Fail 'Installed x64 bridge server hash verification failed.' }
+'@
+          Replace-Once $oldInstall $newInstall 'matched bridge install'
+
+          Replace-Once '        "d3d9.dll=$bridgeHash",' "        \"d3d9.dll=`$bridgeHash\",`r`n        \"NvRemixBridge.exe=`$serverHash\"," 'server receipt hash'
+
+          [IO.File]::WriteAllText($path,$text,(New-Object Text.UTF8Encoding($false)))
+
+          $verify = [IO.File]::ReadAllText($path)
+          foreach ($marker in @('_compDLSSFull32','_compDLSSFull64','SetupVS -Platform x64','NvRemixBridge.exe=$serverHash','Installed x64 bridge server hash verification failed.')) {
+            if (-not $verify.Contains($marker)) { throw "Patched installer missing marker: $marker" }
+          }
+          git diff --check
+
+      - name: Commit installer fix
+        shell: pwsh
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add install/Install-DLSS-Full.bat
+          git commit -m 'Install matched b-bridge client and server pair'
+          git push origin HEAD:main
