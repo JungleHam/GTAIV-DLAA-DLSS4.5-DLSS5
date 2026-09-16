@@ -24,9 +24,11 @@ The repository contains:
 - original installation/orchestration scripts;
 - original documentation;
 - small configuration templates;
-- source transforms and validation scripts for the M3K/A3-S2/A3-S5 integration in historical checkpoints;
+- source transforms and validation scripts for the project's temporal synchronization and startup-stabilization integration;
 - a patching script that applies this project's ReShade 6.8.0 cross-process-input changes to upstream ReShade source;
 - the original debug proof-of-concept ReShade input add-on source.
+
+In historical source/checkpoint names, the temporal-synchronization work is called `A3-S2`, the startup-stabilization work is called `A3-S5`, and the project integration namespace is called `M3K`. Those are engineering identifiers, not separate user-facing modules.
 
 ## What this repository does not bundle
 
