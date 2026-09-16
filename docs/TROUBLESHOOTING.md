@@ -62,6 +62,24 @@ client.DirectInput.forward.keyboardPolicy = 3
 
 If ReShade accepts the foreign window but never logs `handshake complete`, troubleshoot the bridge input-message path next.
 
+## GTA IV DLSS panel is missing
+
+After Step 4, open:
+
+```text
+Home -> Add-ons -> DLSS 5 Feed -> GTA IV DLSS
+```
+
+If the **GTA IV DLSS** section is missing, Step 4 likely did not install the current public Feeder build.
+
+Re-run `Install-DLSS-Full.bat` after confirming Step 3 works.
+
+The current panel should contain:
+
+- Neural Rendering OFF/ON;
+- Neural Rendering passes (advanced);
+- DLSS Super Resolution quality.
+
 ## DLSS starts with vibration
 
 The current fix is **automatic startup stabilization**:
@@ -83,6 +101,14 @@ M3K-A3-S5: STARTUP PRIME COMPLETE after 180 synchronized SR frames
 
 Those internal strings mean the **startup stabilization** ran successfully.
 
+If the startup settings were changed or damaged, use:
+
+```text
+DLSS-Full-Control.bat -> R
+```
+
+The repair action restores only startup-stabilization settings and preserves DLSS quality, Neural Rendering state and pass count.
+
 Do not try to repair this by changing jitter phase count, projection math or jitter sign. The tested temporal-synchronization implementation is already hardware validated.
 
 Internal source/debug names:
@@ -96,7 +122,7 @@ A3-S5 = startup stabilization
 
 This can be normal across Visual Studio/MSVC versions.
 
-The installer pins the exact source checkpoints and runs the build/test gates. The recorded bridge/Feeder/shim SHA256 values identify the hardware-tested reference binaries; a newer compiler can still produce different bytes from the same validated source.
+The installer pins the frozen rendering core and runs its build/test gates. The public Feeder also contains the newer ReShade control panel, so its bytes are expected to differ from the older pre-UI hardware-reference Feeder even when the rendering core is unchanged.
 
 A source checkout/build/test failure matters. A PE hash difference by itself does not necessarily mean the build is wrong.
 
@@ -104,25 +130,25 @@ A source checkout/build/test failure matters. A PE hash difference by itself doe
 
 That is the expected default after Step 4.
 
-Use `DLSS-Full-Control.bat` and choose:
+Open:
 
 ```text
-N  Turn NR ON
+Home -> Add-ons -> DLSS 5 Feed -> GTA IV DLSS
 ```
 
-To disable it again, choose:
+and check **Neural Rendering**.
 
-```text
-O  Turn NR OFF
-```
+To disable it again, uncheck the same box.
 
-For troubleshooting only, the underlying config is:
+The ReShade setting is saved automatically. For troubleshooting only, the underlying config is:
 
 ```ini
 Mode=0   ; NR OFF
 Mode=2   ; NR ON
 NRPasses=1
 ```
+
+The runtime switch is intentionally applied through the normal safe frame/config path, so it can take up to the normal config-poll interval after clicking the checkbox.
 
 ## Neural Rendering ON but it does not start
 
@@ -146,6 +172,7 @@ The current validated NR package targets RTX 40/50. Direct project validation is
 Successful logs may include:
 
 ```text
+M3K-UI: ReShade requested Neural Rendering ON
 M3K-A0: DLSS NR runtime found
 M3K-A0: feature 18 creation SUCCESS
 M3K-A1: feature 18 evaluation SUCCESS
@@ -153,27 +180,47 @@ M3K-A1: feature 18 evaluation SUCCESS
 
 Here, `feature 18` is simply the internal NGX name for **DLSS 5 Neural Rendering**.
 
-## Neural Rendering is much slower than SR alone
+## Neural Rendering is much slower than Super Resolution alone
 
 That is expected on RTX 40 hardware. Neural Rendering adds another substantial neural processing stage before Super Resolution.
 
-The validated normal configuration is one NR pass:
+The validated normal configuration is one NR pass. In the ReShade panel, leave:
 
-```ini
-NRPasses=1
+```text
+Neural Rendering passes (advanced) = 1
 ```
 
-Do not add a second NR provider or extra neural pass while diagnosing performance.
+while diagnosing performance.
+
+Higher pass counts are experimental and intentionally not the public default.
 
 ## Need DLSS Super Resolution without Neural Rendering
 
-Use `DLSS-Full-Control.bat` and choose:
-
-```text
-O  Turn NR OFF
-```
+Open the **GTA IV DLSS** ReShade panel and turn **Neural Rendering OFF**.
 
 Super Resolution remains enabled.
+
+## DLSS quality will not change
+
+Use:
+
+```text
+Home -> Add-ons -> DLSS 5 Feed -> GTA IV DLSS
+```
+
+and select one of:
+
+```text
+Custom Ultra Quality (77%)
+Quality
+Balanced
+Performance
+Ultra Performance
+```
+
+The setting should apply live and save automatically.
+
+If a requested mode is unsupported at the current output/input combination, the integration rejects it safely and keeps the working mode.
 
 ## Need pure DLAA again
 
