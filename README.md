@@ -1,6 +1,6 @@
 # GTA IV — DLAA + DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering
 
-A guided GTA IV integration for **NVIDIA DLAA**, **DLSS 4.5 Super Resolution**, and **DLSS 5 Neural Rendering**.
+A guided GTA IV integration for **NVIDIA DLAA (native-resolution anti-aliasing)**, **DLSS 4.5 Super Resolution**, and **DLSS 5 Neural Rendering**.
 
 The supported install order is:
 
@@ -12,20 +12,20 @@ Neural Rendering is installed in the final step but stays **OFF by default** unt
 
 ## Quick install index
 
-| Step | Install | What it does | You are finished when... |
-|---|---|---|---|
-| **[1](#step-1)** | **FusionFix** | Gives GTA IV the modern renderer fixes this project builds on. | GTA IV launches normally with FusionFix installed. |
-| **[2](#step-2)** | **DLAA baseline** | Installs the bridge, ReShade, motion/depth helpers and NVIDIA DLSS runtime, then enables high-quality native-resolution DLAA. | GTA IV launches and the DLSS log reports DLAA frames being delivered. |
-| **[3](#step-3)** | **ReShade controls fix** | Makes the ReShade overlay usable even though GTA IV and the modern renderer run in different processes. | Pressing **Home** opens ReShade and the mouse/keyboard work inside it. |
-| **[4](#step-4)** | **DLSS 4.5 SR + DLSS 5 NR** | Adds real DLSS resolution scaling, the automatic startup-stability fix, and installs DLSS 5 Neural Rendering. NR remains OFF initially. | GTA IV launches through the startup stabilization and automatically switches to your saved DLSS quality mode. |
+| Step | Install | What you run | What it does | You are finished when... |
+|---|---|---|---|---|
+| **[1](#step-1)** | **FusionFix** | FusionFix 5.0.1 installer/files | Gives GTA IV the modern renderer fixes this project builds on. | GTA IV launches normally with FusionFix installed. |
+| **[2](#step-2)** | **DLAA baseline** | `Install-DLAA.bat` | Installs the bridge, ReShade, motion/depth helpers and NVIDIA DLSS runtime, then enables high-quality native-resolution anti-aliasing. | GTA IV launches and the DLSS log reports DLAA frames being delivered. |
+| **[3](#step-3)** | **ReShade controls fix** | `BUILD.bat`, then `INSTALL.bat` | Makes the ReShade overlay usable even though GTA IV and the modern renderer run in different processes. | Pressing **Home** opens ReShade and the mouse/keyboard work inside it. |
+| **[4](#step-4)** | **DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering** | `Install-DLSS-Full.bat` | Adds real DLSS resolution scaling, automatic startup stabilization, and installs Neural Rendering. Neural Rendering remains OFF initially. | GTA IV launches through startup stabilization and automatically switches to your saved DLSS quality mode. |
 
 ### What you get after all four steps
 
 - DLAA at native resolution.
 - DLSS 4.5 Super Resolution with five selectable quality modes.
 - Automatic startup stabilization before low-resolution DLSS modes are used.
-- DLSS 5 Neural Rendering already installed and ready to toggle ON/OFF.
-- A single `DLSS-Full-Control.bat` helper for quality selection, NR toggle and recommended launching.
+- DLSS 5 Neural Rendering already installed and ready to turn ON/OFF.
+- A single `DLSS-Full-Control.bat` helper for quality selection, Neural Rendering control and recommended launching.
 
 This repository contains the installers, integration code, configuration and validation. Third-party components are fetched from pinned upstream sources and verified where practical.
 
@@ -50,7 +50,7 @@ Step 4 lets GTA IV render internally at a lower resolution and then reconstructs
 
 ```text
 GTA IV internal render resolution
-  -> synchronized camera/raster jitter
+  -> synchronized temporal information
   -> depth + motion data
   -> DLSS 4.5 Super Resolution
   -> display/output resolution
@@ -112,7 +112,7 @@ The current tested configuration uses one Neural Rendering pass.
 | Steps 3–4 | Python 3 in `PATH` |
 | Steps 3–4 | Visual Studio 2022 Build Tools with **Desktop development with C++**, x86+x64 MSVC tools, and a Windows SDK |
 | Steps 2–3 | Administrator permission for the ReShade Vulkan layer |
-| DLSS 5 NR | Current automatic NR runtime is the tested RTX 40/50-compatible build; direct project validation is on RTX 4070 Ti SUPER |
+| Neural Rendering | Current automatic Neural Rendering runtime is the tested RTX 40/50-compatible build; direct project validation is on RTX 4070 Ti SUPER |
 
 ### Driver notes
 
@@ -133,7 +133,7 @@ nvngx_dlss.dll 310.9.1
 nvngx_dlssnr.dll 310.8.0-RTX40
 ```
 
-You do not need to find a separate Neural Rendering DLL or an old third-party NR injector.
+You do not need to find a separate Neural Rendering DLL or an old third-party Neural Rendering injector.
 
 # Installation
 
@@ -258,10 +258,10 @@ Choose `L` to launch GTA IV through the recommended automatic startup stabilizat
 Close GTA IV, run `DLSS-Full-Control.bat`, then choose:
 
 ```text
-N  Turn NR ON
+N  Turn Neural Rendering ON
 ```
 
-Internally this sets the project NR mode to enabled with one pass.
+Internally this enables the project's one-pass Neural Rendering path.
 
 Then choose `L` to launch.
 
@@ -270,7 +270,7 @@ Then choose `L` to launch.
 Close GTA IV, run `DLSS-Full-Control.bat`, then choose:
 
 ```text
-O  Turn NR OFF
+O  Turn Neural Rendering OFF
 ```
 
 DLSS 4.5 Super Resolution remains active; only Neural Rendering is disabled.
@@ -298,8 +298,8 @@ GTAIV\.trex\dlss5-feed.log
 For ordinary users, the easiest checks are visual:
 
 - DLAA: stable native-resolution image with improved anti-aliasing.
-- DLSS SR: the game switches from the brief startup-stabilization resolution to your selected quality mode.
-- NR ON: the game still completes the same stable startup sequence and the log reports successful Neural Rendering initialization/evaluation.
+- DLSS Super Resolution: the game switches from the brief startup-stabilization resolution to your selected quality mode.
+- Neural Rendering ON: the game still completes the same stable startup sequence and the log reports successful Neural Rendering initialization/evaluation.
 
 The log contains internal engineering labels such as `M3K-A3-S5`, `M3K-SR-LIVE`, `M3K-A0` and `M3K-A1`. These are **debug labels**, not extra install stages.
 
@@ -311,13 +311,13 @@ You may encounter these names in old test notes, source code or logs:
 
 | Internal/debug name | What it means for a user |
 |---|---|
-| `A3-S2` | **Temporal synchronization** — keeps GTA IV's camera/raster movement and DLSS jitter aligned. |
+| `A3-S2` | **Temporal synchronization** — keeps GTA IV's per-frame rendering offsets and DLSS temporal sample aligned. |
 | `A3-S5` | **Startup stabilization** — briefly starts at 1485×835 before switching to your saved DLSS quality mode. |
 | `M3K` | **Project DLSS integration layer** — internal code/config namespace used by this project. |
 | `Feature 18` / `NR18` | **DLSS 5 Neural Rendering** — NVIDIA's internal NGX feature identifier. |
 | `true source` | **Internal render resolution** — the resolution GTA IV actually renders before DLSS reconstruction. |
 | `presenter` | **Display/output resolution** — the final resolution sent to the window/monitor. |
-| `SRProfile` | **Saved DLSS quality mode** — the config key storing UQ/Quality/Balanced/Performance/UP. |
+| `SRProfile` | **Saved DLSS quality mode** — the config key storing Custom Ultra Quality/Quality/Balanced/Performance/Ultra Performance. |
 | `UQ77` | **Custom Ultra Quality (77%)** — the project's high-resolution DLSS mode. |
 
 These internal labels are retained only where they help with debugging or reproduce exact tested checkpoints.
@@ -330,11 +330,11 @@ These internal labels are retained only where they help with debugging or reprod
 | ReShade | 6.8.0 Full Add-On Support + cross-process controls fix |
 | DLSS5-Feeder | 0.15.1 upstream base + project integration changes |
 | LumeniteFX | pinned project version |
-| DLSS 4.5 SR / DLAA runtime | `nvngx_dlss.dll` 310.9.1 |
+| DLSS 4.5 Super Resolution / DLAA runtime | `nvngx_dlss.dll` 310.9.1 |
 | DLSS 5 Neural Rendering runtime | `nvngx_dlssnr.dll` 310.8.0-RTX40 |
 | Startup stabilization | 1485×835 for 180 synchronized frames, then saved DLSS mode |
 | Neural Rendering default | OFF |
-| Neural Rendering when enabled | one native NR pass before Super Resolution |
+| Neural Rendering when enabled | one native Neural Rendering pass before Super Resolution |
 
 Exact source commits, package URLs and hashes are kept in [`manifests/versions.json`](manifests/versions.json) for reproducibility.
 
@@ -345,9 +345,9 @@ Exact source commits, package URLs and hashes are kept in [`manifests/versions.j
 - The combined module currently relies on the tested `1485×835` startup stabilization before switching to the saved DLSS mode.
 - Locally compiled integration DLLs can differ byte-for-byte between Visual Studio/MSVC versions even when they are built from the exact same frozen source. Source/build/test validation is therefore more important than identical compiler output hashes.
 - DLSS 5 Neural Rendering is substantially more expensive than Super Resolution alone on RTX 40 hardware.
-- The automatic NR runtime currently follows the tested RTX 40/50 path; other GPU-generation variants are outside this validated installer flow.
+- The automatic Neural Rendering runtime currently follows the tested RTX 40/50 path; other GPU-generation variants are outside this validated installer flow.
 - The ReShade controls fix replaces the global Vulkan ReShade DLL under `C:\ProgramData\ReShade`. Restore the original before using software where a custom global graphics layer is inappropriate, especially anti-cheat titles.
-- No ray tracing or path tracing is part of this project's DLSS 4.5 SR / DLSS 5 NR implementation.
+- No ray tracing or path tracing is part of this project's DLSS 4.5 Super Resolution / DLSS 5 Neural Rendering implementation.
 
 ## Repository layout
 
@@ -370,8 +370,8 @@ tools/debug/                     Historical/debugging tools
 - [DLSS5-Feeder](https://github.com/jlrouzies-fr/DLSS5-Feeder) — jlrouzies-fr and contributors
 - [LumeniteFX](https://github.com/umar-afzaal/LumeniteFX) — umar-afzaal and contributors
 - [NVIDIA](https://developer.nvidia.com/rtx/dlss) — NGX / DLSS technology and runtimes
-- [RankFTW/rhi-repo](https://github.com/RankFTW/rhi-repo) — pinned DLSS SR and RTX40-compatible NR runtime packages
-- [DLSS5 Autopilot](https://github.com/Kizzuwatnaa/DLSS5-Autopilot) — compatibility research around DLSS 5 NR GPU/runtime variants
+- [RankFTW/rhi-repo](https://github.com/RankFTW/rhi-repo) — pinned DLSS Super Resolution and RTX40-compatible Neural Rendering runtime packages
+- [DLSS5 Autopilot](https://github.com/Kizzuwatnaa/DLSS5-Autopilot) — compatibility research around DLSS 5 Neural Rendering GPU/runtime variants
 - **Rockstar Games** — Grand Theft Auto IV
 
 See [`docs/THIRD-PARTY.md`](docs/THIRD-PARTY.md).
