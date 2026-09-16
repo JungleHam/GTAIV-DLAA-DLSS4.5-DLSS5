@@ -218,7 +218,7 @@ try {
     Set-KeyEquals $feedCfg 'mode' '2'
     Set-KeyEquals $feedCfg 'work_resolution' '100'
 
-    $controlUrl = 'https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS5/b78931d2069d0d38a2f2e7a38d8ed75ac889b071/install/DLSS-Full-Control.bat'
+    $controlUrl = 'https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS5/main/install/DLSS-Full-Control.bat'
     $controlPath = Join-Path $Game 'DLSS-Full-Control.bat'
     Write-Host 'Installing DLSS-Full-Control.bat...' -ForegroundColor Cyan
     $curl = Get-Command curl.exe -ErrorAction SilentlyContinue
