@@ -1,0 +1,75 @@
+name: Test legacy DLSS Full uninstaller
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/test-legacy-uninstaller.yml'
+
+jobs:
+  test:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run uninstaller against pre-presenter legacy backup
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $g = Join-Path $env:RUNNER_TEMP 'GTAIV-legacy-uninstall-test'
+          New-Item -ItemType Directory -Path $g -Force | Out-Null
+          New-Item -ItemType File -Path (Join-Path $g 'GTAIV.exe') -Force | Out-Null
+
+          function Put([string]$rel,[string]$text) {
+            $p = Join-Path $g $rel
+            $d = Split-Path -Parent $p
+            if ($d -and -not (Test-Path $d)) { New-Item -ItemType Directory -Path $d -Force | Out-Null }
+            [IO.File]::WriteAllText($p,$text)
+          }
+
+          # Simulated current DLSS Full runtime.
+          Put 'd3d9.dll' 'FULL-client'
+          Put '.trex\NvRemixBridge.exe' 'FULL-server'
+          Put '.trex\d3d9vk_x64.dll' 'FULL-M3K-presenter'
+          Put '.trex\dlss5-feed.addon64' 'FULL-feeder'
+          Put '.trex\dlss5-feed.cfg' 'FULL-config'
+          Put '.trex\m3k-nr.ini' 'FULL-ini'
+          Put '.trex\m3k\m3k-nvngx.dll' 'FULL-shim'
+          Put '.trex\m3k\nvngx_dlssnr.dll' 'FULL-NR'
+          Put 'DLSS-Full-Control.bat' 'FULL-control'
+          Put 'DLSS_FULL_INSTALLED.txt' 'FULL-receipt'
+
+          # Simulated backup created by Full installer revisions from before
+          # d3d9vk_x64.dll was added to the backup list.
+          $b = Join-Path $g '_DLSS_FULL_PREINSTALL_BACKUP_20260912_000000'
+          New-Item -ItemType Directory -Path $b -Force | Out-Null
+          function PutB([string]$rel,[string]$text) {
+            $p = Join-Path $b $rel
+            $d = Split-Path -Parent $p
+            if ($d -and -not (Test-Path $d)) { New-Item -ItemType Directory -Path $d -Force | Out-Null }
+            [IO.File]::WriteAllText($p,$text)
+          }
+          PutB 'd3d9.dll' 'DLAA-client'
+          PutB '.trex\NvRemixBridge.exe' 'DLAA-server'
+          PutB '.trex\dlss5-feed.addon64' 'DLAA-feeder'
+          PutB '.trex\dlss5-feed.cfg' 'DLAA-config'
+          if (Test-Path (Join-Path $b '.trex\d3d9vk_x64.dll')) { throw 'Synthetic legacy backup unexpectedly has presenter' }
+
+          Copy-Item '.\install\Uninstall-DLSS-Full.bat' (Join-Path $g 'Uninstall-DLSS-Full.bat') -Force
+          Push-Location $g
+          try {
+            & .\Uninstall-DLSS-Full.bat
+            if ($LASTEXITCODE -ne 0) { throw "Uninstaller returned $LASTEXITCODE" }
+          } finally { Pop-Location }
+
+          if ([IO.File]::ReadAllText((Join-Path $g 'd3d9.dll')) -ne 'DLAA-client') { throw 'DLAA client was not restored from legacy backup' }
+          if ([IO.File]::ReadAllText((Join-Path $g '.trex\NvRemixBridge.exe')) -ne 'DLAA-server') { throw 'DLAA server was not restored from legacy backup' }
+          if (-not (Test-Path (Join-Path $g '.trex\d3d9vk_x64.dll'))) { throw 'Stock presenter was not reconstructed' }
+          if ((Get-Item (Join-Path $g '.trex\d3d9vk_x64.dll')).Length -lt 1MB) { throw 'Reconstructed presenter is unexpectedly small' }
+          foreach ($rel in @('.trex\m3k-nr.ini','.trex\m3k\m3k-nvngx.dll','.trex\m3k\nvngx_dlssnr.dll','DLSS-Full-Control.bat','DLSS_FULL_INSTALLED.txt')) {
+            if (Test-Path (Join-Path $g $rel)) { throw "Full-only file remains: $rel" }
+          }
+          $safety = @(Get-ChildItem $g -Directory -Filter '_DLSS_FULL_UNINSTALL_SAFETY_*')
+          if ($safety.Count -ne 1) { throw "Expected one safety backup, got $($safety.Count)" }
+          $tempLeft = @(Get-ChildItem $env:RUNNER_TEMP -Directory -Filter 'GTAIV_DLSS_FULL_UNINSTALL_*' -ErrorAction SilentlyContinue)
+          if ($tempLeft.Count -ne 0) { throw 'Temporary uninstaller folder was not cleaned' }
+          Write-Host 'Legacy backup end-to-end uninstall test PASSED.' -ForegroundColor Green
