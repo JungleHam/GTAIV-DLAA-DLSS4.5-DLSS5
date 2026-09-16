@@ -49,6 +49,8 @@ function Assert-SHA256([string]$Path,[string]$Expected) {
 
 function Download-File([string]$Url,[string]$Dest) {
     Write-Host "Downloading: $Url" -ForegroundColor Cyan
+    Write-Host "  Temporary file: $Dest" -ForegroundColor DarkGray
+    Write-Host '  This download will be deleted automatically after use, including if installation fails.' -ForegroundColor DarkGray
     $curl = Get-Command curl.exe -ErrorAction SilentlyContinue
     if ($curl) {
         & curl.exe -L --fail --retry 3 --connect-timeout 20 --silent --show-error -o $Dest $Url
@@ -57,6 +59,21 @@ function Download-File([string]$Url,[string]$Dest) {
         Invoke-WebRequest -UseBasicParsing -Uri $Url -OutFile $Dest
     }
     if (-not (Test-Path -LiteralPath $Dest)) { Fail "Downloaded file is missing: $Dest" }
+}
+
+function Remove-TemporaryInstallerFiles {
+    if (-not (Test-Path -LiteralPath $Temp)) { return }
+    Write-Host "Cleaning temporary installer files: $Temp" -ForegroundColor DarkGray
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        try {
+            Remove-Item -LiteralPath $Temp -Recurse -Force -ErrorAction Stop
+            Write-Host 'Temporary installer files deleted.' -ForegroundColor DarkGray
+            return
+        } catch {
+            if ($attempt -lt 3) { Start-Sleep -Milliseconds 300 }
+            else { Write-Host ("WARNING: Could not completely remove temporary installer folder: " + $_.Exception.Message) -ForegroundColor Yellow }
+        }
+    }
 }
 
 function Write-NoBom([string]$Path,[string[]]$Lines) {
@@ -125,8 +142,10 @@ try {
     Write-Host 'Default DLSS Super Resolution quality: Quality.' -ForegroundColor Yellow
     Write-Host 'After installation, change quality and Neural Rendering directly inside the ReShade menu.' -ForegroundColor Yellow
 
-    if (Test-Path -LiteralPath $Temp) { Remove-Item -LiteralPath $Temp -Recurse -Force }
+    Remove-TemporaryInstallerFiles
     New-Item -ItemType Directory -Path $Temp -Force | Out-Null
+    Write-Host "Temporary download/work folder: $Temp" -ForegroundColor DarkGray
+    Write-Host 'Everything downloaded, cloned, or built in this folder will be deleted automatically after use, including if installation fails.' -ForegroundColor DarkGray
 
     Write-Host ''
     Write-Host 'Downloading the tested DLSS 5 Neural Rendering runtime for RTX 40/50...' -ForegroundColor Cyan
@@ -139,6 +158,8 @@ try {
     if (-not $NrDll) { Fail 'nvngx_dlssnr.dll was not found in the pinned NR package.' }
     Assert-SHA256 $NrDll.FullName $NrDllHash
 
+    Write-Host "Downloading/cloning project source into temporary folder: $Project" -ForegroundColor DarkGray
+    Write-Host 'This source checkout will be deleted automatically after use, including if installation fails.' -ForegroundColor DarkGray
     Run $Git @('clone','--filter=blob:none',$RepoUrl,$Project) 'Cloning project source'
     Run $Git @('-C',$Project,'checkout',$Checkpoint) 'Checking out the frozen tested project checkpoint'
     $head = (& $Git -C $Project rev-parse HEAD).Trim()
@@ -175,8 +196,11 @@ try {
 
     Write-Host ''
     Write-Host 'Building the tested temporal-synchronization bridge...' -ForegroundColor Cyan
+    Write-Host "Downloading/cloning b-bridge source into temporary folder: $BBridge" -ForegroundColor DarkGray
+    Write-Host 'This source checkout and its submodules will be deleted automatically after use, including if installation fails.' -ForegroundColor DarkGray
     Run $Git @('clone','--filter=blob:none','https://github.com/gutbash/b-bridge.git',$BBridge) 'Cloning pinned b-bridge source'
     Run $Git @('-C',$BBridge,'checkout',$BBridgeCommit) 'Checking out pinned b-bridge commit'
+    Write-Host "Downloading b-bridge submodules into temporary folder: $BBridge" -ForegroundColor DarkGray
     Run $Git @('-C',$BBridge,'submodule','update','--init','--recursive') 'Preparing b-bridge submodules'
     $bhead = (& $Git -C $BBridge rev-parse HEAD).Trim()
     if ($bhead -ne $BBridgeCommit) { Fail "Wrong b-bridge revision: $bhead" }
@@ -190,7 +214,9 @@ try {
 
     Run $Python @('-m','venv',$Venv) 'Creating temporary Python build environment'
     $Vpy = Join-Path $Venv 'Scripts\python.exe'
-    Run $Vpy @('-m','pip','install','--disable-pip-version-check','meson==0.64.1','ninja==1.11.1.1') 'Installing pinned Meson/Ninja build tools'
+    Write-Host "Downloading temporary Python build tools into: $Venv" -ForegroundColor DarkGray
+    Write-Host 'pip cache is disabled; the temporary environment will be deleted automatically after use, including if installation fails.' -ForegroundColor DarkGray
+    Run $Vpy @('-m','pip','install','--disable-pip-version-check','--no-cache-dir','meson==0.64.1','ninja==1.11.1.1') 'Installing pinned Meson/Ninja build tools'
     $oldPath = $env:PATH
     $env:PATH = (Join-Path $Venv 'Scripts') + ';' + $env:PATH
     Push-Location $BBridge
@@ -276,9 +302,11 @@ try {
     Set-KeyEquals $feedCfg 'work_resolution' '100'
 
     $controlPath = Join-Path $Game 'DLSS-Full-Control.bat'
+    $controlTemp = Join-Path $Temp 'DLSS-Full-Control.bat'
     Write-Host 'Installing DLSS-Full-Control.bat (launch / repair / diagnostics)...' -ForegroundColor Cyan
-    Download-File $ControlUrl $controlPath
-    Assert-SHA256 $controlPath $ControlHash
+    Download-File $ControlUrl $controlTemp
+    Assert-SHA256 $controlTemp $ControlHash
+    Copy-Item -LiteralPath $controlTemp -Destination $controlPath -Force
 
     $receipt = @(
         'GTA IV DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering installation receipt',
@@ -330,8 +358,8 @@ catch {
     exit 1
 }
 finally {
+    Remove-TemporaryInstallerFiles
     if ($TranscriptStarted) { try { Stop-Transcript | Out-Null } catch {} }
-    if (Test-Path -LiteralPath $Temp) { try { Remove-Item -LiteralPath $Temp -Recurse -Force -ErrorAction SilentlyContinue } catch {} }
 }
 
 exit 0

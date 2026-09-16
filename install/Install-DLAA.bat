@@ -27,6 +27,8 @@ function Is-Admin {
 
 function Download-File([string]$Url, [string]$Dest) {
     Write-Host "Downloading: $Url" -ForegroundColor Cyan
+    Write-Host "  Temporary file: $Dest" -ForegroundColor DarkGray
+    Write-Host '  This download will be deleted automatically after use, including if installation fails.' -ForegroundColor DarkGray
     $curl = Get-Command curl.exe -ErrorAction SilentlyContinue
     if ($curl) {
         & curl.exe -L --fail --retry 3 --connect-timeout 20 --silent --show-error -o $Dest $Url
@@ -87,6 +89,21 @@ function Copy-IfExists([string]$Source, [string]$Destination) {
     }
 }
 
+function Remove-TemporaryInstallerFiles {
+    if (-not (Test-Path -LiteralPath $Temp)) { return }
+    Write-Host "Cleaning temporary installer files: $Temp" -ForegroundColor DarkGray
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        try {
+            Remove-Item -LiteralPath $Temp -Recurse -Force -ErrorAction Stop
+            Write-Host 'Temporary installer files deleted.' -ForegroundColor DarkGray
+            return
+        } catch {
+            if ($attempt -lt 3) { Start-Sleep -Milliseconds 300 }
+            else { Write-Host ("WARNING: Could not completely remove temporary installer folder: " + $_.Exception.Message) -ForegroundColor Yellow }
+        }
+    }
+}
+
 if (-not (Is-Admin)) {
     Write-Host "Administrator permission is required once for the ReShade Vulkan layer." -ForegroundColor Yellow
     $p = Start-Process -FilePath $Self -Verb RunAs -Wait -PassThru
@@ -131,8 +148,10 @@ try {
     Copy-IfExists $ffIni (Join-Path $Backup 'plugins\GTAIV.EFLC.FusionFix.ini')
     Write-Host "Backup: $Backup" -ForegroundColor DarkGray
 
-    if (Test-Path -LiteralPath $Temp) { Remove-Item -LiteralPath $Temp -Recurse -Force }
+    Remove-TemporaryInstallerFiles
     New-Item -ItemType Directory -Path $Temp -Force | Out-Null
+    Write-Host "Temporary download/work folder: $Temp" -ForegroundColor DarkGray
+    Write-Host 'Everything downloaded into this folder will be deleted automatically after use, including if installation fails.' -ForegroundColor DarkGray
     $bZip = Join-Path $Temp 'bbridge.zip'; $fZip = Join-Path $Temp 'feeder.zip'; $lZip = Join-Path $Temp 'lumenite.zip'; $dZip = Join-Path $Temp 'dlss.zip'
 
     Download-File 'https://github.com/gutbash/b-bridge/releases/download/v0.1.0/b-bridge-0.1.0.zip' $bZip
@@ -205,7 +224,17 @@ try {
     Copy-Item -LiteralPath $dlssDll.FullName -Destination (Join-Path $Trex 'nvngx_dlss.dll') -Force
 
     $hdrBase = 'https://raw.githubusercontent.com/crosire/reshade-shaders/6db142b4b1a05c764222e5b0bd9a644b7ccfe1dc/Shaders'
-    Download-File "$hdrBase/ReShade.fxh" (Join-Path $shaderDir 'ReShade.fxh'); Download-File "$hdrBase/ReShadeUI.fxh" (Join-Path $shaderDir 'ReShadeUI.fxh'); Download-File "$hdrBase/DrawText.fxh" (Join-Path $shaderDir 'DrawText.fxh')
+    $headersTemp = Join-Path $Temp 'reshade-headers'
+    New-Item -ItemType Directory -Path $headersTemp -Force | Out-Null
+    $hdrReShade = Join-Path $headersTemp 'ReShade.fxh'
+    $hdrReShadeUI = Join-Path $headersTemp 'ReShadeUI.fxh'
+    $hdrDrawText = Join-Path $headersTemp 'DrawText.fxh'
+    Download-File "$hdrBase/ReShade.fxh" $hdrReShade
+    Download-File "$hdrBase/ReShadeUI.fxh" $hdrReShadeUI
+    Download-File "$hdrBase/DrawText.fxh" $hdrDrawText
+    Copy-Item -LiteralPath $hdrReShade -Destination (Join-Path $shaderDir 'ReShade.fxh') -Force
+    Copy-Item -LiteralPath $hdrReShadeUI -Destination (Join-Path $shaderDir 'ReShadeUI.fxh') -Force
+    Copy-Item -LiteralPath $hdrDrawText -Destination (Join-Path $shaderDir 'DrawText.fxh') -Force
     Set-IniValue $rsIni 'GENERAL' 'EffectSearchPaths' '.\reshade-shaders\Shaders'; Set-IniValue $rsIni 'GENERAL' 'TextureSearchPaths' '.\reshade-shaders\Textures'; Set-IniValue $rsIni 'GENERAL' 'PresetPath' '.\ReShadePreset.ini'; Set-IniValue $rsIni 'ADDON' 'AddonPath' '.\'
     Write-NoBom (Join-Path $Trex 'ReShadePreset.ini') @('Techniques=Lumenite_Kernel@lumenite_Kernel.fx,DLSS5_Feed@DLSS5_Feed.fx','TechniqueSorting=Lumenite_Kernel@lumenite_Kernel.fx,DLSS5_Feed@DLSS5_Feed.fx,DLSS5_Feed_Debug@DLSS5_Feed.fx','','[DLSS5_Feed.fx]','PreprocessorDefinitions=DLSS5_MV_PROVIDER=3')
     Write-NoBom (Join-Path $Trex 'dlss5-feed.cfg') @('enabled=1','mode=2','work_resolution=100')
@@ -240,7 +269,7 @@ Runtime proof after launch should include in .trex\dlss5-feed.log:
 - frame ... delivered
 "@
     [IO.File]::WriteAllText((Join-Path $Game 'DLAA_INSTALL_MANIFEST.txt'), $manifest, (New-Object Text.UTF8Encoding($false)))
-    if (Test-Path -LiteralPath $Temp) { Remove-Item -LiteralPath $Temp -Recurse -Force }
+    Remove-TemporaryInstallerFiles
 
     Write-Host ''; Write-Host '========================================================' -ForegroundColor Green; Write-Host ' SUCCESS: GTA IV DLAA STACK INSTALLED' -ForegroundColor Green; Write-Host '========================================================' -ForegroundColor Green
     Write-Host 'Launch GTA IV normally through Steam/Rockstar.' -ForegroundColor White
@@ -267,7 +296,7 @@ catch {
         }
         Write-Host 'Rollback completed where possible.' -ForegroundColor Green
     } catch { Write-Host ('Rollback error: ' + $_.Exception.Message) -ForegroundColor Red }
-    if (Test-Path -LiteralPath $Temp) { try { Remove-Item -LiteralPath $Temp -Recurse -Force } catch {} }
+    Remove-TemporaryInstallerFiles
     if ($TranscriptStarted) { try { Stop-Transcript | Out-Null } catch {}; $TranscriptStarted = $false }
     Write-Host "Details were written to: $Log" -ForegroundColor Yellow
     Read-Host 'Press Enter to close'; exit 1
