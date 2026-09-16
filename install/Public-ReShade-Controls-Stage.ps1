@@ -94,13 +94,14 @@ $passesNew = @'
 
         const UINT requested = M3kRequestedNrPasses();
         ImGui::TextUnformatted("Neural Rendering passes (advanced)");
+        ImGui::TextWrapped("1 pass is the tested public default. Higher counts are experimental, may hitch while warming, and can cost significant performance.");
 '@
 $feed = Replace-ExactOnce $feed $passesAnchor $passesNew 'NR toggle and pass label'
 
-$feed = Replace-ExactOnce $feed `
-    '        ImGui::TextWrapped("First use of a higher count may hitch briefly while its independent NR feature is created. Click 5 once to warm all five, then 1-5 comparisons are immediate without restarting GTA.");' `
-    '        ImGui::TextWrapped("1 pass is the tested public default. Higher counts are experimental, may hitch while warming, and can cost significant performance.");' `
-    'NR pass guidance'
+# Remove the old experiment-oriented "Click 5 once" hint if that exact historical
+# wording is still present. Later frozen stages are allowed to have already changed it.
+$oldWarmHintPattern = '(?m)^\s*ImGui::TextWrapped\("[^"\r\n]*Click 5 once[^"\r\n]*"\);\r?\n?'
+$feed = [regex]::Replace($feed, $oldWarmHintPattern, '')
 
 $qualityOld = @'
         ImGui::Spacing();
