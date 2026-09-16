@@ -1,0 +1,88 @@
+name: Steam Overlay Bridge Hotfix Test
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'install/Public-BBridge-Steam-Overlay-Fix.py'
+      - '.github/workflows/steam-overlay-hotfix-test.yml'
+  workflow_dispatch:
+
+jobs:
+  build-test-client:
+    runs-on: windows-2022
+    timeout-minutes: 35
+    steps:
+      - name: Checkout public repo
+        uses: actions/checkout@v4
+
+      - name: Checkout frozen project scripts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git clone --filter=blob:none https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5.git _project
+          git -C _project checkout 57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f
+          if ((git -C _project rev-parse HEAD).Trim() -ne '57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f') { throw 'Wrong frozen project checkpoint' }
+
+      - name: Clone and patch exact b-bridge source
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git clone --filter=blob:none https://github.com/gutbash/b-bridge.git _bbridge
+          git -C _bbridge checkout 1dad5e6d4dcf8647e354aa9a87f611256fb61142
+          git -C _bbridge submodule update --init --recursive
+          if ((git -C _bbridge rev-parse HEAD).Trim() -ne '1dad5e6d4dcf8647e354aa9a87f611256fb61142') { throw 'Wrong b-bridge revision' }
+
+          python .\_project\tools\m3k-nr\a2-s21-bbridge-ui.py .\_bbridge
+          if ($LASTEXITCODE -ne 0) { throw 'UI virtualization patch failed' }
+          python .\_project\tools\m3k-nr\a3-s2-bbridge-coherent-draw-jitter.py .\_bbridge
+          if ($LASTEXITCODE -ne 0) { throw 'Temporal synchronization patch failed' }
+          python .\install\Public-BBridge-Steam-Overlay-Fix.py .\_bbridge
+          if ($LASTEXITCODE -ne 0) { throw 'Steam overlay exception patch failed' }
+
+          git -C _bbridge diff --check
+          if ($LASTEXITCODE -ne 0) { throw 'Patched source diff check failed' }
+
+          $window = Get-Content .\_bbridge\src\client\window.cpp -Raw
+          foreach ($marker in @('[M3K-UI] config','[M3K-STEAM]','gameoverlayrenderer.dll','_ReturnAddress()','!steamOverlay && M3kUiVirtualActive')) {
+            if (-not $window.Contains($marker)) { throw "Missing Steam hotfix marker: $marker" }
+          }
+          if ($window.Contains('[M3K-UI-STARTUP]')) { throw 'Rejected startup-resync patch leaked into hotfix build' }
+
+      - name: Setup pinned Meson
+        shell: pwsh
+        run: python -m pip install --disable-pip-version-check --no-cache-dir meson==0.64.1 ninja==1.11.1.1
+
+      - name: Build x86 bridge client only
+        shell: pwsh
+        working-directory: _bbridge
+        run: |
+          $ErrorActionPreference = 'Stop'
+          . .\build_common.ps1
+          SetupVS -Platform x86
+          meson setup --buildtype release --backend ninja _compSteam32 --debug
+          Copy-Item .\Directory.Build.Props -Destination .\_compSteam32 -Force
+          meson compile -C _compSteam32 d3d9
+          if ($LASTEXITCODE -ne 0) { throw 'x86 Steam hotfix build failed' }
+
+          $dll = '.\_compSteam32\src\client\d3d9.dll'
+          if (-not (Test-Path $dll)) { throw 'd3d9.dll missing' }
+          $bytes = [IO.File]::ReadAllBytes($dll)
+          $ascii = [Text.Encoding]::ASCII.GetString($bytes)
+          foreach ($marker in @('remix-main+1dad5e6d','[M3K-UI] config','[M3K-STEAM]')) {
+            if (-not $ascii.Contains($marker)) { throw "Built DLL missing marker: $marker" }
+          }
+          if ($ascii.Contains('[M3K-UI-STARTUP]')) { throw 'Built DLL contains rejected startup-resync patch' }
+          $hash = (Get-FileHash -Algorithm SHA256 $dll).Hash.ToUpperInvariant()
+          Set-Content -LiteralPath '.\_compSteam32\src\client\SHA256.txt' -Value $hash -Encoding ascii
+          Write-Host "STEAM_HOTFIX_D3D9_SHA256=$hash"
+
+      - name: Upload isolated hotfix binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: steam-overlay-hotfix-d3d9
+          path: |
+            _bbridge/_compSteam32/src/client/d3d9.dll
+            _bbridge/_compSteam32/src/client/SHA256.txt
+          if-no-files-found: error
+          retention-days: 7
