@@ -1,4 +1,4 @@
-name: TEMP Public Startup Prime Fix Hash
+name: TEMP Public Startup Fix Hashes
 
 on:
   push:
@@ -11,14 +11,26 @@ jobs:
   hash:
     runs-on: windows-2022
     steps:
-      - name: Download immutable raw stage and print SHA256
+      - name: Download immutable raw stages and print SHA256
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $commit = 'dfc68aea19a295ca09f68c3a7ee07eb19068f41b'
-          $url = "https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/$commit/install/Public-Startup-Prime-Fix-Stage.ps1"
-          $out = Join-Path $env:RUNNER_TEMP 'Public-Startup-Prime-Fix-Stage.raw.ps1'
-          Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $out
-          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $out).Hash.ToUpperInvariant()
-          Write-Host "RAW_SHA256=$hash"
-          Get-Content -LiteralPath $out -TotalCount 8
+          $items = @(
+            @{
+              Name='PRIME_FIX';
+              Commit='dfc68aea19a295ca09f68c3a7ee07eb19068f41b';
+              Path='install/Public-Startup-Prime-Fix-Stage.ps1'
+            },
+            @{
+              Name='UI_FIX';
+              Commit='d4e4c18ae1c4f0907c58b8cdd88813e19985e798';
+              Path='install/Public-BBridge-Startup-UI-Fix.py'
+            }
+          )
+          foreach ($item in $items) {
+            $url = "https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/$($item.Commit)/$($item.Path)"
+            $out = Join-Path $env:RUNNER_TEMP ([IO.Path]::GetFileName($item.Path))
+            Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $out
+            $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $out).Hash.ToUpperInvariant()
+            Write-Host "$($item.Name)_RAW_SHA256=$hash"
+          }
