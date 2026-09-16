@@ -1,17 +1,17 @@
 # Architecture
 
-The unusual part of this setup is that GTA IV itself is still a 32-bit Direct3D 9 application, while the post-processing and NGX work occurs in a separate 64-bit process.
+GTA IV remains a 32-bit Direct3D 9 application, while ReShade, NGX and the modern rendering stages run in the 64-bit b-bridge renderer process.
 
-## Rendering path
+## Process / renderer split
 
 ```text
 GTAIV.exe (32-bit)
   |
   | dinput8.dll
-  +--> FusionFix ASI
+  +--> FusionFix
   |
   | d3d9.dll
-  +--> b-bridge client
+  +--> A3-S2 b-bridge client
           |
           | IPC / bridge protocol
           v
@@ -20,67 +20,102 @@ GTAIV.exe (32-bit)
           +--> .trex\d3d9vk_x64.dll
           |      -> Vulkan
           |
-          +--> ReShade 6.8.0 x64 Vulkan layer
+          +--> ReShade 6.8.0 x64
                   |
-                  +--> Lumenite_Kernel
-                  |      -> estimated motion vectors + depth
+                  +--> LumeniteFX
+                  |      -> depth + estimated motion vectors
                   |
-                  +--> DLSS5-Feeder
-                         -> nvngx_dlss.dll
-                         -> NGX DLAA
+                  +--> A3-S5 DLSS5-Feeder / M3K
                          |
-                         +--> optional Deep Fried Chicken
-                                -> nvngx_dlssnr.dll
-                                -> NGX Feature 18 / Neural Rendering
+                         +--> nvngx_dlss.dll 310.9.1
+                         |      -> DLAA / DLSS 4.5 Super Resolution
+                         |
+                         +--> .trex\m3k\m3k-nvngx.dll
+                         +--> .trex\m3k\nvngx_dlssnr.dll
+                                -> NGX Feature 18 / DLSS 5 Neural Rendering
 ```
 
-The important consequence is that x64 ReShade add-ons, Feeder, DFC and the NGX DLLs belong next to `NvRemixBridge.exe` in `.trex`, **not** beside the 32-bit GTA executable as normal in-process DLLs.
+There is no Deep Fried Chicken stage in the current architecture.
 
-## Why b-bridge is necessary
+## DLAA baseline
 
-The working solution does not use ordinary in-process x86 DXVK for the complete pipeline. b-bridge transports the game's D3D9 work into a 64-bit server process, which gives ReShade and modern x64 NGX components a usable host.
-
-The known-good b-bridge package bundles a non-RTX DXVK server path. A healthy bridge log identifies standard/non-RTX DXVK.
-
-## DLAA guide data
-
-GTA IV does not provide the modern guide buffers expected by DLSS. The setup therefore uses:
-
-- depth exposed to ReShade;
-- LumeniteFX Kernel as `DLSS5_MV_PROVIDER=3`;
-- Feeder as the DLSS integration layer.
-
-The motion vectors are estimated rather than engine-native. They have nevertheless been observed to produce valid, continuously changing motion-vector data and stable DLAA operation.
-
-## Neural Rendering relationship to DLAA
-
-DFC's successful log reports the neural input as the resolved output of the first DLAA pass. Therefore:
+Step 2 establishes a native-resolution DLAA path:
 
 ```text
-DFC off:
-scene -> DLAA -> output
-
-DFC on:
-scene -> DLAA -> DLSS 5 Neural Rendering -> output
+scene -> Lumenite depth/MV guides -> NGX DLAA -> output
 ```
 
-The useful user-facing switch is **DLAA** versus **DLAA + Neural Rendering**.
+The base DLAA install intentionally excludes the NR runtime so the known-good baseline can be verified before the combined module is added.
 
-## Why stock ReShade input fails
+## DLSS 4.5 Super Resolution
 
-The rendered swap chain references GTA's window, but that window is owned by `GTAIV.exe`. ReShade is running in `NvRemixBridge.exe`.
+Step 4 replaces the stock b-bridge client/Feeder path with the frozen A3-S2/A3-S5 integration.
 
-Stock ReShade 6.8.0 checks the window owner before registering its normal input capture and rejects a HWND created by another process.
+A3-S2 keeps GTA's canonical shader constants unmodified and applies a complete c8-c11 projective WVP jitter only at the draw boundary. All four D3D9 draw paths are synchronized, and non-eligible draws restore the canonical unjittered WVP.
 
-b-bridge, however, still contains the old RTX Remix cross-process input machinery:
+The bridge publishes the exact jitter sample through:
+
+```text
+Local\M3K_GTAIV_Jitter_v1
+```
+
+The Feeder consumes the same sample for DLSS. That coherent draw-boundary architecture fixed the earlier spatially inconsistent wobble and is the accepted temporal baseline.
+
+## Startup prime
+
+Cold-start low-resolution vibration was isolated to a narrow good source-resolution region rather than a DLSS quality-mode enum.
+
+Known hardware observations:
+
+```text
+1472x828  -> vibration remains
+1478x832  -> fixed
+1485x835  -> fixed
+1493x840  -> vibration remains
+```
+
+A3-S5 therefore starts each primed launch at `1485x835`, waits for 180 synchronized SR frames with the A3-S2 jitter handoff active, then releases to the saved SR profile and resets temporal history.
+
+## Native DLSS 5 Neural Rendering
+
+The combined module installs the tested NR runtime but leaves it disabled:
+
+```ini
+Mode=0
+NRPasses=1
+```
+
+When the user enables `Mode=2`, the current production order is:
+
+```text
+true GTA source color
+ -> native NGX Feature 18 / DLSS 5 NR
+ -> DLSS 4.5 Super Resolution
+ -> presenter resolution
+```
+
+Feature 18 is owned directly by the M3K/Feeder integration. NR and SR share the same source-size guide domain and synchronized temporal-jitter contract.
+
+The tested configuration uses one NR pass. Multi-pass work existed during research, but the current user-facing module intentionally exposes the proven single-pass path.
+
+## Motion vectors
+
+GTA IV does not provide modern engine-native DLSS motion vectors. LumeniteFX supplies estimated motion vectors and depth through ReShade.
+
+For SR, the guide textures are resized to the true source dimensions. The M3K adapter scales the motion-vector coordinate contract with the render/output ratio; this was audited and is intentionally retained.
+
+## ReShade input patch
+
+The swap chain references GTA's HWND, but ReShade runs in `NvRemixBridge.exe`. Stock ReShade therefore refuses normal input capture because the window belongs to another process.
+
+b-bridge already transports DirectInput state through its old Remix message channel. The patch under `tools/reshade-bbridge-input/` reconnects that channel to ReShade's normal input system:
 
 ```text
 GTA DirectInput
- -> b-bridge converts DirectInput state to WM_* messages
- -> UWM_REMIX_BRIDGE_REGISTER_THREADPROC_MSG channel
- -> renderer-side thread
+ -> b-bridge x86
+ -> cross-process WM_* messages
+ -> patched ReShade x64
+ -> normal ReShade input / ImGui
 ```
 
-The original renderer-side consumer is absent when b-bridge is used with ordinary DXVK.
-
-The patch in `tools/reshade-bbridge-input/` restores that consumer inside ReShade itself, routes the messages into ReShade's existing input object, and sends `UWM_REMIX_UIACTIVE_MSG` back to GTA so the game does not also consume clicks while the overlay is active.
+It also sends `UWM_REMIX_UIACTIVE_MSG` back to GTA so clicks/keys are not consumed by both the overlay and the game.
