@@ -31,6 +31,8 @@ jobs:
           $installer = Get-Content install/Install-DLSS-Full.bat -Raw
           $control = Get-Content install/DLSS-Full-Control.bat -Raw
           $uiStage = Get-Content install/Public-ReShade-Controls-Stage.ps1 -Raw
+          $uiStageHash = (Get-FileHash -Algorithm SHA256 install/Public-ReShade-Controls-Stage.ps1).Hash.ToUpperInvariant()
+          Write-Host "Public ReShade controls stage SHA256: $uiStageHash"
           $manifest = Get-Content manifests/versions.json -Raw | ConvertFrom-Json
 
           foreach ($marker in @(
