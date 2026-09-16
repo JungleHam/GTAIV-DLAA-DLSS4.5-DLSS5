@@ -41,34 +41,26 @@ jobs:
 
           Replace-Checked 'install/Install-DLSS-Full.bat' $oldCommit $newCommit 1
           Replace-Checked 'install/Install-DLSS-Full.bat' $oldHashUpper $newHashUpper 1
-
           Replace-Checked 'manifests/versions.json' $oldCommit $newCommit 1
           Replace-Checked 'manifests/versions.json' $oldHashLower $newHashLower 1
 
-          Replace-Checked '.github/workflows/dlss-full-module.yml' $oldCommit $newCommit 2
-          Replace-Checked '.github/workflows/dlss-full-module.yml' $oldHashUpper $newHashUpper 2
-
           $installer = [IO.File]::ReadAllText('install/Install-DLSS-Full.bat')
           $manifest = Get-Content 'manifests/versions.json' -Raw | ConvertFrom-Json
-          $workflow = [IO.File]::ReadAllText('.github/workflows/dlss-full-module.yml')
           if (-not $installer.Contains("`$PublicControlsCommit = '$newCommit'")) { throw 'Installer commit pin verification failed' }
           if (-not $installer.Contains("`$PublicControlsHash = '$newHashUpper'")) { throw 'Installer hash pin verification failed' }
           if ($manifest.components.'dlss-full'.public_reshade_controls_commit -ne $newCommit) { throw 'Manifest commit pin verification failed' }
           if ($manifest.components.'dlss-full'.public_reshade_controls_sha256.ToUpperInvariant() -ne $newHashUpper) { throw 'Manifest hash pin verification failed' }
-          if (($workflow.Split($newCommit).Count - 1) -ne 2) { throw 'Workflow commit expectation verification failed' }
-          if (($workflow.Split($newHashUpper).Count - 1) -ne 2) { throw 'Workflow hash expectation verification failed' }
 
           git diff --check
           if ($LASTEXITCODE -ne 0) { throw 'git diff --check failed' }
 
-      - name: Commit final pin and remove one-shot workflow
+      - name: Commit installer and manifest pins
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add install/Install-DLSS-Full.bat manifests/versions.json .github/workflows/dlss-full-module.yml
-          git rm .github/workflows/finalize-public-controls-pin.yml
+          git add install/Install-DLSS-Full.bat manifests/versions.json
           git commit -m 'Pin validated public ReShade controls stage'
           if ($LASTEXITCODE -ne 0) { throw 'Pin commit failed' }
           git push origin HEAD:main
