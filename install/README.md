@@ -7,7 +7,7 @@ For most users, follow these four steps in order:
 | **1** | **FusionFix 5.0.1** | Clean modern GTA IV renderer baseline. |
 | **2** | **`Install-DLAA.bat`** | DLAA plus the bridge/ReShade/motion-data foundation required by the rest of the project. |
 | **3** | **ReShade controls fix** | Makes the Home overlay, mouse and keyboard work through the separate renderer process. |
-| **4** | **`Install-DLSS-Full.bat`** | DLSS 4.5 Super Resolution, automatic startup stabilization, and DLSS 5 Neural Rendering installed OFF by default. |
+| **4** | **`Install-DLSS-Full.bat`** | DLSS 4.5 Super Resolution, the M3K render/output presenter, automatic startup stabilization, and DLSS 5 Neural Rendering installed OFF by default. |
 
 The root [`README.md`](../README.md) is the main step-by-step guide.
 
@@ -38,6 +38,7 @@ Do not continue to Step 4 until that works.
 `Install-DLSS-Full.bat` adds:
 
 - five DLSS Super Resolution quality modes;
+- the pinned M3K DXVK 3.0.2 presenter that separates internal render resolution from physical output and automatically sizes the presenter to the monitor;
 - temporal synchronization needed for stable reconstruction;
 - automatic `1485×835` startup stabilization;
 - automatic return to the saved DLSS quality mode;
