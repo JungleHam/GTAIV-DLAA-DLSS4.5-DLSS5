@@ -1,121 +1,174 @@
 # Architecture
 
-GTA IV remains a 32-bit Direct3D 9 application, while ReShade, NGX and the modern rendering stages run in the 64-bit b-bridge renderer process.
+This page is the technical explanation of the project. The normal installation still has only four user-facing steps:
 
-## Process / renderer split
+```text
+1. FusionFix
+2. DLAA
+3. ReShade controls fix
+4. DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering
+```
+
+Internal checkpoint names such as `A3-S2`, `A3-S5` and `M3K` are engineering/debug labels, not additional install stages.
+
+## Why there is a bridge at all
+
+GTA IV is a **32-bit Direct3D 9 game**, while the modern ReShade/NGX/DLSS work happens in a separate **64-bit renderer process**.
+
+In simplified form:
 
 ```text
 GTAIV.exe (32-bit)
+  -> FusionFix
+  -> bridge client
+  -> NvRemixBridge.exe (64-bit)
+  -> Vulkan / ReShade
+  -> DLSS processing
+  -> display
+```
+
+The exact technical chain is:
+
+```text
+GTAIV.exe
   |
-  | dinput8.dll
   +--> FusionFix
   |
-  | d3d9.dll
-  +--> A3-S2 b-bridge client
+  +--> b-bridge client (d3d9.dll)
           |
-          | IPC / bridge protocol
           v
-      .trex\NvRemixBridge.exe (64-bit)
+      .trex\NvRemixBridge.exe
           |
           +--> .trex\d3d9vk_x64.dll
           |      -> Vulkan
           |
-          +--> ReShade 6.8.0 x64
+          +--> ReShade 6.8.0
                   |
                   +--> LumeniteFX
-                  |      -> depth + estimated motion vectors
+                  |      -> estimated depth + motion data
                   |
-                  +--> A3-S5 DLSS5-Feeder / M3K
+                  +--> project DLSS integration
                          |
                          +--> nvngx_dlss.dll 310.9.1
                          |      -> DLAA / DLSS 4.5 Super Resolution
                          |
                          +--> .trex\m3k\m3k-nvngx.dll
                          +--> .trex\m3k\nvngx_dlssnr.dll
-                                -> NGX Feature 18 / DLSS 5 Neural Rendering
+                                -> DLSS 5 Neural Rendering
 ```
 
-There is no Deep Fried Chicken stage in the current architecture.
-
-## DLAA baseline
+## Step 2 — DLAA baseline
 
 Step 2 establishes a native-resolution DLAA path:
 
 ```text
-scene -> Lumenite depth/MV guides -> NGX DLAA -> output
+GTA IV at output resolution
+ -> depth + estimated motion data
+ -> NVIDIA DLAA
+ -> display
 ```
 
-The base DLAA install intentionally excludes the NR runtime so the known-good baseline can be verified before the combined module is added.
+This baseline is deliberately kept simple so it can be tested before resolution scaling and Neural Rendering are added.
 
-## DLSS 4.5 Super Resolution
+## Step 4 — DLSS 4.5 Super Resolution
 
-Step 4 replaces the stock b-bridge client/Feeder path with the frozen A3-S2/A3-S5 integration.
+Step 4 lets GTA IV render internally below the final display resolution and then reconstructs the image with DLSS.
 
-A3-S2 keeps GTA's canonical shader constants unmodified and applies a complete c8-c11 projective WVP jitter only at the draw boundary. All four D3D9 draw paths are synchronized, and non-eligible draws restore the canonical unjittered WVP.
-
-The bridge publishes the exact jitter sample through:
+User-facing description:
 
 ```text
-Local\M3K_GTAIV_Jitter_v1
+lower internal game resolution
+ -> synchronized temporal data
+ -> DLSS Super Resolution
+ -> full display resolution
 ```
 
-The Feeder consumes the same sample for DLSS. That coherent draw-boundary architecture fixed the earlier spatially inconsistent wobble and is the accepted temporal baseline.
+### Temporal synchronization
 
-## Startup prime
+DLSS depends on tiny per-frame offsets plus previous-frame information. GTA IV was not designed to supply that modern temporal contract.
 
-Cold-start low-resolution vibration was isolated to a narrow good source-resolution region rather than a DLSS quality-mode enum.
+The project therefore keeps the game's geometry/raster offset and the DLSS jitter sample synchronized at draw time. It also restores the normal, unshifted state for draws that should not inherit that offset.
 
-Known hardware observations:
+This fixed the severe spatially inconsistent wobble seen in earlier experiments.
+
+Internal checkpoint name: **A3-S2**.
+
+## Automatic startup stabilization
+
+Cold-start testing found that very low DLSS render resolutions could begin a fresh session in a vibrating state.
+
+The reliable sequence is:
 
 ```text
-1472x828  -> vibration remains
-1478x832  -> fixed
-1485x835  -> fixed
-1493x840  -> vibration remains
+start at 1485×835
+ -> hold synchronized temporal data for 180 frames
+ -> switch automatically to the user's saved DLSS quality mode
 ```
 
-A3-S5 therefore starts each primed launch at `1485x835`, waits for 180 synchronized SR frames with the A3-S2 jitter handoff active, then releases to the saved SR profile and resets temporal history.
+Internal checkpoint name: **A3-S5**.
 
-## Native DLSS 5 Neural Rendering
+The name `startup prime` may still appear in logs/config because that is the original engineering term. User-facing documentation calls it **startup stabilization**.
 
-The combined module installs the tested NR runtime but leaves it disabled:
+## DLSS 5 Neural Rendering
 
-```ini
-Mode=0
-NRPasses=1
-```
+Step 4 also installs the tested Neural Rendering runtime but leaves it OFF by default.
 
-When the user enables `Mode=2`, the current production order is:
+When enabled, the current rendering order is:
 
 ```text
-true GTA source color
- -> native NGX Feature 18 / DLSS 5 NR
+GTA IV internal image
+ -> DLSS 5 Neural Rendering
  -> DLSS 4.5 Super Resolution
- -> presenter resolution
+ -> display/output resolution
 ```
 
-Feature 18 is owned directly by the M3K/Feeder integration. NR and SR share the same source-size guide domain and synchronized temporal-jitter contract.
+The tested configuration uses one Neural Rendering pass.
 
-The tested configuration uses one NR pass. Multi-pass work existed during research, but the current user-facing module intentionally exposes the proven single-pass path.
+In source code and logs you may see **Feature 18** or **NR18**. That is NVIDIA/NGX's internal feature identifier for the Neural Rendering stage; it is not another user-selectable module.
 
-## Motion vectors
+## The `M3K` name
 
-GTA IV does not provide modern engine-native DLSS motion vectors. LumeniteFX supplies estimated motion vectors and depth through ReShade.
-
-For SR, the guide textures are resized to the true source dimensions. The M3K adapter scales the motion-vector coordinate contract with the render/output ratio; this was audited and is intentionally retained.
-
-## ReShade input patch
-
-The swap chain references GTA's HWND, but ReShade runs in `NvRemixBridge.exe`. Stock ReShade therefore refuses normal input capture because the window belongs to another process.
-
-b-bridge already transports DirectInput state through its old Remix message channel. The patch under `tools/reshade-bbridge-input/` reconnects that channel to ReShade's normal input system:
+`M3K` is the project's internal namespace for the custom DLSS integration code and configuration. For example:
 
 ```text
-GTA DirectInput
- -> b-bridge x86
- -> cross-process WM_* messages
- -> patched ReShade x64
- -> normal ReShade input / ImGui
+.trex\m3k-nr.ini
+.trex\m3k\m3k-nvngx.dll
 ```
 
-It also sends `UWM_REMIX_UIACTIVE_MSG` back to GTA so clicks/keys are not consumed by both the overlay and the game.
+Users do not install an additional product called “M3K.” In the normal guide it is simply part of **Step 4 — DLSS 4.5 SR + DLSS 5 NR**.
+
+## Motion vectors and depth
+
+Modern temporal reconstruction needs information about how pixels moved between frames and where scene geometry sits in depth.
+
+GTA IV does not expose modern engine-native DLSS motion vectors, so LumeniteFX estimates the motion/depth information through ReShade.
+
+When Super Resolution is active, these guide textures are matched to the game's actual internal render resolution before DLSS uses them.
+
+## ReShade controls fix
+
+The game window belongs to `GTAIV.exe`, but ReShade runs in `NvRemixBridge.exe`. Stock ReShade therefore cannot normally capture input from GTA IV's window.
+
+Step 3 reconnects that input path:
+
+```text
+GTA IV keyboard/mouse input
+ -> 32-bit bridge
+ -> cross-process Windows messages
+ -> patched ReShade in the 64-bit renderer
+```
+
+That is why Home, mouse clicks and keyboard input work in the ReShade overlay after Step 3.
+
+## Terminology reference
+
+| Technical/internal wording | Plain-English meaning |
+|---|---|
+| `A3-S2` | temporal synchronization fix |
+| `A3-S5` | automatic startup stabilization |
+| `M3K` | project DLSS integration namespace |
+| `Feature 18` / `NR18` | DLSS 5 Neural Rendering |
+| `true source` | GTA IV's actual internal render resolution |
+| `presenter` | final display/output resolution |
+| `SRProfile` | saved DLSS Super Resolution quality mode |
+| `UQ77` | Custom Ultra Quality at 77% render scale |
