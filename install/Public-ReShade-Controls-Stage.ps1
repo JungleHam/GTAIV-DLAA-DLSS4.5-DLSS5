@@ -68,7 +68,11 @@ $pollNew = @'
 '@
 $vk = Replace-ExactOnce $vk $pollAnchor $pollNew 'NR requested-mode sync'
 
-$vk = Replace-ExactOnce $vk '        case 1: return "Ultra Quality";' '        case 1: return "Custom Ultra Quality (77%)";' 'Ultra Quality label'
+# The frozen custom-UQ stage already uses the public label. Keep compatibility with
+# older generated sources without requiring a second copy of the same text.
+if ($vk.IndexOf('case 1: return "Custom Ultra Quality (77%)";',[StringComparison]::Ordinal) -lt 0) {
+    $vk = Replace-ExactOnce $vk '        case 1: return "Ultra Quality";' '        case 1: return "Custom Ultra Quality (77%)";' 'Ultra Quality label'
+}
 
 $feed = Replace-ExactOnce $feed `
     '    if (ImGui::CollapsingHeader("M3K Neural Rendering"))' `
