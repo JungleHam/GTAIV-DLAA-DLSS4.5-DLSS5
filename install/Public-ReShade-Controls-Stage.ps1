@@ -130,11 +130,11 @@ $feed = (
     $feed.Substring($qualityEnd)
 )
 
-$passesAnchor = @'
-        const UINT requested = M3kRequestedNrPasses();
-        ImGui::TextUnformatted("Feature 18 passes (live)");
-'@
-$passesNew = @'
+# Keep this transform independent of whether the downloaded stage file itself uses
+# LF or CRLF. The real installer downloads this script as raw GitHub LF bytes while
+# Git for Windows may materialize the generated Feeder source with CRLF.
+$passesStartMarker = '        const UINT requested = M3kRequestedNrPasses();'
+$passesToggleNew = @'
         bool nrEnabled = M3kNrEnabledRequested();
         if (ImGui::Checkbox("Neural Rendering##M3KNrEnabled", &nrEnabled))
             M3kRequestNrEnabledLive(nrEnabled);
@@ -144,10 +144,15 @@ $passesNew = @'
         ImGui::Spacing();
 
         const UINT requested = M3kRequestedNrPasses();
+'@
+$feed = Replace-ExactOnce $feed $passesStartMarker $passesToggleNew 'NR toggle insertion'
+
+$passesLabelAnchor = '        ImGui::TextUnformatted("Feature 18 passes (live)");'
+$passesLabelNew = @'
         ImGui::TextUnformatted("Neural Rendering passes (advanced)");
         ImGui::TextWrapped("1 pass is the tested public default. Higher counts are experimental, may hitch while warming, and can cost significant performance.");
 '@
-$feed = Replace-ExactOnce $feed $passesAnchor $passesNew 'NR toggle and pass label'
+$feed = Replace-ExactOnce $feed $passesLabelAnchor $passesLabelNew 'NR pass label'
 
 # Remove the old experiment-oriented "Click 5 once" hint if that exact historical
 # wording is still present. Later frozen stages are allowed to have already changed it.
