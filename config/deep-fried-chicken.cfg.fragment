@@ -1,4 +1,0 @@
-# Merge these values into the DFC 1.7.4 config generated/supplied by the project.
-arm=1
-enabled=1
-safe_neutral_start=0
