@@ -24,11 +24,13 @@
       "s27_reference_shim_sha256": "a2e4bedace8d99bc60b5d18e958bd7e98f8887ff40ec45a8674b892e2d1fcbbc",
       "startup_stabilization_resolution": "1485x835",
       "startup_stabilization_synchronized_frames": 180,
+      "startup_prime": "1485x835",
+      "startup_prime_synchronized_frames": 180,
       "nr_default_mode": 0,
       "nr_enabled_mode": 2,
       "nr_passes": 1,
       "hardware_validation": "RTX 4070 Ti SUPER, 2560x1440 output. Temporal synchronization was stable across Custom Ultra Quality (77%), Quality, Balanced, Performance and Ultra Performance. Automatic 1485x835 startup stabilization was confirmed to remove cold-start vibration before returning to Ultra Performance. Native DLSS 5 Neural Rendering was also validated on the same GPU.",
-      "notes": "The combined module installs both Super Resolution and the Neural Rendering runtime while leaving Neural Rendering disabled by default. A3-S2 and A3-S5 are retained only as internal checkpoint identifiers. Local builds use frozen source plus build/CPU gates. PE hashes can differ with local MSVC revisions, so the listed bridge/Feeder/shim hashes are hardware-tested references rather than mandatory local-build identity."
+      "notes": "The combined module installs both Super Resolution and the Neural Rendering runtime while leaving Neural Rendering disabled by default. A3-S2 and A3-S5 are retained only as internal checkpoint identifiers. The older startup_prime keys are retained for tooling compatibility; user-facing docs call the same mechanism startup stabilization. Local builds use frozen source plus build/CPU gates. PE hashes can differ with local MSVC revisions, so the listed bridge/Feeder/shim hashes are hardware-tested references rather than mandatory local-build identity."
     },
     "reshade": {
       "version": "6.8.0",
