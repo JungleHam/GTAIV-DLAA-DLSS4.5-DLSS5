@@ -37,7 +37,8 @@ function Get-Ini([string]$Key) {
 }
 
 function Arm-Prime {
-    Set-Ini 'Mode' '0'
+    # Deliberately preserve M3K Mode. DLSS Full installs Mode=0 initially,
+    # but a later NR module may set Mode=2 and this launcher must not undo it.
     Set-Ini 'SRProof' '1'
     Set-Ini 'RenderWidth' '1485'
     Set-Ini 'RenderHeight' '835'
@@ -78,7 +79,9 @@ while ($true) {
     Write-Host ' GTA IV DLSS FULL' -ForegroundColor Cyan
     Write-Host '============================================================' -ForegroundColor Cyan
     $p = Get-Ini 'SRProfile'
+    $mode = Get-Ini 'Mode'
     Write-Host ("Saved mode: " + $(if ($names.ContainsKey($p)) { $names[$p] } else { $p }))
+    Write-Host "NR mode: $mode"
     Write-Host 'Startup prime: 1485x835 / 180 synchronized frames'
     Write-Host ''
     Write-Host '[1] Custom Ultra Quality (77%)'
