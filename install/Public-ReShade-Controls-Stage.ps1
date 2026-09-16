@@ -79,6 +79,18 @@ $feed = Replace-ExactOnce $feed `
     '    if (ImGui::CollapsingHeader("GTA IV DLSS"))' `
     'panel title'
 
+# The frozen engineering checkpoint still contains the old A3-S1.2 screenshot lab.
+# Keep its dead implementation out of the public settings surface by removing its
+# ReShade overlay registration/unregistration. The renderer path itself is untouched.
+$feed = Replace-ExactOnce $feed `
+    '        reshade::register_overlay("M3K Capture Lab", M3kCaptureOverlay);' `
+    '' `
+    'Capture Lab registration removal'
+$feed = Replace-ExactOnce $feed `
+    '        reshade::unregister_overlay("M3K Capture Lab", M3kCaptureOverlay);' `
+    '' `
+    'Capture Lab unregister removal'
+
 # A2-S2.4 inserts the reconstruction selector immediately after the panel opening.
 # The generated frozen source has evolved across later stages, so replace the section
 # structurally instead of exact-matching the entire historical block. The engineering-only
@@ -111,15 +123,21 @@ if ($qualitySecond -ge 0) {
 }
 
 $qualityNew = @'
-        ImGui::TextUnformatted("DLSS Super Resolution quality");
-        int srProfile = static_cast<int>(M3kRequestedSrProfile());
-        if (srProfile < 1 || srProfile > 5) srProfile = 2;
-        int srIndex = srProfile - 1;
-        const char *srItems = "Custom Ultra Quality (77%)\0Quality\0Balanced\0Performance\0Ultra Performance\0\0";
-        if (ImGui::Combo("Quality##M3KSRProfile", &srIndex, srItems))
-            M3kRequestSrProfileLive(static_cast<UINT>(srIndex + 1));
+        ImGui::TextUnformatted("DLSS / DLAA mode");
+        int reconstruction = static_cast<int>(M3kRequestedSrProfile());
+        if (reconstruction < 0 || reconstruction > 5) reconstruction = 2;
+        const char *reconstructionItems = "DLAA Native\0Custom Ultra Quality (77%)\0Quality\0Balanced\0Performance\0Ultra Performance\0\0";
+        if (ImGui::Combo("Mode##M3KSRProfile", &reconstruction, reconstructionItems))
+            M3kRequestSrProfileLive(static_cast<UINT>(reconstruction));
         ImGui::Text("Applied: %s", M3kSrProfileName(M3kAppliedSrProfile()));
-        ImGui::TextWrapped("Quality changes are saved automatically and apply live. Unsupported modes are rejected safely.");
+        ImGui::Text("True render target: %u x %u", M3kDesiredRenderWidth(), M3kDesiredRenderHeight());
+        ImGui::Text("DXVK source now:    %u x %u", M3kCurrentSourceWidth(), M3kCurrentSourceHeight());
+        if (M3kDesiredRenderWidth() != M3kCurrentSourceWidth() || M3kDesiredRenderHeight() != M3kCurrentSourceHeight())
+            ImGui::TextColored(ImVec4(1.0f, 0.78f, 0.25f, 1.0f), "Applying GTA/DXVK render resize...");
+        if (M3kRequestedSrProfile() == 0)
+            ImGui::TextWrapped("DLAA Native renders GTA at the full output resolution and applies DLAA without Super Resolution upscaling.");
+        else
+            ImGui::TextWrapped("DLSS modes resize GTA to NVIDIA's matching input resolution, then reconstruct to the native presenter. Changes are saved automatically and apply live.");
         ImGui::Separator();
 '@
 
@@ -170,7 +188,10 @@ foreach ($marker in @(
     'Neural Rendering##M3KNrEnabled',
     'Neural Rendering passes (advanced)',
     '1 pass is the tested public default',
-    'DLSS Super Resolution quality',
+    'DLSS / DLAA mode',
+        'DLAA Native',
+        'True render target:',
+        'DXVK source now:',
     'Custom Ultra Quality (77%)',
     'Quality##M3KSRProfile')) {
     if ($verify.IndexOf($marker, [StringComparison]::Ordinal) -lt 0) {
@@ -178,4 +199,9 @@ foreach ($marker in @(
     }
 }
 
-Write-Host 'Public ReShade controls ready: Neural Rendering Off/On + 1-pass default guidance + five DLSS quality modes.'
+if ($verify.IndexOf('reshade::register_overlay("M3K Capture Lab"', [StringComparison]::Ordinal) -ge 0 -or
+    $verify.IndexOf('reshade::unregister_overlay("M3K Capture Lab"', [StringComparison]::Ordinal) -ge 0) {
+    throw 'Public ReShade controls verification failed: M3K Capture Lab is still registered'
+}
+
+Write-Host 'Public ReShade controls ready: DLAA Native + five DLSS modes + live resolution diagnostics + Neural Rendering controls.'
