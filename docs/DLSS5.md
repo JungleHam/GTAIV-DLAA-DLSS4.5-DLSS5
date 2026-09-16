@@ -1,93 +1,70 @@
-# DLSS 5 Neural Rendering — native M3K path
+# DLSS 5 Neural Rendering
 
-The current project does **not** use Deep Fried Chicken.
+DLSS 5 Neural Rendering is included in **Step 4** together with DLSS 4.5 Super Resolution.
 
-DLSS 5 Neural Rendering is integrated directly into the project’s A3-S5 Feeder/M3K path and is installed together with DLSS 4.5 Super Resolution by:
+You do not install a separate Neural Rendering mod after that step.
 
-```text
-install/Install-DLSS-Full.bat
-```
+## What gets installed
 
-## Required base
-
-Complete the normal flow first:
+The combined Step 4 installer downloads and verifies:
 
 ```text
-FusionFix -> DLAA -> ReShade input fix -> combined SR + NR module
+nvngx_dlssnr.dll 310.8.0-RTX40
 ```
 
-The combined installer places the NR runtime at:
+and places it at:
 
 ```text
 GTAIV\.trex\m3k\nvngx_dlssnr.dll
 ```
 
-and verifies the tested RTX40-compatible DLL hash:
+The runtime is installed automatically, but Neural Rendering starts **OFF by default**.
 
-```text
-4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05
-```
+## Turn Neural Rendering ON
 
-## Default state
-
-NR is installed but **OFF** after Step 4:
-
-```ini
-Mode=0
-NRPasses=1
-```
-
-This means DLSS 4.5 Super Resolution can run normally while Feature 18 remains disabled.
-
-## Enable Neural Rendering
-
-Close GTA IV and run:
+1. Close GTA IV.
+2. Run:
 
 ```text
 DLSS-Full-Control.bat
 ```
 
-Choose:
+3. Choose:
 
 ```text
 N  Turn NR ON
 ```
 
-That sets:
+4. Choose `L` to launch GTA IV through the recommended startup-stabilization path.
 
-```ini
-Mode=2
-NRPasses=1
-```
-
-The production rendering order is:
+When enabled, the rendering order is:
 
 ```text
-GTA IV true source color
- -> native DLSS 5 Neural Rendering / NGX Feature 18
+GTA IV internal image
+ -> DLSS 5 Neural Rendering
  -> DLSS 4.5 Super Resolution
- -> presenter resolution
+ -> display/output resolution
 ```
 
-The NR pass uses the same source-resolution depth/motion-vector/jitter domain as the SR stage.
+The current validated configuration uses **one Neural Rendering pass**.
 
-## Disable Neural Rendering
+## Turn Neural Rendering OFF
 
-Close GTA IV, run the same control helper, and choose:
+1. Close GTA IV.
+2. Run `DLSS-Full-Control.bat`.
+3. Choose:
 
 ```text
 O  Turn NR OFF
 ```
 
-That writes:
+DLSS 4.5 Super Resolution remains active.
 
-```ini
-Mode=0
-```
+## Why it is OFF by default
 
-SR remains enabled.
+Neural Rendering adds a substantial GPU workload, especially on RTX 40 hardware. Keeping it OFF by default means Step 4 can first be verified as a stable DLSS Super Resolution installation before the extra neural pass is enabled.
 
-## Runtime / GPU notes
+## GPU/runtime notes
 
 The current tested runtime is:
 
@@ -95,11 +72,34 @@ The current tested runtime is:
 nvngx_dlssnr.dll 310.8.0-RTX40
 ```
 
-It is the community RTX 40/50-compatible build with Ada (`sm_89`) support. The project’s direct hardware validation is on an RTX 4070 Ti SUPER.
+It is the RTX 40/50-compatible build used by this project. Direct project validation is on RTX 4070 Ti SUPER.
 
-The runtime reports a minimum NVIDIA driver of **615.00**. Use 615.00 or newer before enabling NR.
+The runtime reports a minimum NVIDIA driver of **615.00**. Use 615.00 or newer before enabling Neural Rendering.
 
-The current validated installer does not automatically select the RTX 20/30 SF variants; those are outside this project’s tested path.
+Other GPU-generation Neural Rendering variants are outside the current validated install path.
+
+## How the config represents ON/OFF
+
+Normal users should use `DLSS-Full-Control.bat`, but for troubleshooting the underlying configuration is:
+
+```ini
+Mode=0       ; Neural Rendering OFF
+Mode=2       ; Neural Rendering ON
+NRPasses=1   ; use one NR pass
+```
+
+The `Mode` number is an internal project setting, not a DLSS quality level.
+
+## Names you may see in logs
+
+Older engineering notes and runtime logs may use:
+
+- `M3K` — the project's internal DLSS integration namespace;
+- `Feature 18` or `NR18` — NVIDIA's internal NGX identifier for the Neural Rendering feature;
+- `A3-S2` — the project's temporal synchronization checkpoint;
+- `A3-S5` — the project's automatic startup-stabilization checkpoint.
+
+For normal use, all of these simply belong to the single **DLSS 4.5 SR + DLSS 5 Neural Rendering** Step 4 installation.
 
 ## Verification
 
@@ -109,15 +109,8 @@ Open:
 GTAIV\.trex\dlss5-feed.log
 ```
 
-Successful native NR validation has produced evidence such as:
+A healthy NR-enabled session should report successful Neural Rendering initialization/evaluation rather than repeatedly creating and failing the feature.
 
-```text
-M3K-A0: DLSS NR runtime found
-M3K-A0: feature 18 creation SUCCESS
-M3K-A1: feature 18 evaluation SUCCESS
-M3K-A2-S2.6: NR18 -> DLAA running ...
-```
+The log may use internal wording such as `feature 18 creation SUCCESS` or `feature 18 evaluation SUCCESS`. In user-facing terms, that means **DLSS 5 Neural Rendering initialized and ran successfully**.
 
-A healthy Mode 2 session should continue evaluating NR rather than repeatedly failing/recreating Feature 18.
-
-There is no `deep-fried-chicken.log`, DFC config, DFC add-on, or DFC ReShade tab in the current implementation.
+See [`VERIFY.md`](VERIFY.md) for exact debug strings.
