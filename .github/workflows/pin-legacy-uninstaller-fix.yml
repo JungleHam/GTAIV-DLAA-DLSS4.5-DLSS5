@@ -1,0 +1,50 @@
+name: Pin legacy uninstaller fix
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/pin-legacy-uninstaller-fix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  pin:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify raw uninstaller and pin installer/manifest
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $commit = '62af76739c06c0915b64d293d623ec1f591cb0b7'
+          $hash = '948ACF211A23EE411B0D823663DE7774C3EE35FFC137CAF0268240CF6D3C14DE'
+          $raw = Join-Path $env:RUNNER_TEMP 'Uninstall-DLSS-Full.raw.bat'
+          Invoke-WebRequest -UseBasicParsing -Uri "https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/$commit/install/Uninstall-DLSS-Full.bat" -OutFile $raw
+          $actual = (Get-FileHash -Algorithm SHA256 $raw).Hash.ToUpperInvariant()
+          if ($actual -ne $hash) { throw "Raw uninstaller hash mismatch: expected $hash got $actual" }
+
+          $installerPath = 'install/Install-DLSS-Full.bat'
+          $installer = [IO.File]::ReadAllText($installerPath)
+          $installer = $installer.Replace("$" + "UninstallerCommit = 'd65fb6c9df2e6206015bad53c24f96a75c2d10e0'", "$" + "UninstallerCommit = '$commit'")
+          $installer = $installer.Replace("$" + "UninstallerHash = '3F7E4103A8C58FF337142E4438D534BA7B4B9E5D3D6057A4857012AA88C29E34'", "$" + "UninstallerHash = '$hash'")
+          if (-not $installer.Contains("$" + "UninstallerCommit = '$commit'")) { throw 'Installer uninstaller-commit pin failed' }
+          if (-not $installer.Contains("$" + "UninstallerHash = '$hash'")) { throw 'Installer uninstaller-hash pin failed' }
+          [IO.File]::WriteAllText($installerPath,$installer,[Text.UTF8Encoding]::new($false))
+
+          $manifestPath = 'manifests/versions.json'
+          $m = Get-Content $manifestPath -Raw | ConvertFrom-Json
+          $m.components.'dlss-full'.uninstaller_commit = $commit
+          $m.components.'dlss-full'.uninstaller_sha256 = $hash.ToLowerInvariant()
+          $m.components.'dlss-full' | Add-Member -NotePropertyName uninstaller_legacy_backup_support -NotePropertyValue 'Pre-presenter backups may omit .trex/d3d9vk_x64.dll; restore it from pinned b-bridge 0.1.0 package.' -Force
+          $m | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $manifestPath -Encoding utf8NoBOM
+
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add $installerPath $manifestPath
+          git commit -m 'Pin legacy-compatible DLSS Full uninstaller'
+          git push origin HEAD:main
