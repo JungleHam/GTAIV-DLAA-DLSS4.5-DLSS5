@@ -98,7 +98,8 @@ try {
     Write-Host ''
     Write-Host '====================================================================' -ForegroundColor Green
     Write-Host ' GTA IV - DLSS 4.5 SUPER RESOLUTION + DLSS 5 NEURAL RENDERING' -ForegroundColor Green
-    Write-Host ' A3-S2 coherent jitter + A3-S5 startup prime; NR installed OFF' -ForegroundColor Green
+    Write-Host ' Temporal synchronization + automatic startup stabilization' -ForegroundColor Green
+    Write-Host ' Neural Rendering is installed but remains OFF by default' -ForegroundColor Green
     Write-Host '====================================================================' -ForegroundColor Green
     Write-Host "Game folder: $Game"
     Write-Host ''
@@ -114,7 +115,7 @@ try {
     $Git = Need-Command 'git.exe' 'Git for Windows is required for the reproducible combined-module build.'
     $Python = Need-Command 'python.exe' 'Python 3 in PATH is required for the reproducible combined-module build.'
 
-    Write-Host 'Choose the saved DLSS 4.5 Super Resolution mode:' -ForegroundColor Yellow
+    Write-Host 'Choose the saved DLSS 4.5 Super Resolution quality mode:' -ForegroundColor Yellow
     Write-Host '  1 = Custom Ultra Quality (77%)'
     Write-Host '  2 = Quality [recommended default]'
     Write-Host '  3 = Balanced'
@@ -128,7 +129,7 @@ try {
     New-Item -ItemType Directory -Path $Temp -Force | Out-Null
 
     Write-Host ''
-    Write-Host 'Fetching the pinned DLSS 5 NR runtime for RTX 40/50...' -ForegroundColor Cyan
+    Write-Host 'Downloading the tested DLSS 5 Neural Rendering runtime for RTX 40/50...' -ForegroundColor Cyan
     $nrZip = Join-Path $Temp 'nvngx_dlssnr_310.8.0-RTX40.zip'
     $nrDir = Join-Path $Temp 'dlssnr'
     Download-File $NrPackageUrl $nrZip
@@ -139,22 +140,22 @@ try {
     Assert-SHA256 $NrDll.FullName $NrDllHash
 
     Run $Git @('clone','--filter=blob:none',$RepoUrl,$Project) 'Cloning project source'
-    Run $Git @('-C',$Project,'checkout',$Checkpoint) 'Checking out frozen A3-S5 checkpoint'
+    Run $Git @('-C',$Project,'checkout',$Checkpoint) 'Checking out the frozen tested project checkpoint'
     $head = (& $Git -C $Project rev-parse HEAD).Trim()
     if ($head -ne $Checkpoint) { Fail "Wrong project revision: $head" }
 
     Write-Host ''
-    Write-Host 'Building the A3-S5 Feeder chain from pinned sources...' -ForegroundColor Cyan
+    Write-Host 'Building the tested DLSS integration from pinned sources...' -ForegroundColor Cyan
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Project 'tools\m3k-nr\build-a3-s5.ps1')
-    if ($LASTEXITCODE -ne 0) { Fail "A3-S5 build failed with exit code $LASTEXITCODE" }
+    if ($LASTEXITCODE -ne 0) { Fail "DLSS integration build failed with exit code $LASTEXITCODE" }
 
     $Feeder = Join-Path $Project 'tools\m3k-nr\out-m3k-a3-s5\dlss5-feed.addon64'
     $Shim = Join-Path $Project 'tools\m3k-nr\out-m3k-s27\m3k\m3k-nvngx.dll'
-    if (-not (Test-Path -LiteralPath $Feeder)) { Fail 'A3-S5 Feeder output is missing.' }
-    if (-not (Test-Path -LiteralPath $Shim)) { Fail 'Stable S2.7 shim output is missing.' }
+    if (-not (Test-Path -LiteralPath $Feeder)) { Fail 'DLSS integration Feeder output is missing.' }
+    if (-not (Test-Path -LiteralPath $Shim)) { Fail 'DLSS integration shim output is missing.' }
 
     Write-Host ''
-    Write-Host 'Building the accepted A3-S2 x86 b-bridge client...' -ForegroundColor Cyan
+    Write-Host 'Building the tested temporal-synchronization bridge...' -ForegroundColor Cyan
     Run $Git @('clone','--filter=blob:none','https://github.com/gutbash/b-bridge.git',$BBridge) 'Cloning pinned b-bridge source'
     Run $Git @('-C',$BBridge,'checkout',$BBridgeCommit) 'Checking out pinned b-bridge commit'
     Run $Git @('-C',$BBridge,'submodule','update','--init','--recursive') 'Preparing b-bridge submodules'
@@ -162,9 +163,9 @@ try {
     if ($bhead -ne $BBridgeCommit) { Fail "Wrong b-bridge revision: $bhead" }
 
     & $Python (Join-Path $Project 'tools\m3k-nr\a2-s21-bbridge-ui.py') $BBridge
-    if ($LASTEXITCODE -ne 0) { Fail 'A3-S2 UI patch failed.' }
+    if ($LASTEXITCODE -ne 0) { Fail 'Bridge window/resolution patch failed.' }
     & $Python (Join-Path $Project 'tools\m3k-nr\a3-s2-bbridge-coherent-draw-jitter.py') $BBridge
-    if ($LASTEXITCODE -ne 0) { Fail 'A3-S2 coherent-jitter patch failed.' }
+    if ($LASTEXITCODE -ne 0) { Fail 'Temporal-synchronization patch failed.' }
     & $Git -C $BBridge diff --check
     if ($LASTEXITCODE -ne 0) { Fail 'Patched b-bridge source failed git diff --check.' }
 
@@ -181,13 +182,13 @@ try {
         if ($LASTEXITCODE -ne 0) { Fail "Meson setup failed: $LASTEXITCODE" }
         Copy-Item .\Directory.Build.Props -Destination .\_compDLSSFull -Force
         & meson compile -C _compDLSSFull d3d9
-        if ($LASTEXITCODE -ne 0) { Fail "A3-S2 d3d9 build failed: $LASTEXITCODE" }
+        if ($LASTEXITCODE -ne 0) { Fail "Temporal-synchronization bridge build failed: $LASTEXITCODE" }
     } finally {
         Pop-Location
         $env:PATH = $oldPath
     }
     $Bridge = Join-Path $BBridge '_compDLSSFull\src\client\d3d9.dll'
-    if (-not (Test-Path -LiteralPath $Bridge)) { Fail 'A3-S2 d3d9.dll output is missing.' }
+    if (-not (Test-Path -LiteralPath $Bridge)) { Fail 'Temporal-synchronization bridge d3d9.dll output is missing.' }
 
     $bridgeHash = Hash $Bridge
     $feederHash = Hash $Feeder
@@ -198,12 +199,12 @@ try {
     Write-Host "  dlss5-feed.addon64   $feederHash"
     Write-Host "  m3k-nvngx.dll        $shimHash"
     Write-Host "  nvngx_dlssnr.dll     $NrDllHash"
-    if ($bridgeHash -eq $ReferenceBridgeHash) { Write-Host '  A3-S2 bridge matches the hardware-validated reference binary.' -ForegroundColor Green }
-    else { Write-Host '  NOTE: A3-S2 bridge bytes differ from the CI reference (local compiler/toolchain), but pinned source + patch validation passed.' -ForegroundColor Yellow }
-    if ($feederHash -eq $ReferenceFeederHash) { Write-Host '  A3-S5 Feeder matches the hardware-validated reference binary.' -ForegroundColor Green }
-    else { Write-Host '  NOTE: A3-S5 Feeder bytes differ from the CI reference (local compiler/toolchain), but pinned source + CPU tests passed.' -ForegroundColor Yellow }
-    if ($shimHash -eq $ReferenceShimHash) { Write-Host '  Stable S2.7 shim matches the hardware-validated reference binary.' -ForegroundColor Green }
-    else { Write-Host '  NOTE: Stable shim bytes differ from the CI reference (local compiler/toolchain), but pinned S2.7 source + CPU tests passed.' -ForegroundColor Yellow }
+    if ($bridgeHash -eq $ReferenceBridgeHash) { Write-Host '  Temporal-synchronization bridge matches the hardware-tested reference binary.' -ForegroundColor Green }
+    else { Write-Host '  NOTE: bridge bytes differ from the reference build (local compiler/toolchain), but pinned source + patch validation passed.' -ForegroundColor Yellow }
+    if ($feederHash -eq $ReferenceFeederHash) { Write-Host '  DLSS integration Feeder matches the hardware-tested reference binary.' -ForegroundColor Green }
+    else { Write-Host '  NOTE: Feeder bytes differ from the reference build (local compiler/toolchain), but pinned source + CPU tests passed.' -ForegroundColor Yellow }
+    if ($shimHash -eq $ReferenceShimHash) { Write-Host '  DLSS integration shim matches the hardware-tested reference binary.' -ForegroundColor Green }
+    else { Write-Host '  NOTE: integration shim bytes differ from the reference build (local compiler/toolchain), but pinned source + CPU tests passed.' -ForegroundColor Yellow }
 
     $stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
     $Backup = Join-Path $Game ("_DLSS_FULL_PREINSTALL_BACKUP_" + $stamp)
@@ -214,7 +215,7 @@ try {
     }
 
     Write-Host ''
-    Write-Host 'Installing DLSS 4.5 SR + DLSS 5 NR runtime...' -ForegroundColor Cyan
+    Write-Host 'Installing DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering...' -ForegroundColor Cyan
     Copy-Item -LiteralPath $Bridge -Destination (Join-Path $Game 'd3d9.dll') -Force
     Copy-Item -LiteralPath $Feeder -Destination (Join-Path $Trex 'dlss5-feed.addon64') -Force
     New-Item -ItemType Directory -Path (Join-Path $Trex 'm3k') -Force | Out-Null
@@ -223,8 +224,9 @@ try {
 
     $ini = @(
         '[M3K]',
-        '; GTA IV DLSS 4.5 SR + DLSS 5 NR - hardware-validated A3-S2 + A3-S5 path',
-        '; Mode=0: NR OFF (default). Mode=2: native Feature 18 NR -> DLSS SR.',
+        '; GTA IV DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering',
+        '; Internal checkpoint names: A3-S2 = temporal synchronization; A3-S5 = startup stabilization.',
+        '; Mode=0: Neural Rendering OFF (default). Mode=2: Neural Rendering ON before DLSS Super Resolution.',
         'Mode=0',
         'SourceProof=0',
         'SRProof=1',
@@ -260,16 +262,18 @@ try {
     Download-File $controlUrl $controlPath
 
     $receipt = @(
-        'GTA IV DLSS 4.5 SR + DLSS 5 NR installation receipt',
+        'GTA IV DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering installation receipt',
         "Installed=$(Get-Date -Format o)",
         "ProjectCheckpoint=$Checkpoint",
         "BBridgeCommit=$BBridgeCommit",
-        "SRProfile=$profile",
+        "SavedDLSSQualityProfile=$profile",
         'NeuralRendering=installed-off-by-default',
-        'M3KMode=0',
+        'InternalNRMode=0',
         'NRPasses=1',
-        'StartupPrime=1485x835',
-        'StartupPrimeFrames=180',
+        'StartupStabilization=1485x835',
+        'StartupStabilizationFrames=180',
+        'InternalTemporalCheckpoint=A3-S2',
+        'InternalStartupCheckpoint=A3-S5',
         "d3d9.dll=$bridgeHash",
         "dlss5-feed.addon64=$feederHash",
         "m3k-nvngx.dll=$shimHash",
@@ -285,16 +289,16 @@ try {
 
     Write-Host ''
     Write-Host '====================================================================' -ForegroundColor Green
-    Write-Host ' DLSS 4.5 SR + DLSS 5 NR INSTALLED' -ForegroundColor Green
+    Write-Host ' DLSS 4.5 SUPER RESOLUTION + DLSS 5 NEURAL RENDERING INSTALLED' -ForegroundColor Green
     Write-Host '====================================================================' -ForegroundColor Green
-    Write-Host "Saved SRProfile: $profile"
+    Write-Host "Saved DLSS quality profile: $profile"
     Write-Host 'Neural Rendering runtime: INSTALLED'
-    Write-Host 'Neural Rendering execution: OFF by default (Mode=0)'
-    Write-Host 'Startup: 1485x835 prime -> 180 synchronized frames -> saved SR mode'
+    Write-Host 'Neural Rendering: OFF by default'
+    Write-Host 'Startup stabilization: 1485x835 -> 180 synchronized frames -> saved DLSS mode'
     Write-Host "Rollback backup: $Backup"
     Write-Host ''
-    Write-Host 'Use DLSS-Full-Control.bat to choose SR quality, toggle NR ON/OFF, and launch primed.' -ForegroundColor Yellow
-    Write-Host 'NR ON = Mode=2, one native Feature 18 pass before DLSS SR.'
+    Write-Host 'Use DLSS-Full-Control.bat to choose DLSS quality, turn Neural Rendering ON/OFF, and launch with startup stabilization.' -ForegroundColor Yellow
+    Write-Host 'When NR is ON, one Neural Rendering pass runs before DLSS Super Resolution.'
     Write-Host ''
 }
 catch {
