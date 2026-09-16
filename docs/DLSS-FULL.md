@@ -20,7 +20,8 @@ The combined installer gives you:
 - the tested temporal synchronization required for stable DLSS reconstruction;
 - automatic startup stabilization to prevent the cold-start vibration seen at low render resolutions;
 - the tested DLSS 5 Neural Rendering runtime;
-- `DLSS-Full-Control.bat` for quality selection, NR ON/OFF and recommended launching.
+- a **GTA IV DLSS** panel inside ReShade for normal settings;
+- `DLSS-Full-Control.bat` for launch, repair, status and diagnostics only.
 
 **Neural Rendering is installed but OFF by default.**
 
@@ -34,27 +35,78 @@ install/Install-DLSS-Full.bat
 
 beside `GTAIV.exe` and run it.
 
-Choose the DLSS Super Resolution quality mode you want to save. **Quality** is the default recommendation.
-
-After installation, use:
+The public defaults are:
 
 ```text
-DLSS-Full-Control.bat
+DLSS quality:       Quality
+Neural Rendering:  OFF
+NR passes:          1
 ```
 
-for normal control and launching.
+The installer does not ask you to choose quality because normal configuration is now done live inside ReShade.
 
-## DLSS quality modes
+## Configure DLSS in ReShade
 
-| Choice | User-facing mode | Meaning |
-|---:|---|---|
-| 1 | Custom Ultra Quality (77%) | Highest internal render resolution of the upscaling modes. |
-| 2 | Quality | Recommended general-purpose default. |
-| 3 | Balanced | Middle ground between image quality and performance. |
-| 4 | Performance | Lower internal render resolution for more GPU headroom. |
-| 5 | Ultra Performance | Lowest internal render resolution; mainly useful when maximum performance is needed. |
+Press **Home**, then open:
 
-The config file stores this as `SRProfile`, but users normally change it through `DLSS-Full-Control.bat` instead of editing the file manually.
+```text
+Add-ons -> DLSS 5 Feed -> GTA IV DLSS
+```
+
+This is the project's single normal settings surface.
+
+### Neural Rendering
+
+Use the **Neural Rendering** checkbox to turn DLSS 5 Neural Rendering OFF or ON.
+
+The setting is saved automatically and the runtime switch is applied through the normal safe frame/config path rather than directly inside the UI callback.
+
+### Neural Rendering passes
+
+The same panel contains:
+
+```text
+Neural Rendering passes (advanced)
+```
+
+The tested public default is **1 pass**.
+
+Higher pass counts remain available for experimentation, but they may hitch while warming and can cost significant performance.
+
+### DLSS Super Resolution quality
+
+The panel exposes only the five normal DLSS quality choices:
+
+| Mode | Meaning |
+|---|---|
+| Custom Ultra Quality (77%) | Highest internal render resolution of the upscaling modes. |
+| Quality | Recommended general-purpose default. |
+| Balanced | Middle ground between image quality and performance. |
+| Performance | Lower internal render resolution for more GPU headroom. |
+| Ultra Performance | Lowest internal render resolution; mainly useful when maximum performance is needed. |
+
+Quality changes apply live and are saved automatically.
+
+The older internal DLAA-only reconstruction baseline is no longer shown in this public dropdown; it remains an engineering/debug path only.
+
+## DLSS tools helper
+
+`DLSS-Full-Control.bat` is no longer a settings menu.
+
+It provides:
+
+```text
+L  Launch GTA IV with startup stabilization pre-armed
+R  Repair / re-arm startup stabilization settings
+S  Show current DLSS / Neural Rendering status
+D  Open the DLSS diagnostic log
+```
+
+The repair action intentionally preserves:
+
+- saved DLSS quality;
+- Neural Rendering OFF/ON state;
+- Neural Rendering pass count.
 
 ## Automatic startup stabilization
 
@@ -97,7 +149,7 @@ Internal/source name: `A3-S5`.
 
 These names may appear in logs or source code, but **they are not extra installation steps**.
 
-## Neural Rendering
+## Neural Rendering runtime
 
 Step 4 automatically downloads and verifies:
 
@@ -111,25 +163,7 @@ and installs it to:
 GTAIV\.trex\m3k\nvngx_dlssnr.dll
 ```
 
-After installation, NR is present but disabled.
-
-### Turn Neural Rendering ON
-
-Close GTA IV and run:
-
-```text
-DLSS-Full-Control.bat
-```
-
-Choose:
-
-```text
-N  Turn NR ON
-```
-
-Then launch with `L`.
-
-When enabled, the rendering order is:
+When Neural Rendering is enabled in the ReShade panel, the rendering order is:
 
 ```text
 GTA IV internal image
@@ -137,18 +171,6 @@ GTA IV internal image
  -> DLSS 4.5 Super Resolution
  -> display/output resolution
 ```
-
-The tested configuration uses **one Neural Rendering pass**.
-
-### Turn Neural Rendering OFF
-
-Close GTA IV, run the control helper and choose:
-
-```text
-O  Turn NR OFF
-```
-
-DLSS Super Resolution remains enabled.
 
 ## Requirements
 
@@ -163,7 +185,7 @@ For the reproducible local build used by this installer you also need:
 - Windows SDK;
 - internet access.
 
-The tested Neural Rendering runtime requires NVIDIA driver **615.00 or newer** when NR is enabled. Direct project hardware validation is on RTX 4070 Ti SUPER.
+The tested Neural Rendering runtime requires NVIDIA driver **615.00 or newer** when Neural Rendering is enabled. Direct project hardware validation is on RTX 4070 Ti SUPER.
 
 ## Verification
 
@@ -175,22 +197,25 @@ GTAIV\.trex\dlss5-feed.log
 
 For an ordinary user, the important result is simple:
 
-1. launch through `DLSS-Full-Control.bat` → `L`;
+1. launch the game, preferably through `DLSS-Full-Control.bat` → `L` so startup stabilization is pre-armed;
 2. the game briefly initializes at the stabilization resolution;
 3. it switches automatically to the saved DLSS mode;
-4. the image remains stable instead of vibrating.
+4. press Home and verify `Add-ons -> DLSS 5 Feed -> GTA IV DLSS` is available;
+5. quality and Neural Rendering changes can then be made live from that panel.
 
 If you need log-level proof, see [`VERIFY.md`](VERIFY.md).
 
 ## Technical identities
 
-For exact reproduction and debugging, the current validated implementation corresponds to these internal checkpoints:
+For exact reproduction and debugging, the rendering core corresponds to these internal checkpoints:
 
 ```text
 Temporal synchronization: A3-S2
 Startup stabilization:    A3-S5
-Project checkpoint:       57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f
+Frozen core checkpoint:   57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f
 ```
+
+The public build then applies a small post-checkpoint ReShade-controls source stage. It changes the settings UI/INI control path only; the frozen temporal and startup rendering logic is not modified.
 
 Those codes are intentionally kept out of the normal installation instructions because they describe engineering checkpoints, not user-selectable features.
 
