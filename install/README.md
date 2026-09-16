@@ -92,6 +92,12 @@ The installer source and logs still contain internal engineering labels such as 
 
 Normal users do not need to configure those directly.
 
+## Temporary downloads
+
+`Install-DLAA.bat` and `Install-DLSS-Full.bat` show the temporary destination of every network download while they run. Downloaded archives, source checkouts, build environments and other installer-only files are kept under the installer's temporary work folder and are deleted automatically after use, including when installation fails.
+
+Files that are part of the finished installation are copied from the temporary work folder into their final GTA IV locations before cleanup. The DLSS Full installer also disables the pip download cache for its temporary Python build tools.
+
 ## Backup
 
 `Backup-Working-Stack.bat` snapshots the current integration, including the bridge, ReShade configuration, DLSS configuration and Neural Rendering runtime.
