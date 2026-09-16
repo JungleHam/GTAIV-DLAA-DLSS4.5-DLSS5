@@ -5,40 +5,64 @@ Recommended order:
 ```text
 1. FusionFix 5.0.1 (external prerequisite)
 2. Install-DLAA.bat
-3. ReShade b-bridge input patch (recommended for interactive UI)
+3. ReShade b-bridge input patch
 4. Install-DLSS-Full.bat
-5. Optional Neural Rendering module
 ```
 
 ## DLAA
 
-`Install-DLAA.bat` creates the project's known-good b-bridge/ReShade/Feeder DLAA baseline.
-Start here from a clean FusionFix installation.
+`Install-DLAA.bat` creates the known-good b-bridge/ReShade/Feeder DLAA baseline from a clean FusionFix installation.
 
-## DLSS Full
+It installs `nvngx_dlss.dll` 310.9.1 but does not install/enable the DLSS 5 NR runtime yet.
 
-`Install-DLSS-Full.bat` upgrades that working DLAA baseline to the hardware-validated
-Super Resolution path:
+## ReShade input fix
 
-- A3-S2 coherent draw-boundary jitter
-- UQ77 / Quality / Balanced / Performance / Ultra Performance profiles
-- A3-S5 automatic 1485x835 startup prime
-- automatic return to the saved SR profile
-- Neural Rendering left disabled (`Mode=0`)
+Build `tools/reshade-bbridge-input/BUILD.bat`, then **right-click `INSTALL.bat` → Run as administrator**.
 
-The installer also places `DLSS-Full-Control.bat` beside `GTAIV.exe` for profile selection
-and the recommended primed launch path.
+Do not continue until Home opens ReShade and mouse/keyboard input works.
 
-Read [`../docs/DLSS-FULL.md`](../docs/DLSS-FULL.md) for requirements and verification.
+## DLSS 4.5 SR + DLSS 5 NR
 
-## Neural Rendering
+`Install-DLSS-Full.bat` is the current combined module. It adds:
 
-Neural Rendering remains a separate optional layer after DLSS Full. The existing
-`Upgrade-DLSS5-DFC.bat` is the repository's older DFC-based NR integration; the newer
-native M3K Feature-18 path is being packaged separately. Do not assume the older DFC
-upgrade has been revalidated on top of DLSS Full unless its documentation explicitly says so.
+- A3-S2 coherent draw-boundary jitter;
+- UQ77 / Quality / Balanced / Performance / Ultra Performance SR profiles;
+- A3-S5 automatic `1485x835` startup prime;
+- automatic return to the saved SR profile;
+- the pinned RTX40-compatible `nvngx_dlssnr.dll` 310.8.0 runtime;
+- native M3K Feature 18 integration.
+
+Neural Rendering is **installed but OFF by default**:
+
+```ini
+Mode=0
+NRPasses=1
+```
+
+The installer also places `DLSS-Full-Control.bat` beside `GTAIV.exe`.
+
+Use it to:
+
+```text
+1..5  choose the saved DLSS 4.5 SR profile
+N     turn DLSS 5 NR ON  (Mode=2)
+O     turn DLSS 5 NR OFF (Mode=0)
+L     launch through the 1485x835 startup prime
+```
+
+There is no separate Deep Fried Chicken module in the current install path.
+
+Read [`../docs/DLSS-FULL.md`](../docs/DLSS-FULL.md) and [`../docs/DLSS5.md`](../docs/DLSS5.md).
 
 ## Backup
 
-`Backup-Working-Stack.bat` remains available for manual snapshots. Both DLAA and DLSS Full
-installers also create their own timestamped rollback backups before replacing runtime files.
+`Backup-Working-Stack.bat` snapshots the current integration, including:
+
+- A3-S2 `d3d9.dll`;
+- A3-S5 Feeder/config;
+- `.trex/m3k-nr.ini`;
+- `.trex/m3k/m3k-nvngx.dll`;
+- `.trex/m3k/nvngx_dlssnr.dll`;
+- ReShade/DLAA integration files.
+
+The install scripts also create timestamped rollback backups before replacing runtime files.
