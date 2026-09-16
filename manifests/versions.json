@@ -17,16 +17,18 @@
       "product_name": "DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering",
       "project_checkpoint": "57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f",
       "bbridge_source_commit": "1dad5e6d4dcf8647e354aa9a87f611256fb61142",
+      "temporal_synchronization_internal_name": "A3-S2",
+      "startup_stabilization_internal_name": "A3-S5",
       "a3s2_reference_d3d9_sha256": "6dd40f145a5d503624e3e05ecf0adbaa094cf83b24278c0bb333318e3c52a912",
       "a3s5_reference_feeder_sha256": "c73d8d54271f55f8931f00d62a4cdf605118bea71d7c6bee0b61d0ca7c1cce4b",
       "s27_reference_shim_sha256": "a2e4bedace8d99bc60b5d18e958bd7e98f8887ff40ec45a8674b892e2d1fcbbc",
-      "startup_prime": "1485x835",
-      "startup_prime_synchronized_frames": 180,
+      "startup_stabilization_resolution": "1485x835",
+      "startup_stabilization_synchronized_frames": 180,
       "nr_default_mode": 0,
       "nr_enabled_mode": 2,
       "nr_passes": 1,
-      "hardware_validation": "RTX 4070 Ti SUPER, 2560x1440 presenter; A3-S2 jitter stable across UQ77/Quality/Balanced/Performance/Ultra Performance; A3-S5 automatic prime -> Ultra Performance confirmed steady; native Feature 18 path previously validated on the same GPU.",
-      "notes": "The combined module installs both SR and the NR runtime but leaves NR execution disabled by default. Local builds use frozen source plus build/CPU gates. PE hashes can differ with local MSVC revisions, so the listed bridge/Feeder/shim hashes are hardware-validated references rather than mandatory local-build identity."
+      "hardware_validation": "RTX 4070 Ti SUPER, 2560x1440 output. Temporal synchronization was stable across Custom Ultra Quality (77%), Quality, Balanced, Performance and Ultra Performance. Automatic 1485x835 startup stabilization was confirmed to remove cold-start vibration before returning to Ultra Performance. Native DLSS 5 Neural Rendering was also validated on the same GPU.",
+      "notes": "The combined module installs both Super Resolution and the Neural Rendering runtime while leaving Neural Rendering disabled by default. A3-S2 and A3-S5 are retained only as internal checkpoint identifiers. Local builds use frozen source plus build/CPU gates. PE hashes can differ with local MSVC revisions, so the listed bridge/Feeder/shim hashes are hardware-tested references rather than mandatory local-build identity."
     },
     "reshade": {
       "version": "6.8.0",
@@ -60,7 +62,8 @@
       "dll_sha256": "3975567b8943c53acce397f2b72380092f84f162d00b0d2c7d08a1025c563983"
     },
     "nvngx_dlssnr": {
-      "product": "DLSS 5 Neural Rendering / NGX Feature 18 runtime",
+      "product": "DLSS 5 Neural Rendering runtime",
+      "internal_ngx_identifier": "Feature 18 / NR18",
       "version": "310.8.0-RTX40",
       "variant": "community RTX 40/50 build, sm_89 compatible",
       "package_url": "https://github.com/RankFTW/rhi-repo/releases/download/dlssnr-310.8.0-RTX40/nvngx_dlssnr_310.8.0-RTX40.zip",
@@ -69,7 +72,7 @@
       "redistributed": false,
       "installed_automatically": true,
       "default_enabled": false,
-      "notes": "Downloaded and hash-verified automatically by Install-DLSS-Full.bat. Known-good on RTX 4070 Ti SUPER. The module installs it to .trex/m3k/nvngx_dlssnr.dll and keeps M3K Mode=0 until the user enables NR."
+      "notes": "Downloaded and hash-verified automatically by Install-DLSS-Full.bat. Known-good on RTX 4070 Ti SUPER. Installed to .trex/m3k/nvngx_dlssnr.dll and left OFF until the user enables Neural Rendering through DLSS-Full-Control.bat."
     }
   }
 }
