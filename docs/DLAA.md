@@ -1,5 +1,9 @@
 # DLAA installation
 
+## Purpose
+
+Step 2 creates a clean, known-good DLAA baseline before the ReShade input fix and combined DLSS 4.5 SR + DLSS 5 NR module are added.
+
 ## Prerequisites
 
 Use GTA IV Complete Edition with a clean, working **FusionFix 5.0.1** installation.
@@ -11,15 +15,21 @@ Before running the project installer:
 3. close GTA IV completely;
 4. make sure no old `.trex` folder or previous b-bridge experiment remains.
 
-The installer is deliberately strict about this clean baseline because its automatic rollback logic assumes it.
+The installer is deliberately strict because its rollback logic assumes a clean FusionFix baseline.
 
 ## Install
 
-Copy `install/Install-DLAA.bat` into the same folder as `GTAIV.exe` and double-click it.
+Copy:
 
-The BAT contains an embedded PowerShell installer and elevates itself once because ReShade's Vulkan global-layer registration needs Administrator rights.
+```text
+install/Install-DLAA.bat
+```
 
-It downloads only pinned upstream packages and verifies the hashes that are recorded in `manifests/versions.json` where available.
+beside `GTAIV.exe` and run it.
+
+The BAT contains an embedded PowerShell installer and elevates itself because ReShade's global Vulkan-layer registration requires Administrator permission.
+
+It downloads pinned upstream packages and verifies hashes recorded in `manifests/versions.json` where available.
 
 ## Resulting important files
 
@@ -27,7 +37,7 @@ It downloads only pinned upstream packages and verifies the hashes that are reco
 GTAIV\
   dinput8.dll                     FusionFix ASI loader
   d3d9.dll                        b-bridge client
-  d3d9Hooked.dll                  FusionFix's renderer wrapper, chained by b-bridge
+  d3d9Hooked.dll                  FusionFix renderer wrapper chained by b-bridge
   dxvk.conf
   commandline.txt
   .trex\
@@ -38,7 +48,7 @@ GTAIV\
     ReShadePreset.ini
     dlss5-feed.addon64
     dlss5-feed.cfg
-    nvngx_dlss.dll
+    nvngx_dlss.dll                310.9.1
     reshade-shaders\
       Shaders\
         lumenite_Kernel.fx
@@ -50,7 +60,7 @@ GTAIV\
         lumenite_bluenoise256.png
 ```
 
-## Known-good configuration
+## Known-good base configuration
 
 FusionFix:
 
@@ -67,7 +77,7 @@ Antialiasing=5
 FpsLimitPreset=0
 ```
 
-`commandline.txt` contains:
+`commandline.txt`:
 
 ```text
 -windowed
@@ -91,47 +101,55 @@ TechniqueSorting=Lumenite_Kernel@lumenite_Kernel.fx,DLSS5_Feed@DLSS5_Feed.fx,DLS
 PreprocessorDefinitions=DLSS5_MV_PROVIDER=3
 ```
 
-Do not append `\**` to the ReShade shader search paths in this stack; that previously produced invalid-path/shader-loading failures.
+Do not append `\**` to the ReShade shader search paths in this stack.
+
+## What Step 2 intentionally does not install
+
+The DLAA baseline does not yet install the native M3K NR runtime or A3-S2/A3-S5 SR path.
+
+In particular, after Step 2 you should not yet have:
+
+```text
+.trex\m3k-nr.ini
+.trex\m3k\m3k-nvngx.dll
+.trex\m3k\nvngx_dlssnr.dll
+```
+
+Those arrive automatically in Step 4.
 
 ## DLAA model / preset selector
 
-After the ReShade b-bridge input patch from **Step 3** of the main README is installed, the existing DLSS5-Feeder model selector becomes fully interactive.
-
-Launch GTA IV and press **Home**, then go to:
+After completing the ReShade b-bridge input patch in Step 3, press Home and open:
 
 ```text
 Add-ons -> DLSS 5 Feed -> DLSS render preset -> Preset
 ```
 
-### What each preset means
+Recommended starting point: **K**.
 
-| Preset | Model type | What it means / when to use it |
-|---|---|---|
-| **K** | Modern transformer | **Recommended.** NVIDIA defines K as the default preset for DLAA, Quality and Balanced. It targets the best image quality, with somewhat higher GPU cost than older models. Start here. |
-| **J** | Modern transformer | Very similar to K. NVIDIA notes that J can show a little less ghosting, but may introduce more flicker. Try it if K leaves visible trails or temporal smearing. |
-| **Default** | Runtime-selected | Does not force a specific model. The NVIDIA runtime chooses its default, which may change with runtime/OTA behavior. Use this if you want the runtime's normal policy instead of pinning a model. |
-| **E** | Legacy CNN | Deprecated by NVIDIA. Kept mainly as a troubleshooting option. In this Feeder setup, older CNN behavior can sometimes reduce motion/transparency warping around things like smoke, dust or flames. |
-| **F** | Legacy CNN | Also a deprecated legacy CNN preset. Treat it like E: not a normal quality upgrade, but another fallback to try if the transformer presets produce motion artifacts. |
+- **K** — modern transformer; normal recommendation.
+- **J** — modern alternative; may trade a little less ghosting for more flicker.
+- **Default** — runtime-selected policy.
+- **E/F** — legacy CNN troubleshooting choices.
 
-There is **no universal quality ladder** where E < F < J < K in every scene. K is the normal recommendation; J is the modern alternative; E/F are compatibility/troubleshooting choices.
+Changing the preset rebuilds the DLSS feature and may briefly hitch.
 
-Changing the preset in the Home menu causes Feeder to rebuild the DLSS feature and stores the selected value in `.trex\dlss5-feed.cfg`. A short hitch while the feature rebuilds is normal.
+At this stage GTA IV still renders at native resolution; this selector does not by itself enable Super Resolution.
 
-This control changes the **DLAA model/preset only**. It does not turn GTA IV into DLSS Super Resolution Quality/Balanced/Performance; the game still renders at native resolution and the DLSS feature remains DLAA / 1:1.
+## Verify before continuing
 
-## What the DLAA installer intentionally does not install
+Launch GTA IV and inspect:
 
-The base install removes/avoids:
+```text
+.trex\dlss5-feed.log
+```
 
-- `nvngx_dlssnr.dll`
-- Deep Fried Chicken
-- RenoDX DLSS5 provider add-ons
-- OptiScaler neural consumers
+Expected evidence includes:
 
-The point is to establish a known-good DLAA baseline before adding Neural Rendering.
+```text
+DLSS5_MV_PROVIDER=3
+feature ready: <native resolution> DLAA ...
+frame ... delivered
+```
 
-## After installation
-
-Launch GTA IV normally. The first launch may spend time compiling shaders.
-
-Then inspect `.trex\dlss5-feed.log`. See `VERIFY.md`.
+Only after the DLAA baseline works should you continue to Step 3 and Step 4.
