@@ -11,14 +11,15 @@ if not exist "%GTA%GTAIV.exe" (
 )
 
 for /f %%I in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd_HHmmss"') do set "STAMP=%%I"
-set "DEST=%PARENT%\GTAIV_DLAA_WORKING_BACKUP_%STAMP%"
+set "DEST=%PARENT%\GTAIV_DLSS_WORKING_BACKUP_%STAMP%"
 
 mkdir "%DEST%" >nul 2>&1
 mkdir "%DEST%\plugins" >nul 2>&1
 mkdir "%DEST%\.trex" >nul 2>&1
+mkdir "%DEST%\.trex\m3k" >nul 2>&1
 
 echo Backing up root integration files...
-for %%F in (d3d9.dll d3d9Hooked.dll dxvk.conf commandline.txt dinput8.dll) do (
+for %%F in (d3d9.dll d3d9Hooked.dll dxvk.conf commandline.txt dinput8.dll DLSS-Full-Control.bat DLSS_FULL_INSTALLED.txt) do (
   if exist "%GTA%%%F" copy /Y "%GTA%%%F" "%DEST%\%%F" >nul
 )
 
@@ -27,19 +28,22 @@ for %%F in ("%GTA%plugins\*FusionFix*.asi" "%GTA%plugins\*FusionFix*.cfg" "%GTA%
   if exist "%%~F" copy /Y "%%~F" "%DEST%\plugins\" >nul
 )
 
-echo Backing up bridge/ReShade/DLAA/DFC files...
+echo Backing up bridge, ReShade, DLAA and DLSS integration files...
 for %%F in (
   NvRemixBridge.exe d3d9vk_x64.dll bridge.conf ReShade.ini ReShadePreset.ini
-  dlss5-feed.addon64 dlss5-feed.cfg nvngx_dlss.dll nvngx_dlssnr.dll
-  deep-fried-chicken.addon64 deep-fried-chicken-nvngx.dll deep-fried-chicken.cfg
+  dlss5-feed.addon64 dlss5-feed.cfg nvngx_dlss.dll m3k-nr.ini
 ) do (
   if exist "%GTA%.trex\%%F" copy /Y "%GTA%.trex\%%F" "%DEST%\.trex\%%F" >nul
+)
+
+for %%F in (m3k-nvngx.dll nvngx_dlssnr.dll) do (
+  if exist "%GTA%.trex\m3k\%%F" copy /Y "%GTA%.trex\m3k\%%F" "%DEST%\.trex\m3k\%%F" >nul
 )
 
 if exist "%GTA%.trex\reshade-shaders" xcopy "%GTA%.trex\reshade-shaders" "%DEST%\.trex\reshade-shaders\" /E /I /Y /Q >nul
 
 (
-  echo GTA IV DLAA / DLSS5 integration backup
+  echo GTA IV DLAA / DLSS 4.5 SR / DLSS 5 NR integration backup
   echo Created: %DATE% %TIME%
   echo Source: %GTA%
   echo.
