@@ -1,0 +1,36 @@
+name: Publish M3K DXVK Presenter
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/publish-m3k-dxvk-presenter.yml'
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download verified presenter artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download 35128854650 --repo "$GITHUB_REPOSITORY" --name m3k-dxvk-v3.0.2-presenter --dir presenter
+          test -f presenter/d3d9vk_x64.dll
+          echo "511e0c2509e1922db2ec38940507ba956908fe6dc5fd9b3db9fec489dc05f297  presenter/d3d9vk_x64.dll" | sha256sum -c -
+
+      - name: Publish immutable presenter release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag='m3k-dxvk-v3.0.2-a2s1b'
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag
+          fi
+          gh release create "$tag" presenter/d3d9vk_x64.dll \
+            --repo "$GITHUB_REPOSITORY" \
+            --title 'M3K DXVK 3.0.2 Presenter (A2-S1B)' \
+            --notes 'Pinned DXVK v3.0.2 presenter built from upstream commit 6b20f622a77b87b2921fe5d2c1774d2f2ba3e9b7 plus the frozen M3K source-tap and A2-S1B render/output split patches from project checkpoint 57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f. DLL SHA256: 511E0C2509E1922DB2EC38940507BA956908FE6DC5FD9B3DB9FEC489DC05F297.'
