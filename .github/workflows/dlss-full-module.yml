@@ -39,8 +39,8 @@ jobs:
             '6DD40F145A5D503624E3E05ECF0ADBAA094CF83B24278C0BB333318E3C52A912',
             'C73D8D54271F55F8931F00D62A4CDF605118BEA71D7C6BEE0B61D0CA7C1CCE4B',
             'A2E4BEDACE8D99BC60B5D18E958BD7E98F8887FF40EC45A8674B892E2D1FCBBC',
-            'e5c2300128e89d6a16b3eb370f58a7e9b623c145',
-            '8F94C0C8035DC745E39CB4716F8A17E732B7F04689BECF5C6C6A0739253620F6',
+            '6d31f05862eeb51f05e86455696c0838d4f62a71',
+            'D0EA12FC652C21FD2D7FC7F56DF1F7703F361226BD5D26A26C6A9AAB3579D1C1',
             'https://github.com/RankFTW/rhi-repo/releases/download/dlssnr-310.8.0-RTX40/nvngx_dlssnr_310.8.0-RTX40.zip',
             '46124CFAEF532AD5F6DA07494772EA8C1B3E719F934E254385697F38D1289E3F',
             '4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05',
@@ -82,6 +82,8 @@ jobs:
           $full = $manifest.components.'dlss-full'
           if ($full.project_checkpoint -ne '57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f') { throw 'Manifest checkpoint mismatch' }
           if ($full.nr_default_mode -ne 0 -or $full.nr_enabled_mode -ne 2 -or $full.nr_passes -ne 1) { throw 'Manifest NR mode contract mismatch' }
+          if ($full.public_reshade_controls_commit -ne '6d31f05862eeb51f05e86455696c0838d4f62a71') { throw 'Manifest public ReShade controls commit mismatch' }
+          if ($full.public_reshade_controls_sha256.ToUpperInvariant() -ne 'D0EA12FC652C21FD2D7FC7F56DF1F7703F361226BD5D26A26C6A9AAB3579D1C1') { throw 'Manifest public ReShade controls hash mismatch' }
           if ($full.a3s2_reference_d3d9_sha256.ToUpperInvariant() -ne '6DD40F145A5D503624E3E05ECF0ADBAA094CF83B24278C0BB333318E3C52A912') { throw 'Manifest temporal-sync reference hash mismatch' }
           if ($full.a3s5_reference_feeder_sha256.ToUpperInvariant() -ne 'C73D8D54271F55F8931F00D62A4CDF605118BEA71D7C6BEE0B61D0CA7C1CCE4B') { throw 'Manifest pre-UI Feeder reference hash mismatch' }
           if ($full.s27_reference_shim_sha256.ToUpperInvariant() -ne 'A2E4BEDACE8D99BC60B5D18E958BD7E98F8887FF40EC45A8674B892E2D1FCBBC') { throw 'Manifest shim reference hash mismatch' }
