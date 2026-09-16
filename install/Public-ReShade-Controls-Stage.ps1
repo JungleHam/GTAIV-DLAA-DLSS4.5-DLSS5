@@ -193,7 +193,7 @@ foreach ($marker in @(
         'True render target:',
         'DXVK source now:',
     'Custom Ultra Quality (77%)',
-    'Quality##M3KSRProfile')) {
+    'Mode##M3KSRProfile')) {
     if ($verify.IndexOf($marker, [StringComparison]::Ordinal) -lt 0) {
         throw "Public ReShade controls verification marker missing: $marker"
     }
