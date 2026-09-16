@@ -1,0 +1,128 @@
+name: DLSS Full Module Reproducibility
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'install/Install-DLSS-Full.bat'
+      - 'install/DLSS-Full-Control.bat'
+      - 'docs/DLSS-FULL.md'
+      - 'manifests/versions.json'
+      - '.github/workflows/dlss-full-module.yml'
+
+jobs:
+  reproduce-dlss-full:
+    runs-on: windows-2022
+    timeout-minutes: 60
+    steps:
+      - name: Checkout public module
+        uses: actions/checkout@v4
+
+      - name: Static module checks
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = Get-Content install/Install-DLSS-Full.bat -Raw
+          $control = Get-Content install/DLSS-Full-Control.bat -Raw
+          $manifest = Get-Content manifests/versions.json -Raw | ConvertFrom-Json
+
+          foreach ($marker in @(
+            "57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f",
+            "1dad5e6d4dcf8647e354aa9a87f611256fb61142",
+            "6DD40F145A5D503624E3E05ECF0ADBAA094CF83B24278C0BB333318E3C52A912",
+            "C73D8D54271F55F8931F00D62A4CDF605118BEA71D7C6BEE0B61D0CA7C1CCE4B",
+            "A2E4BEDACE8D99BC60B5D18E958BD7E98F8887FF40EC45A8674B892E2D1FCBBC",
+            "StartupPrimeWidth=1485",
+            "StartupPrimeHeight=835",
+            "StartupPrimeFrames=180",
+            "Mode=0")) {
+            if (-not $installer.Contains($marker)) { throw "Installer missing marker: $marker" }
+          }
+
+          # The profile/launch helper must preserve Mode so a later NR module is not disabled.
+          $armStart = $control.IndexOf('function Arm-Prime')
+          $profileStart = $control.IndexOf('function Set-Profile')
+          if ($armStart -lt 0 -or $profileStart -le $armStart) { throw 'Could not locate Arm-Prime helper' }
+          $armBody = $control.Substring($armStart, $profileStart - $armStart)
+          if ($armBody -match "Set-Ini\s+'Mode'") { throw 'DLSS-Full-Control must preserve the installed NR Mode' }
+          foreach ($marker in @("Set-Ini 'RenderWidth' '1485'", "Set-Ini 'RenderHeight' '835'", "Set-Ini 'StartupPrimeFrames' '180'")) {
+            if (-not $armBody.Contains($marker)) { throw "Control helper missing marker: $marker" }
+          }
+
+          $full = $manifest.components.'dlss-full'
+          if ($full.project_checkpoint -ne '57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f') { throw 'Manifest checkpoint mismatch' }
+          if ($full.a3s2_reference_d3d9_sha256.ToUpperInvariant() -ne '6DD40F145A5D503624E3E05ECF0ADBAA094CF83B24278C0BB333318E3C52A912') { throw 'Manifest A3-S2 hash mismatch' }
+          if ($full.a3s5_reference_feeder_sha256.ToUpperInvariant() -ne 'C73D8D54271F55F8931F00D62A4CDF605118BEA71D7C6BEE0B61D0CA7C1CCE4B') { throw 'Manifest A3-S5 hash mismatch' }
+          if ($full.s27_reference_shim_sha256.ToUpperInvariant() -ne 'A2E4BEDACE8D99BC60B5D18E958BD7E98F8887FF40EC45A8674B892E2D1FCBBC') { throw 'Manifest S2.7 shim hash mismatch' }
+          Write-Host 'Static module checks passed.'
+
+      - name: Checkout frozen A3-S5 project source
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git clone --filter=blob:none https://github.com/JungleHam/GTAIV-DLAA-DLSS5.git _verify_project
+          git -C _verify_project checkout 57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f
+          $head = git -C _verify_project rev-parse HEAD
+          if ($head.Trim() -ne '57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f') { throw "Wrong frozen project revision: $head" }
+
+      - name: Build frozen A3-S5 Feeder chain
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\_verify_project\tools\m3k-nr\build-a3-s5.ps1
+          if ($LASTEXITCODE -ne 0) { throw "A3-S5 build failed: $LASTEXITCODE" }
+          $feeder = '.\_verify_project\tools\m3k-nr\out-m3k-a3-s5\dlss5-feed.addon64'
+          $shim = '.\_verify_project\tools\m3k-nr\out-m3k-s27\m3k\m3k-nvngx.dll'
+          if (-not (Test-Path $feeder)) { throw 'Missing A3-S5 Feeder output' }
+          if (-not (Test-Path $shim)) { throw 'Missing stable S2.7 shim output' }
+          $fh = (Get-FileHash -Algorithm SHA256 $feeder).Hash
+          $sh = (Get-FileHash -Algorithm SHA256 $shim).Hash
+          if ($fh -ne 'C73D8D54271F55F8931F00D62A4CDF605118BEA71D7C6BEE0B61D0CA7C1CCE4B') { throw "A3-S5 reference hash mismatch: $fh" }
+          if ($sh -ne 'A2E4BEDACE8D99BC60B5D18E958BD7E98F8887FF40EC45A8674B892E2D1FCBBC') { throw "S2.7 shim reference hash mismatch: $sh" }
+          Write-Host "A3-S5 Feeder: $fh"
+          Write-Host "S2.7 shim:     $sh"
+
+      - name: Clone and patch frozen b-bridge
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git clone --filter=blob:none https://github.com/gutbash/b-bridge.git _verify_bbridge
+          git -C _verify_bbridge checkout 1dad5e6d4dcf8647e354aa9a87f611256fb61142
+          git -C _verify_bbridge submodule update --init --recursive
+          $head = git -C _verify_bbridge rev-parse HEAD
+          if ($head.Trim() -ne '1dad5e6d4dcf8647e354aa9a87f611256fb61142') { throw "Wrong b-bridge revision: $head" }
+          python .\_verify_project\tools\m3k-nr\a2-s21-bbridge-ui.py .\_verify_bbridge
+          if ($LASTEXITCODE -ne 0) { throw 'UI patch failed' }
+          python .\_verify_project\tools\m3k-nr\a3-s2-bbridge-coherent-draw-jitter.py .\_verify_bbridge
+          if ($LASTEXITCODE -ne 0) { throw 'A3-S2 patch failed' }
+          git -C _verify_bbridge diff --check
+          if ($LASTEXITCODE -ne 0) { throw 'Patched b-bridge diff check failed' }
+
+      - name: Setup pinned Meson
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check meson==0.64.1 ninja==1.11.1.1
+
+      - name: Build exact A3-S2 x86 client
+        shell: pwsh
+        working-directory: _verify_bbridge
+        run: |
+          $ErrorActionPreference = 'Stop'
+          . .\build_common.ps1
+          SetupVS -Platform x86
+          meson setup --buildtype release --backend ninja _compVerify --debug
+          if ($LASTEXITCODE -ne 0) { throw "Meson setup failed: $LASTEXITCODE" }
+          Copy-Item .\Directory.Build.Props -Destination .\_compVerify -Force
+          meson compile -C _compVerify d3d9
+          if ($LASTEXITCODE -ne 0) { throw "d3d9 build failed: $LASTEXITCODE" }
+          $bridge = '.\_compVerify\src\client\d3d9.dll'
+          if (-not (Test-Path $bridge)) { throw 'Missing A3-S2 d3d9.dll' }
+          $bh = (Get-FileHash -Algorithm SHA256 $bridge).Hash
+          if ($bh -ne '6DD40F145A5D503624E3E05ECF0ADBAA094CF83B24278C0BB333318E3C52A912') { throw "A3-S2 reference hash mismatch: $bh" }
+          Write-Host "A3-S2 bridge: $bh"
+
+      - name: Module verification summary
+        shell: pwsh
+        run: |
+          Write-Host 'DLSS Full public module reproduces the hardware-validated A3-S2/A3-S5/S2.7 runtime payload on windows-2022.' -ForegroundColor Green
