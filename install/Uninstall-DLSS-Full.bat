@@ -55,7 +55,15 @@ $FullOnly = @(
 
 function Hash([string]$Path) {
     if (-not (Test-Path -LiteralPath $Path)) { return '<missing>' }
-    return (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash.ToUpperInvariant()
+    $stream = [IO.File]::OpenRead($Path)
+    try {
+        $sha = [Security.Cryptography.SHA256]::Create()
+        try { $bytes = $sha.ComputeHash($stream) }
+        finally { $sha.Dispose() }
+    } finally {
+        $stream.Dispose()
+    }
+    return ([BitConverter]::ToString($bytes)).Replace('-','')
 }
 
 function Assert-SHA256([string]$Path,[string]$Expected) {
