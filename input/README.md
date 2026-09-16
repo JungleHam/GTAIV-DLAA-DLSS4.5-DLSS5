@@ -1,66 +1,47 @@
-# User-supplied files
+# Input / local runtime files
 
-This repository deliberately does **not** redistribute Deep Fried Chicken or `nvngx_dlssnr.dll`.
+## Normal installation: nothing to bring
 
-For the tested DLSS 5 Neural Rendering upgrade, place these files either beside `Upgrade-DLSS5-DFC.bat`, on your Desktop, or in Downloads:
+The current supported install flow does **not** require any manually downloaded files in this directory.
+
+You do **not** need to supply:
 
 ```text
-Deep-Fried-Chicken-v1.7.4-checkpoint-70-chicken-assist-reliability.7z
+Deep Fried Chicken
 nvngx_dlssnr.dll
+nvngx_dlss.dll
 ```
 
-## Where to get them
+The normal installers fetch the pinned runtime packages automatically and verify their hashes.
 
-### Deep Fried Chicken
+## Current automatic runtime sources
 
-The tested DFC build came from the Deep Fried Chicken community distribution used by DLSS5-Feeder:
-
-- Deep Fried Chicken / community Discord: https://discord.gg/g2v2XGqvR
-- DLSS5-Feeder project: https://github.com/jlrouzies-fr/DLSS5-Feeder
-
-The exact tested archive is:
+DLSS 4.5 SR / DLAA:
 
 ```text
-Deep-Fried-Chicken-v1.7.4-checkpoint-70-chicken-assist-reliability.7z
+nvngx_dlss.dll 310.9.1
+https://github.com/RankFTW/rhi-repo/releases/download/dlss-310.9.1/nvngx_dlss_310.9.1.zip
 ```
 
-### `nvngx_dlssnr.dll`
-
-The tested Neural Rendering DLL was obtained through **DLSS5 Autopilot**:
-
-- Project: https://github.com/Kizzuwatnaa/DLSS5-Autopilot
-- Releases: https://github.com/Kizzuwatnaa/DLSS5-Autopilot/releases
-
-The file used by this project was the **RTX 40-series-compatible community build** used by DLSS5 Autopilot for Ada / `sm_89` GPUs. Autopilot identifies this branch as:
+DLSS 5 Neural Rendering:
 
 ```text
-310.8.0-RTX40
-community build
-sm_89
+nvngx_dlssnr.dll 310.8.0-RTX40
+https://github.com/RankFTW/rhi-repo/releases/download/dlssnr-310.8.0-RTX40/nvngx_dlssnr_310.8.0-RTX40.zip
 ```
 
-That is the build intended for RTX 40-series cards such as the RTX 4070 family. The successful reference setup for this repository used an **RTX 4070 Ti SUPER**.
-
-This is important: do **not** substitute the stock RTX 50 FP8 build and assume it is equivalent. `nvngx_dlssnr.dll` is architecture-specific.
-
-## Known-good hashes
-
-The installer identifies the user-supplied files by SHA256 rather than trusting filenames.
+The combined Step 4 installer verifies:
 
 ```text
-DFC archive:
-91dc4137b1f2d7cdbd7f9eb4de9d33848b59e3af7a747d5d798271ee262eab09
+NR package SHA256:
+46124CFAEF532AD5F6DA07494772EA8C1B3E719F934E254385697F38D1289E3F
 
-nvngx_dlssnr.dll 310.8.0 RTX 40-compatible build:
-4b8d19bc3eff58a084f5eca7489c921501c203450169fb82ff4f649a4482ba05
+Extracted nvngx_dlssnr.dll SHA256:
+4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05
 ```
 
-The tested DFC archive is password protected with:
+## Why this folder still exists
 
-```text
-chicken
-```
+It is kept only as a convenient ignored location for developers doing local runtime experiments. Files placed here are not consumed by the normal current installer.
 
-`nvngx_dlss.dll` does **not** need to be supplied again: the DLSS 5 upgrade verifies and reuses the 310.9.1 DLL installed by `Install-DLAA.bat`.
-
-If your files do not match these hashes, the installer stops instead of silently mixing untested versions.
+Do not commit proprietary/runtime DLLs or archives to the repository.
