@@ -9,38 +9,13 @@ GTAIV.exe owns the game HWND
 NvRemixBridge.exe runs Vulkan + ReShade
 ```
 
-The ReShade overlay is rendered correctly, but stock ReShade refuses normal input capture because the target HWND belongs to another process.
-
-That is why the server-side ReShade UI can be visible but cannot normally be clicked.
+The ReShade overlay can render correctly, but stock ReShade refuses normal input capture because the target HWND belongs to another process.
 
 ## Discovery
 
-b-bridge's GTA-side client already contains a DirectInput forwarder. It translates GTA input into ordinary Windows messages:
+b-bridge's GTA-side client already forwards DirectInput state as ordinary Windows messages and retains the old Remix registration/UI-active message channel.
 
-```text
-WM_KEYDOWN / WM_KEYUP / WM_CHAR
-WM_MOUSEMOVE
-WM_LBUTTONDOWN / UP
-WM_RBUTTONDOWN / UP
-WM_MOUSEWHEEL
-...
-```
-
-It also retains the RTX Remix renderer registration message:
-
-```text
-UWM_REMIX_BRIDGE_REGISTER_THREADPROC_MSG
-```
-
-and UI-state message:
-
-```text
-UWM_REMIX_UIACTIVE_MSG
-```
-
-The missing piece in the non-RTX-DXVK b-bridge path was a renderer-side consumer.
-
-The debug POC under `tools/debug/bridge-input-poc/` proved the complete transport:
+The debug POC under `tools/debug/bridge-input-poc/` proved the transport:
 
 ```text
 GTA IV
@@ -49,52 +24,48 @@ GTA IV
  -> NvRemixBridge x64
 ```
 
-including Home, mouse moves, left/right clicks and keyboard messages.
+including Home, mouse movement, clicks and keyboard messages.
 
 ## Final patch
 
-`apply_patch.ps1` makes two targeted changes to the exact ReShade 6.8.0 source.
+`apply_patch.ps1` makes targeted changes to the exact ReShade 6.8.0 source.
 
 ### `source/input_windows.cpp`
 
 It:
 
-- accepts the foreign GTA HWND instead of returning `nullptr`;
+- accepts the foreign GTA HWND;
 - starts a message-queue worker;
-- registers itself with b-bridge through `UWM_REMIX_BRIDGE_REGISTER_THREADPROC_MSG`;
-- reconstructs the foreign HWND on forwarded thread messages;
-- forwards those messages into ReShade's existing `input::handle_window_message` path.
-
-This deliberately uses ReShade's **normal input system** rather than maintaining a separate ImGui implementation.
+- registers with b-bridge through `UWM_REMIX_BRIDGE_REGISTER_THREADPROC_MSG`;
+- reconstructs the forwarded HWND/message context;
+- routes events through ReShade's normal `input::handle_window_message` path.
 
 ### `source/runtime_gui.cpp`
 
-When the ReShade overlay opens or closes, the patch sends:
+When the ReShade overlay opens/closes, the patch sends:
 
 ```text
 UWM_REMIX_UIACTIVE_MSG
 ```
 
-back to GTA's b-bridge client.
-
-b-bridge can then use its existing UI-active behavior to swallow clicks/keys before the game also reacts to them.
+back to GTA's b-bridge client so the game does not also consume overlay input.
 
 ## Build
 
 Requirements:
 
-- Git
-- Python in PATH
-- Visual Studio 2022 or Build Tools
-- `Desktop development with C++`
+- Git for Windows;
+- Python 3 in `PATH`;
+- Visual Studio 2022 / Build Tools;
+- Desktop development with C++.
 
-No terminal knowledge is required for the normal install flow.
+Normal flow:
 
-1. **Double-click `BUILD.bat`.**
-2. Wait for it to say `SUCCESS` and create `ReShade64-bbridge.dll`.
+1. Double-click **`BUILD.bat`**.
+2. Wait for `BUILD SUCCESS - PATCH MARKER VERIFIED`.
 3. Close the build window.
 
-`BUILD.bat` clones exact ReShade `v6.8.0` with submodules, applies the patch idempotently, and builds:
+The build clones exact ReShade `v6.8.0`, applies the patch idempotently and produces:
 
 ```text
 ReShade64-bbridge.dll
@@ -102,26 +73,22 @@ ReShade64-bbridge.dll
 
 ## Install
 
-First fully close GTA IV and `NvRemixBridge.exe`.
+Fully close GTA IV and `NvRemixBridge.exe`.
 
-Then simply **double-click `INSTALL.bat`**.
+For the current reliable install path:
 
-The installer handles the rest itself:
+1. **Right-click `INSTALL.bat` -> Run as administrator.**
+2. Paste or drag the GTA IV folder containing `GTAIV.exe` into the installer.
+3. Press Enter.
+4. Let the installer back up and replace the global ReShade Vulkan DLL.
 
-1. It asks for your GTA IV folder while still running normally.
-2. Copy/paste the folder path, or drag the folder into the installer window, then press **Enter**.
-3. Windows shows a User Account Control prompt — click **Yes**.
-4. The elevated installer continues automatically with the same folder.
-
-Example path:
+Example:
 
 ```text
 B:\Games\Steam\steamapps\common\Grand Theft Auto IV\GTAIV
 ```
 
-The path is requested before elevation so normal Explorer drag-and-drop works. The script is also deliberately forgiving: if you paste `GTAIV.exe` itself, or select the outer `Grand Theft Auto IV` folder, it tries to resolve the correct `GTAIV` folder automatically.
-
-The script backs up:
+The installer backs up:
 
 ```text
 C:\ProgramData\ReShade\ReShade64.dll
@@ -133,51 +100,60 @@ to:
 C:\ProgramData\ReShade\ReShade64.dll.pre-bbridge-input
 ```
 
-and installs the patched DLL.
-
-It also writes these b-bridge policies if possible:
+It also writes these b-bridge policies where possible:
 
 ```ini
 client.DirectInput.forward.mousePolicy = 3
 client.DirectInput.forward.keyboardPolicy = 3
 ```
 
-## Verify before continuing
+## Verify before Step 4
 
-The installer being able to copy the files is **not enough to prove the input patch is working**.
+File installation alone does not prove the patch works.
 
 After installation:
 
-1. Fully launch GTA IV again.
-2. Wait until you reach a rendered menu or gameplay scene.
-3. Press **Home**.
+1. launch GTA IV;
+2. wait for a rendered menu/gameplay scene;
+3. press **Home**.
 
-Step 3 is only considered successful if the ReShade overlay opens and accepts mouse/keyboard input.
+Step 3 is successful only if:
 
-If **Home does nothing**, stop there and do **not** continue to the DLSS 5 Neural Rendering step yet. Keep these two files for troubleshooting:
+- Home opens/closes ReShade;
+- the ReShade cursor moves;
+- tabs, checkboxes and sliders can be clicked;
+- keyboard input works inside the overlay;
+- the DLSS5-Feeder controls are interactive;
+- closing the overlay returns control to GTA.
+
+If Home does nothing, stop and troubleshoot before installing the combined DLSS 4.5 SR + DLSS 5 NR module.
+
+Useful files:
 
 ```text
 GTAIV\.trex\bridge.conf
 GTAIV\.trex\ReShade.log
 ```
 
-The expected successful result is:
+Expected patched-log evidence may include:
 
-- Home opens/closes ReShade;
-- the ReShade cursor moves;
-- tabs, checkboxes and sliders can be clicked;
-- the DLSS5-Feeder preset selector is interactive;
-- after DFC is installed later, its UI is interactive too;
-- closing the overlay returns control to GTA.
+```text
+b-bridge input relay: accepting foreign render window
+b-bridge input relay: handshake complete
+```
 
 ## Restore stock ReShade
 
-Close GTA IV and `NvRemixBridge.exe`, then simply **double-click `RESTORE_ORIGINAL.bat`**.
+Close GTA IV and `NvRemixBridge.exe`, then run:
 
-It asks for the GTA IV folder first, then requests Administrator permission automatically and continues with the selected folder. No terminal command is required.
+```text
+RESTORE_ORIGINAL.bat
+```
+
+Use the same GTA IV folder when prompted.
 
 ## Scope
 
-The patch is intentionally pinned to ReShade 6.8.0. It should be reviewed/rebased before using it against another ReShade release.
+The patch is pinned to ReShade 6.8.0 and should be reviewed/rebased before use with another ReShade release.
 
-It does not modify DFC, Feeder, LumeniteFX, FusionFix, DXVK or b-bridge binaries.
+It does not provide DLAA, SR or NR by itself. It only restores interactive ReShade input across the b-bridge process boundary.
