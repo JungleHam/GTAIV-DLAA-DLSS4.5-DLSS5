@@ -1,0 +1,82 @@
+name: TEMP Integrate Startup Runtime Fixes
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/tmp-integrate-startup-fixes.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch installer and manifest
+        shell: python
+        run: |
+          from pathlib import Path
+          import json
+
+          installer_path = Path('install/Install-DLSS-Full.bat')
+          text = installer_path.read_text(encoding='utf-8')
+
+          prime_commit = 'dfc68aea19a295ca09f68c3a7ee07eb19068f41b'
+          prime_hash = 'B98BF323C3F454C2B7DB70FDCDE05B0F67954EA9507EA957F8E1A58A6A4BFBDB'
+          ui_commit = 'd4e4c18ae1c4f0907c58b8cdd88813e19985e798'
+          ui_hash = '45F4C4B7957D32BDFDC203375F1B66F500F57B8BD36419D25659BFB342435544'
+
+          anchor = "$PublicControlsHash = '0C602D710F62EB6DF15C86B7B5473A7F3E9F2E1CF3270AEA3976EA512F5907A3'"
+          insert = anchor + f"\n$StartupPrimeFixCommit = '{prime_commit}'\n$StartupPrimeFixUrl = \"https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/$StartupPrimeFixCommit/install/Public-Startup-Prime-Fix-Stage.ps1\"\n$StartupPrimeFixHash = '{prime_hash}'\n$StartupUiFixCommit = '{ui_commit}'\n$StartupUiFixUrl = \"https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/$StartupUiFixCommit/install/Public-BBridge-Startup-UI-Fix.py\"\n$StartupUiFixHash = '{ui_hash}'"
+          if text.count(anchor) != 1:
+              raise SystemExit(f'public controls hash anchor count={text.count(anchor)}')
+          text = text.replace(anchor, insert, 1)
+
+          download_anchor = "    Download-File $PublicControlsUrl $publicStage\n    Assert-SHA256 $publicStage $PublicControlsHash\n"
+          download_new = download_anchor + "\n    Write-Host 'Adding the public startup-prime release fix...' -ForegroundColor Cyan\n    $primeFixStage = Join-Path $Project 'tools\\m3k-nr\\public-startup-prime-fix-stage.ps1'\n    Download-File $StartupPrimeFixUrl $primeFixStage\n    Assert-SHA256 $primeFixStage $StartupPrimeFixHash\n\n    Write-Host 'Adding the public first-launch GTA UI resync fix...' -ForegroundColor Cyan\n    $startupUiFix = Join-Path $Project 'tools\\m3k-nr\\public-bbridge-startup-ui-fix.py'\n    Download-File $StartupUiFixUrl $startupUiFix\n    Assert-SHA256 $startupUiFix $StartupUiFixHash\n"
+          if text.count(download_anchor) != 1:
+              raise SystemExit(f'public stage download anchor count={text.count(download_anchor)}')
+          text = text.replace(download_anchor, download_new, 1)
+
+          old_build = "& (Join-Path $toolRoot 'a3-s5-startup-prime-stage.ps1') -GeneratedRoot $generated\n& (Join-Path $toolRoot 'public-reshade-controls-stage.ps1') -GeneratedRoot $generated -FeederSource (Join-Path $feeder 'src\\dlss5-feed.cpp')"
+          new_build = old_build + "\n& (Join-Path $toolRoot 'public-startup-prime-fix-stage.ps1') -GeneratedRoot $generated -FeederSource (Join-Path $feeder 'src\\dlss5-feed.cpp')"
+          if text.count(old_build) != 1:
+              raise SystemExit(f'build stage anchor count={text.count(old_build)}')
+          text = text.replace(old_build, new_build, 1)
+
+          bridge_anchor = "    & $Python (Join-Path $Project 'tools\\m3k-nr\\a3-s2-bbridge-coherent-draw-jitter.py') $BBridge\n    if ($LASTEXITCODE -ne 0) { Fail 'Temporal-synchronization patch failed.' }\n"
+          bridge_new = bridge_anchor + "    & $Python $startupUiFix $BBridge\n    if ($LASTEXITCODE -ne 0) { Fail 'First-launch GTA UI resync patch failed.' }\n"
+          if text.count(bridge_anchor) != 1:
+              raise SystemExit(f'bridge stage anchor count={text.count(bridge_anchor)}')
+          text = text.replace(bridge_anchor, bridge_new, 1)
+
+          installer_path.write_text(text, encoding='utf-8', newline='\n')
+
+          manifest_path = Path('manifests/versions.json')
+          data = json.loads(manifest_path.read_text(encoding='utf-8'))
+          data['project_status'] = 'tested-core-with-public-startup-runtime-fixes-2026-09-16'
+          full = data['components']['dlss-full']
+          full['startup_prime_public_fix_commit'] = prime_commit
+          full['startup_prime_public_fix_sha256'] = prime_hash.lower()
+          full['startup_stabilization_frame_policy'] = '180 valid synchronized frames cumulative; explicit live DLSS/DLAA mode change cancels startup prime immediately'
+          full['startup_ui_resync_commit'] = ui_commit
+          full['startup_ui_resync_sha256'] = ui_hash.lower()
+          full['startup_ui_resync_behavior'] = 'Posts one logical WM_SIZE when b-bridge first attaches to GTA IV so HUD/map/weapon-wheel layout is initialized without forcing a display resolution.'
+          manifest_path.write_text(json.dumps(data, indent=2) + '\n', encoding='utf-8')
+
+          for marker in (prime_commit, prime_hash, ui_commit, ui_hash, 'public-startup-prime-fix-stage.ps1', 'public-bbridge-startup-ui-fix.py'):
+              if marker not in installer_path.read_text(encoding='utf-8'):
+                  raise SystemExit(f'installer verification missing {marker}')
+      - name: Commit product files
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add install/Install-DLSS-Full.bat manifests/versions.json
+          if (git diff --cached --quiet) { throw 'No product changes produced' }
+          git commit -m "Integrate startup prime escape and GTA UI resync"
+          git push origin HEAD:main
