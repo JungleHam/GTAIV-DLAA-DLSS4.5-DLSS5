@@ -38,15 +38,37 @@ This step is verified by behavior:
 
 If Home does nothing, do not continue to Step 4.
 
-## Step 4 — Verify DLSS Super Resolution
+## Step 4 — Verify the GTA IV DLSS panel
 
-Launch through:
+Launch GTA IV. For the strongest cold-start test, use:
 
 ```text
-DLSS-Full-Control.bat
+DLSS-Full-Control.bat -> L
 ```
 
-and choose `L`.
+Then press **Home** and open:
+
+```text
+Add-ons -> DLSS 5 Feed -> GTA IV DLSS
+```
+
+The panel should contain:
+
+- **Neural Rendering** OFF/ON;
+- **Neural Rendering passes (advanced)**;
+- **DLSS Super Resolution quality**.
+
+The public defaults are:
+
+```text
+DLSS quality:       Quality
+Neural Rendering:  OFF
+NR passes:          1
+```
+
+Quality and Neural Rendering changes should be saved automatically without closing GTA IV.
+
+## Verify startup stabilization
 
 Expected user-visible behavior:
 
@@ -79,7 +101,7 @@ These are log labels, not steps you need to install separately.
 
 Neural Rendering is OFF by default after Step 4.
 
-The config will contain:
+The ReShade checkbox should be unchecked and the config will contain:
 
 ```ini
 Mode=0
@@ -92,13 +114,19 @@ The NR runtime is still installed at:
 .trex\m3k\nvngx_dlssnr.dll
 ```
 
-so you can enable it later without reinstalling Step 4.
+so you can enable it without reinstalling Step 4.
 
 ## Verify Neural Rendering ON
 
-Close GTA IV, run `DLSS-Full-Control.bat`, choose `N`, then launch with `L`.
+Open:
 
-The config becomes:
+```text
+Home -> Add-ons -> DLSS 5 Feed -> GTA IV DLSS
+```
+
+Check **Neural Rendering**.
+
+Within the normal config-poll interval the runtime should switch on safely. The config becomes:
 
 ```ini
 Mode=2
@@ -108,6 +136,7 @@ NRPasses=1
 Successful logs may contain internal strings such as:
 
 ```text
+M3K-UI: ReShade requested Neural Rendering ON
 M3K-A0: DLSS NR runtime found
 M3K-A0: feature 18 creation SUCCESS
 M3K-A1: feature 18 evaluation SUCCESS
@@ -117,6 +146,7 @@ M3K-A2-S2.6: NR18 -> DLAA running ...
 
 Plain-English translation:
 
+- `M3K-UI` = the ReShade settings panel saved the requested change;
 - `feature 18` / `NR18` = **DLSS 5 Neural Rendering**;
 - `creation SUCCESS` = the Neural Rendering feature initialized;
 - `evaluation SUCCESS` = the Neural Rendering pass actually ran;
@@ -126,13 +156,12 @@ A healthy session should continue evaluating Neural Rendering rather than repeat
 
 ## Simple NR A/B test
 
-To compare NR visually without changing anything else:
+To compare Neural Rendering visually without changing anything else:
 
-1. close GTA IV;
-2. run `DLSS-Full-Control.bat` and choose `O` for NR OFF;
-3. launch and capture a scene;
-4. close GTA IV;
-5. run the helper and choose `N` for NR ON;
-6. launch the same SR quality mode and compare the same scene.
+1. open the **GTA IV DLSS** ReShade panel;
+2. turn **Neural Rendering OFF** and capture a scene;
+3. turn **Neural Rendering ON**;
+4. wait for the runtime switch to complete;
+5. capture the same scene with the same DLSS quality mode.
 
 Good comparison targets include thin fences/power lines, foliage, distant detail, night lighting, motion stability and ghosting.
