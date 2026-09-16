@@ -1,16 +1,18 @@
 # Verification
 
-The current stack is verified primarily through:
+You do not need to understand the project's internal stage names to verify the install.
+
+Main runtime log:
 
 ```text
 GTAIV\.trex\dlss5-feed.log
 ```
 
-There is no Deep Fried Chicken log in the current implementation.
+## Step 2 — Verify DLAA
 
-## Step 2 — DLAA baseline
+A healthy DLAA baseline should report that the motion/depth provider is active and DLAA frames are being delivered.
 
-A healthy base should show evidence equivalent to:
+Typical log evidence:
 
 ```text
 DLSS5_MV_PROVIDER=3 (LumeniteFX Kernel)
@@ -18,58 +20,92 @@ feature ready: <output resolution> DLAA ...
 frame ... delivered
 ```
 
-The exact resolution depends on the game output.
+For a normal user, the important checks are:
 
-Healthy runtime probes should show usable depth and non-trivial motion-vector data while moving through the scene.
+- GTA IV launches normally;
+- DLAA is active at the native/output resolution;
+- the image is stable during camera movement.
 
-## Step 4 — DLSS 4.5 Super Resolution
+## Step 3 — Verify the ReShade controls fix
 
-The combined module should first establish the A3-S5 startup prime:
+This step is verified by behavior:
+
+- Home opens/closes ReShade;
+- the ReShade cursor moves;
+- mouse clicks work;
+- keyboard input works inside the overlay;
+- closing the overlay returns control to GTA IV.
+
+If Home does nothing, do not continue to Step 4.
+
+## Step 4 — Verify DLSS Super Resolution
+
+Launch through:
+
+```text
+DLSS-Full-Control.bat
+```
+
+and choose `L`.
+
+Expected user-visible behavior:
+
+1. GTA IV starts through the brief automatic startup-stabilization phase;
+2. the game switches automatically to your saved DLSS quality mode;
+3. the image remains stable instead of entering the old cold-start vibration state.
+
+### Exact debug strings
+
+The runtime still uses internal engineering labels in the log. A successful startup may include:
 
 ```text
 M3K-A3-S5: STARTUP PRIME armed 1485x835
 M3K-SR-LIVE: STARTUP PRIME: Quality contract ... true-source=1485x835 ACCEPTED
 M3K-A3-S5: prime synchronized to A3-S2 jitter ... at 1485x835
 M3K-A3-S5: STARTUP PRIME COMPLETE after 180 synchronized SR frames
+M3K-SR-LIVE: ACTIVE <saved mode> ...
 ```
 
-It should then switch to the saved SR profile:
+Plain-English translation:
 
-```text
-M3K-SR-LIVE: ACTIVE <saved mode> ... -> <presenter resolution>
-```
+- `A3-S5` / `STARTUP PRIME` = **automatic startup stabilization**;
+- `A3-S2 jitter` = **temporal synchronization**;
+- `true-source` = **the game's actual internal render resolution**;
+- `M3K-SR-LIVE: ACTIVE` = **DLSS Super Resolution is running in the selected mode**.
 
-The bridge log should continue to show synchronized draw-boundary jitter rather than upload-time partial jitter.
+These are log labels, not steps you need to install separately.
 
-## DLSS 5 Neural Rendering OFF
+## Verify Neural Rendering OFF
 
-Default combined-module state:
+Neural Rendering is OFF by default after Step 4.
+
+The config will contain:
 
 ```ini
 Mode=0
 NRPasses=1
 ```
 
-`nvngx_dlssnr.dll` is still installed at:
+The NR runtime is still installed at:
 
 ```text
 .trex\m3k\nvngx_dlssnr.dll
 ```
 
-but Feature 18 is not evaluated.
+so you can enable it later without reinstalling Step 4.
 
-## DLSS 5 Neural Rendering ON
+## Verify Neural Rendering ON
 
-Use `DLSS-Full-Control.bat` and choose `N`.
+Close GTA IV, run `DLSS-Full-Control.bat`, choose `N`, then launch with `L`.
 
-Expected configuration:
+The config becomes:
 
 ```ini
 Mode=2
 NRPasses=1
 ```
 
-The proven native M3K path has produced evidence such as:
+Successful logs may contain internal strings such as:
 
 ```text
 M3K-A0: DLSS NR runtime found
@@ -79,33 +115,24 @@ M3K-A1: DLAA running after NR
 M3K-A2-S2.6: NR18 -> DLAA running ...
 ```
 
-A healthy session should continue evaluating Feature 18 rather than repeatedly creating/failing it.
+Plain-English translation:
 
-For a clean A/B comparison:
+- `feature 18` / `NR18` = **DLSS 5 Neural Rendering**;
+- `creation SUCCESS` = the Neural Rendering feature initialized;
+- `evaluation SUCCESS` = the Neural Rendering pass actually ran;
+- `NR18 -> DLAA/SR` = Neural Rendering completed before the following DLSS reconstruction stage.
+
+A healthy session should continue evaluating Neural Rendering rather than repeatedly creating/failing it.
+
+## Simple NR A/B test
+
+To compare NR visually without changing anything else:
 
 1. close GTA IV;
-2. use `DLSS-Full-Control.bat` → `O` for NR OFF;
-3. capture the same scene;
+2. run `DLSS-Full-Control.bat` and choose `O` for NR OFF;
+3. launch and capture a scene;
 4. close GTA IV;
-5. use `DLSS-Full-Control.bat` → `N` for NR ON;
-6. launch with the same SR profile and scene.
+5. run the helper and choose `N` for NR ON;
+6. launch the same SR quality mode and compare the same scene.
 
-Useful visual comparison targets include thin fences/power lines, foliage, distant detail, night lighting, motion stability and ghosting.
-
-## ReShade input patch
-
-Step 3 is verified by behavior, not merely by copied files:
-
-- Home opens/closes ReShade;
-- the ReShade cursor moves;
-- mouse clicks and keyboard input work;
-- the DLSS5-Feeder controls are interactive;
-- closing the overlay returns input to GTA IV.
-
-The patched ReShade log may also contain messages prefixed with:
-
-```text
-b-bridge input relay:
-```
-
-If Home does nothing, do not continue to Step 4 until the input patch is fixed.
+Good comparison targets include thin fences/power lines, foliage, distant detail, night lighting, motion stability and ghosting.
