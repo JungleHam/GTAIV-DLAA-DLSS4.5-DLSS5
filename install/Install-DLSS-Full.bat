@@ -20,11 +20,17 @@ $Checkpoint = '57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f'
 $BBridgeCommit = '1dad5e6d4dcf8647e354aa9a87f611256fb61142'
 $RepoUrl = 'https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5.git'
 $ReferenceBridgeHash = '6DD40F145A5D503624E3E05ECF0ADBAA094CF83B24278C0BB333318E3C52A912'
-$ReferenceFeederHash = 'C73D8D54271F55F8931F00D62A4CDF605118BEA71D7C6BEE0B61D0CA7C1CCE4B'
+$ReferenceCoreFeederHash = 'C73D8D54271F55F8931F00D62A4CDF605118BEA71D7C6BEE0B61D0CA7C1CCE4B'
 $ReferenceShimHash = 'A2E4BEDACE8D99BC60B5D18E958BD7E98F8887FF40EC45A8674B892E2D1FCBBC'
 $NrPackageUrl = 'https://github.com/RankFTW/rhi-repo/releases/download/dlssnr-310.8.0-RTX40/nvngx_dlssnr_310.8.0-RTX40.zip'
 $NrPackageHash = '46124CFAEF532AD5F6DA07494772EA8C1B3E719F934E254385697F38D1289E3F'
 $NrDllHash = '4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05'
+$PublicControlsCommit = 'e5c2300128e89d6a16b3eb370f58a7e9b623c145'
+$PublicControlsUrl = "https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/$PublicControlsCommit/install/Public-ReShade-Controls-Stage.ps1"
+$PublicControlsHash = '8F94C0C8035DC745E39CB4716F8A17E732B7F04689BECF5C6C6A0739253620F6'
+$ControlCommit = 'a6bd0080982398046b20cf39e858f3e016c03492'
+$ControlUrl = "https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/$ControlCommit/install/DLSS-Full-Control.bat"
+$ControlHash = 'F209610F26970939D5B12EFCC13BEE84BB08348B045B2C4442D3177ED142661D'
 $TranscriptStarted = $false
 
 function Fail([string]$Message) { throw $Message }
@@ -115,15 +121,9 @@ try {
     $Git = Need-Command 'git.exe' 'Git for Windows is required for the reproducible combined-module build.'
     $Python = Need-Command 'python.exe' 'Python 3 in PATH is required for the reproducible combined-module build.'
 
-    Write-Host 'Choose the saved DLSS 4.5 Super Resolution quality mode:' -ForegroundColor Yellow
-    Write-Host '  1 = Custom Ultra Quality (77%)'
-    Write-Host '  2 = Quality [recommended default]'
-    Write-Host '  3 = Balanced'
-    Write-Host '  4 = Performance'
-    Write-Host '  5 = Ultra Performance'
-    $profile = (Read-Host 'Profile [2]').Trim()
-    if (-not $profile) { $profile = '2' }
-    if ($profile -notin @('1','2','3','4','5')) { Fail "Invalid profile: $profile" }
+    $profile = '2'
+    Write-Host 'Default DLSS Super Resolution quality: Quality.' -ForegroundColor Yellow
+    Write-Host 'After installation, change quality and Neural Rendering directly inside the ReShade menu.' -ForegroundColor Yellow
 
     if (Test-Path -LiteralPath $Temp) { Remove-Item -LiteralPath $Temp -Recurse -Force }
     New-Item -ItemType Directory -Path $Temp -Force | Out-Null
@@ -145,8 +145,27 @@ try {
     if ($head -ne $Checkpoint) { Fail "Wrong project revision: $head" }
 
     Write-Host ''
+    Write-Host 'Adding the public ReShade DLSS controls to the frozen rendering core...' -ForegroundColor Cyan
+    $publicStage = Join-Path $Project 'tools\m3k-nr\public-reshade-controls-stage.ps1'
+    Download-File $PublicControlsUrl $publicStage
+    Assert-SHA256 $publicStage $PublicControlsHash
+
+    $buildScript = Join-Path $Project 'tools\m3k-nr\build-a3-s5.ps1'
+    $buildText = [IO.File]::ReadAllText($buildScript)
+    $buildAnchor = @'
+& (Join-Path $toolRoot 'a3-s5-startup-prime-stage.ps1') -GeneratedRoot $generated
+'@
+    $buildReplacement = @'
+& (Join-Path $toolRoot 'a3-s5-startup-prime-stage.ps1') -GeneratedRoot $generated
+& (Join-Path $toolRoot 'public-reshade-controls-stage.ps1') -GeneratedRoot $generated -FeederSource (Join-Path $feeder 'src\dlss5-feed.cpp')
+'@
+    $count = ([regex]::Matches($buildText,[regex]::Escape($buildAnchor))).Count
+    if ($count -ne 1) { Fail "Could not attach public ReShade controls stage to frozen build; anchor count=$count" }
+    [IO.File]::WriteAllText($buildScript,$buildText.Replace($buildAnchor,$buildReplacement),(New-Object Text.UTF8Encoding($false)))
+
+    Write-Host ''
     Write-Host 'Building the tested DLSS integration from pinned sources...' -ForegroundColor Cyan
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Project 'tools\m3k-nr\build-a3-s5.ps1')
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $buildScript
     if ($LASTEXITCODE -ne 0) { Fail "DLSS integration build failed with exit code $LASTEXITCODE" }
 
     $Feeder = Join-Path $Project 'tools\m3k-nr\out-m3k-a3-s5\dlss5-feed.addon64'
@@ -201,8 +220,8 @@ try {
     Write-Host "  nvngx_dlssnr.dll     $NrDllHash"
     if ($bridgeHash -eq $ReferenceBridgeHash) { Write-Host '  Temporal-synchronization bridge matches the hardware-tested reference binary.' -ForegroundColor Green }
     else { Write-Host '  NOTE: bridge bytes differ from the reference build (local compiler/toolchain), but pinned source + patch validation passed.' -ForegroundColor Yellow }
-    if ($feederHash -eq $ReferenceFeederHash) { Write-Host '  DLSS integration Feeder matches the hardware-tested reference binary.' -ForegroundColor Green }
-    else { Write-Host '  NOTE: Feeder bytes differ from the reference build (local compiler/toolchain), but pinned source + CPU tests passed.' -ForegroundColor Yellow }
+    if ($feederHash -eq $ReferenceCoreFeederHash) { Write-Host '  Feeder matches the pre-UI hardware-tested core reference binary.' -ForegroundColor Green }
+    else { Write-Host '  NOTE: Feeder differs from the pre-UI hardware reference as expected because the public ReShade controls are compiled into it; frozen rendering core + CPU tests passed.' -ForegroundColor Yellow }
     if ($shimHash -eq $ReferenceShimHash) { Write-Host '  DLSS integration shim matches the hardware-tested reference binary.' -ForegroundColor Green }
     else { Write-Host '  NOTE: integration shim bytes differ from the reference build (local compiler/toolchain), but pinned source + CPU tests passed.' -ForegroundColor Yellow }
 
@@ -225,7 +244,7 @@ try {
     $ini = @(
         '[M3K]',
         '; GTA IV DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering',
-        '; Internal checkpoint names: A3-S2 = temporal synchronization; A3-S5 = startup stabilization.',
+        '; Change DLSS quality and Neural Rendering from Home -> Add-ons -> DLSS 5 Feed -> GTA IV DLSS.',
         '; Mode=0: Neural Rendering OFF (default). Mode=2: Neural Rendering ON before DLSS Super Resolution.',
         'Mode=0',
         'SourceProof=0',
@@ -256,30 +275,30 @@ try {
     Set-KeyEquals $feedCfg 'mode' '2'
     Set-KeyEquals $feedCfg 'work_resolution' '100'
 
-    $controlUrl = 'https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/main/install/DLSS-Full-Control.bat'
     $controlPath = Join-Path $Game 'DLSS-Full-Control.bat'
-    Write-Host 'Installing DLSS-Full-Control.bat...' -ForegroundColor Cyan
-    Download-File $controlUrl $controlPath
+    Write-Host 'Installing DLSS-Full-Control.bat (launch / repair / diagnostics)...' -ForegroundColor Cyan
+    Download-File $ControlUrl $controlPath
+    Assert-SHA256 $controlPath $ControlHash
 
     $receipt = @(
         'GTA IV DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering installation receipt',
         "Installed=$(Get-Date -Format o)",
         "ProjectCheckpoint=$Checkpoint",
         "BBridgeCommit=$BBridgeCommit",
-        "SavedDLSSQualityProfile=$profile",
+        'DefaultDLSSQuality=Quality',
         'NeuralRendering=installed-off-by-default',
-        'InternalNRMode=0',
         'NRPasses=1',
+        'SettingsSurface=ReShade Home > Add-ons > DLSS 5 Feed > GTA IV DLSS',
         'StartupStabilization=1485x835',
         'StartupStabilizationFrames=180',
-        'InternalTemporalCheckpoint=A3-S2',
-        'InternalStartupCheckpoint=A3-S5',
+        "PublicControlsCommit=$PublicControlsCommit",
+        "PublicControlsSHA256=$PublicControlsHash",
         "d3d9.dll=$bridgeHash",
         "dlss5-feed.addon64=$feederHash",
         "m3k-nvngx.dll=$shimHash",
         "nvngx_dlssnr.dll=$NrDllHash",
         "ReferenceA3S2Bridge=$ReferenceBridgeHash",
-        "ReferenceA3S5Feeder=$ReferenceFeederHash",
+        "ReferencePreUiA3S5Feeder=$ReferenceCoreFeederHash",
         "ReferenceS27Shim=$ReferenceShimHash",
         "NRPackage=$NrPackageUrl",
         "NRPackageSHA256=$NrPackageHash",
@@ -291,14 +310,16 @@ try {
     Write-Host '====================================================================' -ForegroundColor Green
     Write-Host ' DLSS 4.5 SUPER RESOLUTION + DLSS 5 NEURAL RENDERING INSTALLED' -ForegroundColor Green
     Write-Host '====================================================================' -ForegroundColor Green
-    Write-Host "Saved DLSS quality profile: $profile"
+    Write-Host 'Default DLSS quality: Quality'
     Write-Host 'Neural Rendering runtime: INSTALLED'
     Write-Host 'Neural Rendering: OFF by default'
+    Write-Host 'Neural Rendering passes: 1 (tested public default)'
     Write-Host 'Startup stabilization: 1485x835 -> 180 synchronized frames -> saved DLSS mode'
     Write-Host "Rollback backup: $Backup"
     Write-Host ''
-    Write-Host 'Use DLSS-Full-Control.bat to choose DLSS quality, turn Neural Rendering ON/OFF, and launch with startup stabilization.' -ForegroundColor Yellow
-    Write-Host 'When NR is ON, one Neural Rendering pass runs before DLSS Super Resolution.'
+    Write-Host 'Normal settings are now inside ReShade:' -ForegroundColor Yellow
+    Write-Host '  Home -> Add-ons -> DLSS 5 Feed -> GTA IV DLSS'
+    Write-Host 'Use DLSS-Full-Control.bat only for launch, repair, status, and logs.' -ForegroundColor Yellow
     Write-Host ''
 }
 catch {
