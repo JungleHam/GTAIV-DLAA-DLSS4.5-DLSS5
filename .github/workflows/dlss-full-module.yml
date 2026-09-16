@@ -31,8 +31,18 @@ jobs:
           $installer = Get-Content install/Install-DLSS-Full.bat -Raw
           $control = Get-Content install/DLSS-Full-Control.bat -Raw
           $uiStage = Get-Content install/Public-ReShade-Controls-Stage.ps1 -Raw
-          $uiStageHash = (Get-FileHash -Algorithm SHA256 install/Public-ReShade-Controls-Stage.ps1).Hash.ToUpperInvariant()
-          Write-Host "Public ReShade controls stage SHA256: $uiStageHash"
+          $uiStageCheckoutHash = (Get-FileHash -Algorithm SHA256 install/Public-ReShade-Controls-Stage.ps1).Hash.ToUpperInvariant()
+          Write-Host "Public ReShade controls checkout SHA256 (line-ending dependent): $uiStageCheckoutHash"
+
+          $publicControlsCommit = '4f80efdacccc7a65ffa735e931f34a0ac5f46d35'
+          $publicControlsHash = '913CCB9568BA9FB1738DB88B539FF96D600394CD08895E11CF4743720FB943D3'
+          $uiStageRaw = Join-Path $env:RUNNER_TEMP 'Public-ReShade-Controls-Stage.raw.ps1'
+          $uiStageRawUrl = "https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/$publicControlsCommit/install/Public-ReShade-Controls-Stage.ps1"
+          Invoke-WebRequest -UseBasicParsing -Uri $uiStageRawUrl -OutFile $uiStageRaw
+          $uiStageRawHash = (Get-FileHash -Algorithm SHA256 $uiStageRaw).Hash.ToUpperInvariant()
+          Write-Host "Public ReShade controls raw-download SHA256: $uiStageRawHash"
+          if ($uiStageRawHash -ne $publicControlsHash) { throw "Raw public ReShade controls hash mismatch: expected $publicControlsHash, got $uiStageRawHash" }
+
           $manifest = Get-Content manifests/versions.json -Raw | ConvertFrom-Json
 
           foreach ($marker in @(
@@ -42,7 +52,7 @@ jobs:
             'C73D8D54271F55F8931F00D62A4CDF605118BEA71D7C6BEE0B61D0CA7C1CCE4B',
             'A2E4BEDACE8D99BC60B5D18E958BD7E98F8887FF40EC45A8674B892E2D1FCBBC',
             '4f80efdacccc7a65ffa735e931f34a0ac5f46d35',
-            '18D10AEBCB45739E15E52182CDFB890322553D8DED6E75265540524278326958',
+            '913CCB9568BA9FB1738DB88B539FF96D600394CD08895E11CF4743720FB943D3',
             'https://github.com/RankFTW/rhi-repo/releases/download/dlssnr-310.8.0-RTX40/nvngx_dlssnr_310.8.0-RTX40.zip',
             '46124CFAEF532AD5F6DA07494772EA8C1B3E719F934E254385697F38D1289E3F',
             '4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05',
@@ -85,7 +95,7 @@ jobs:
           if ($full.project_checkpoint -ne '57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f') { throw 'Manifest checkpoint mismatch' }
           if ($full.nr_default_mode -ne 0 -or $full.nr_enabled_mode -ne 2 -or $full.nr_passes -ne 1) { throw 'Manifest NR mode contract mismatch' }
           if ($full.public_reshade_controls_commit -ne '4f80efdacccc7a65ffa735e931f34a0ac5f46d35') { throw 'Manifest public ReShade controls commit mismatch' }
-          if ($full.public_reshade_controls_sha256.ToUpperInvariant() -ne '18D10AEBCB45739E15E52182CDFB890322553D8DED6E75265540524278326958') { throw 'Manifest public ReShade controls hash mismatch' }
+          if ($full.public_reshade_controls_sha256.ToUpperInvariant() -ne '913CCB9568BA9FB1738DB88B539FF96D600394CD08895E11CF4743720FB943D3') { throw 'Manifest public ReShade controls hash mismatch' }
           if ($full.a3s2_reference_d3d9_sha256.ToUpperInvariant() -ne '6DD40F145A5D503624E3E05ECF0ADBAA094CF83B24278C0BB333318E3C52A912') { throw 'Manifest temporal-sync reference hash mismatch' }
           if ($full.a3s5_reference_feeder_sha256.ToUpperInvariant() -ne 'C73D8D54271F55F8931F00D62A4CDF605118BEA71D7C6BEE0B61D0CA7C1CCE4B') { throw 'Manifest pre-UI Feeder reference hash mismatch' }
           if ($full.s27_reference_shim_sha256.ToUpperInvariant() -ne 'A2E4BEDACE8D99BC60B5D18E958BD7E98F8887FF40EC45A8674B892E2D1FCBBC') { throw 'Manifest shim reference hash mismatch' }
