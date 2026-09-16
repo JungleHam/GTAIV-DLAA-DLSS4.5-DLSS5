@@ -48,6 +48,6 @@ jobs:
           foreach ($m in @('_DLSS_FULL_DLAA_BASELINE','Uninstall-DLSS-Full.bat',$contentCommit,$stageHash,$uninstallHash)) { if (-not $installer.Contains($m)) { throw "Installer missing $m" } }
           if (-not $uninstaller.Contains('DLAA-only runtime restored')) { throw 'Uninstaller content validation failed' }
 
-          git add install/Install-DLSS-Full.bat manifests/versions.json .github/workflows/dlss-full-module.yml install/README.md
+          git add install/Install-DLSS-Full.bat manifests/versions.json install/README.md
           git commit -m 'Pin final public controls and DLAA rollback flow'
           git push origin HEAD:main
