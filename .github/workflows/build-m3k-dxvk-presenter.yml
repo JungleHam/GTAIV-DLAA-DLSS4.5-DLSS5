@@ -23,8 +23,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y mingw-w64 meson ninja-build glslang-tools
 
-      - name: Clone exact DXVK 3.0.2 source
+      - name: Clone frozen M3K project and exact DXVK 3.0.2 source
         run: |
+          git clone --filter=blob:none https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5.git _project
+          git -C _project checkout 57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f
+          test "$(git -C _project rev-parse HEAD)" = "57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f"
+
           git clone --recursive https://github.com/doitsujin/dxvk.git _dxvk
           git -C _dxvk checkout 6b20f622a77b87b2921fe5d2c1774d2f2ba3e9b7
           git -C _dxvk submodule update --init --recursive
@@ -32,8 +36,8 @@ jobs:
 
       - name: Apply frozen M3K source tap and presenter patches
         run: |
-          git -C _dxvk apply "$GITHUB_WORKSPACE/tools/m3k-nr/dxvk-v3.0.2-m3k-source-tap.patch"
-          python3 tools/m3k-nr/a2-s1b-dxvk.py _dxvk
+          git -C _dxvk apply "$GITHUB_WORKSPACE/_project/tools/m3k-nr/dxvk-v3.0.2-m3k-source-tap.patch"
+          python3 _project/tools/m3k-nr/a2-s1b-dxvk.py _dxvk
           git -C _dxvk diff --check
           grep -q 'M3K_QueryPresentSourceV1' _dxvk/src/d3d9/d3d9_swapchain.cpp
           grep -q '\[M3K-S1B\] config' _dxvk/src/d3d9/d3d9_swapchain.cpp
