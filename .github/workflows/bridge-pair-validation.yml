@@ -1,0 +1,90 @@
+name: Matched b-bridge Client + Server Validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'install/Install-DLSS-Full.bat'
+      - '.github/workflows/bridge-pair-validation.yml'
+
+jobs:
+  validate-bridge-pair:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - name: Checkout module
+        uses: actions/checkout@v4
+
+      - name: Verify installer installs a matched pair
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installer = Get-Content install/Install-DLSS-Full.bat -Raw
+          foreach ($marker in @(
+            '_compDLSSFull32',
+            '_compDLSSFull64',
+            'SetupVS -Platform x64',
+            "Copy-Item -LiteralPath `$BridgeServer -Destination (Join-Path `$Trex 'NvRemixBridge.exe') -Force",
+            "NvRemixBridge.exe=`$serverHash",
+            'Installed x64 bridge server hash verification failed.')) {
+            if (-not $installer.Contains($marker)) { throw "Installer missing matched-pair marker: $marker" }
+          }
+          Write-Host 'Installer contains matched client/server bridge deployment.' -ForegroundColor Green
+
+      - name: Clone frozen project and pinned b-bridge
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git clone --filter=blob:none https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5.git _verify_project
+          git -C _verify_project checkout 57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f
+          git clone --filter=blob:none https://github.com/gutbash/b-bridge.git _verify_bbridge
+          git -C _verify_bbridge checkout 1dad5e6d4dcf8647e354aa9a87f611256fb61142
+          git -C _verify_bbridge submodule update --init --recursive
+          python .\_verify_project\tools\m3k-nr\a2-s21-bbridge-ui.py .\_verify_bbridge
+          if ($LASTEXITCODE -ne 0) { throw 'UI patch failed' }
+          python .\_verify_project\tools\m3k-nr\a3-s2-bbridge-coherent-draw-jitter.py .\_verify_bbridge
+          if ($LASTEXITCODE -ne 0) { throw 'Temporal-sync patch failed' }
+          git -C _verify_bbridge diff --check
+          if ($LASTEXITCODE -ne 0) { throw 'Patched b-bridge diff check failed' }
+
+      - name: Setup pinned Meson
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check meson==0.64.1 ninja==1.11.1.1
+
+      - name: Build and verify matched x86 client + x64 server
+        shell: pwsh
+        working-directory: _verify_bbridge
+        run: |
+          $ErrorActionPreference = 'Stop'
+          . .\build_common.ps1
+
+          SetupVS -Platform x86
+          meson setup --buildtype release --backend ninja _compPair32 --debug
+          if ($LASTEXITCODE -ne 0) { throw "x86 Meson setup failed: $LASTEXITCODE" }
+          Copy-Item .\Directory.Build.Props -Destination .\_compPair32 -Force
+          meson compile -C _compPair32 d3d9
+          if ($LASTEXITCODE -ne 0) { throw "x86 d3d9 build failed: $LASTEXITCODE" }
+
+          SetupVS -Platform x64
+          meson setup --buildtype release --backend ninja _compPair64 --debug
+          if ($LASTEXITCODE -ne 0) { throw "x64 Meson setup failed: $LASTEXITCODE" }
+          Copy-Item .\Directory.Build.Props -Destination .\_compPair64 -Force
+          meson compile -C _compPair64 NvRemixBridge
+          if ($LASTEXITCODE -ne 0) { throw "x64 NvRemixBridge build failed: $LASTEXITCODE" }
+
+          $client = '.\_compPair32\src\client\d3d9.dll'
+          $server = '.\_compPair64\src\server\NvRemixBridge.exe'
+          if (-not (Test-Path $client)) { throw 'Matched x86 d3d9.dll missing' }
+          if (-not (Test-Path $server)) { throw 'Matched x64 NvRemixBridge.exe missing' }
+
+          $expectedVersion = 'remix-main+1dad5e6d'
+          $clientAscii = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($client))
+          $serverAscii = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($server))
+          if (-not $clientAscii.Contains($expectedVersion)) { throw "x86 client does not embed expected version $expectedVersion" }
+          if (-not $serverAscii.Contains($expectedVersion)) { throw "x64 server does not embed expected version $expectedVersion" }
+
+          Write-Host "x86 client SHA256: $((Get-FileHash -Algorithm SHA256 $client).Hash)"
+          Write-Host "x64 server SHA256: $((Get-FileHash -Algorithm SHA256 $server).Hash)"
+          Write-Host "MATCHED BRIDGE PAIR VERIFIED: $expectedVersion" -ForegroundColor Green
