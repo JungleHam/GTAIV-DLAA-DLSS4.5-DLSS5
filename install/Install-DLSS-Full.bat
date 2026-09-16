@@ -1,4 +1,4 @@
-@rem GTAIV-DLAA-DLSS5 project installer. See docs/DLSS-FULL.md before use.
+@rem GTAIV-DLAA-DLSS4.5-DLSS5 combined SR + NR installer. See docs/DLSS-FULL.md before use.
 @echo off
 setlocal
 set "DLSSF_SELF=%~f0"
@@ -18,9 +18,13 @@ $BBridge = Join-Path $Temp 'bbridge'
 $Venv = Join-Path $Temp 'venv'
 $Checkpoint = '57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f'
 $BBridgeCommit = '1dad5e6d4dcf8647e354aa9a87f611256fb61142'
+$RepoUrl = 'https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5.git'
 $ReferenceBridgeHash = '6DD40F145A5D503624E3E05ECF0ADBAA094CF83B24278C0BB333318E3C52A912'
 $ReferenceFeederHash = 'C73D8D54271F55F8931F00D62A4CDF605118BEA71D7C6BEE0B61D0CA7C1CCE4B'
 $ReferenceShimHash = 'A2E4BEDACE8D99BC60B5D18E958BD7E98F8887FF40EC45A8674B892E2D1FCBBC'
+$NrPackageUrl = 'https://github.com/RankFTW/rhi-repo/releases/download/dlssnr-310.8.0-RTX40/nvngx_dlssnr_310.8.0-RTX40.zip'
+$NrPackageHash = '46124CFAEF532AD5F6DA07494772EA8C1B3E719F934E254385697F38D1289E3F'
+$NrDllHash = '4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05'
 $TranscriptStarted = $false
 
 function Fail([string]$Message) { throw $Message }
@@ -28,6 +32,25 @@ function Fail([string]$Message) { throw $Message }
 function Hash([string]$Path) {
     if (-not (Test-Path -LiteralPath $Path)) { return '<missing>' }
     return (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash.ToUpperInvariant()
+}
+
+function Assert-SHA256([string]$Path,[string]$Expected) {
+    $actual = Hash $Path
+    if ($actual -ne $Expected.ToUpperInvariant()) {
+        Fail "SHA256 mismatch for $Path`nExpected: $Expected`nActual:   $actual"
+    }
+}
+
+function Download-File([string]$Url,[string]$Dest) {
+    Write-Host "Downloading: $Url" -ForegroundColor Cyan
+    $curl = Get-Command curl.exe -ErrorAction SilentlyContinue
+    if ($curl) {
+        & curl.exe -L --fail --retry 3 --connect-timeout 20 --silent --show-error -o $Dest $Url
+        if ($LASTEXITCODE -ne 0) { Fail "Download failed: $Url" }
+    } else {
+        Invoke-WebRequest -UseBasicParsing -Uri $Url -OutFile $Dest
+    }
+    if (-not (Test-Path -LiteralPath $Dest)) { Fail "Downloaded file is missing: $Dest" }
 }
 
 function Write-NoBom([string]$Path,[string[]]$Lines) {
@@ -73,25 +96,25 @@ try {
     $TranscriptStarted = $true
 
     Write-Host ''
-    Write-Host '============================================================' -ForegroundColor Green
-    Write-Host ' GTA IV DLSS FULL - A3-S2 + A3-S5' -ForegroundColor Green
-    Write-Host ' DLAA baseline -> Super Resolution, NR remains OFF' -ForegroundColor Green
-    Write-Host '============================================================' -ForegroundColor Green
+    Write-Host '====================================================================' -ForegroundColor Green
+    Write-Host ' GTA IV - DLSS 4.5 SUPER RESOLUTION + DLSS 5 NEURAL RENDERING' -ForegroundColor Green
+    Write-Host ' A3-S2 coherent jitter + A3-S5 startup prime; NR installed OFF' -ForegroundColor Green
+    Write-Host '====================================================================' -ForegroundColor Green
     Write-Host "Game folder: $Game"
     Write-Host ''
 
     if (-not (Test-Path -LiteralPath (Join-Path $Game 'GTAIV.exe'))) { Fail 'Put this BAT beside GTAIV.exe.' }
-    if (-not (Test-Path -LiteralPath $Trex)) { Fail 'Missing .trex. Install and verify the project DLAA module first.' }
+    if (-not (Test-Path -LiteralPath $Trex)) { Fail 'Missing .trex. Complete the DLAA step first.' }
     foreach ($required in @('d3d9.dll','.trex\NvRemixBridge.exe','.trex\d3d9vk_x64.dll','.trex\dlss5-feed.addon64','.trex\dlss5-feed.cfg','.trex\nvngx_dlss.dll')) {
         if (-not (Test-Path -LiteralPath (Join-Path $Game $required))) { Fail "DLAA prerequisite missing: $required" }
     }
-    if (Get-Process GTAIV -ErrorAction SilentlyContinue) { Fail 'Close GTA IV before installing DLSS Full.' }
-    if (Get-Process NvRemixBridge -ErrorAction SilentlyContinue) { Fail 'Close NvRemixBridge.exe before installing DLSS Full.' }
+    if (Get-Process GTAIV -ErrorAction SilentlyContinue) { Fail 'Close GTA IV before installing the combined module.' }
+    if (Get-Process NvRemixBridge -ErrorAction SilentlyContinue) { Fail 'Close NvRemixBridge.exe before installing the combined module.' }
 
-    $Git = Need-Command 'git.exe' 'Git for Windows is required for the reproducible DLSS Full build.'
-    $Python = Need-Command 'python.exe' 'Python 3 in PATH is required for the reproducible DLSS Full build.'
+    $Git = Need-Command 'git.exe' 'Git for Windows is required for the reproducible combined-module build.'
+    $Python = Need-Command 'python.exe' 'Python 3 in PATH is required for the reproducible combined-module build.'
 
-    Write-Host 'Choose the saved DLSS Super Resolution mode:' -ForegroundColor Yellow
+    Write-Host 'Choose the saved DLSS 4.5 Super Resolution mode:' -ForegroundColor Yellow
     Write-Host '  1 = Custom Ultra Quality (77%)'
     Write-Host '  2 = Quality [recommended default]'
     Write-Host '  3 = Balanced'
@@ -104,7 +127,18 @@ try {
     if (Test-Path -LiteralPath $Temp) { Remove-Item -LiteralPath $Temp -Recurse -Force }
     New-Item -ItemType Directory -Path $Temp -Force | Out-Null
 
-    Run $Git @('clone','--filter=blob:none','https://github.com/JungleHam/GTAIV-DLAA-DLSS5.git',$Project) 'Cloning project source'
+    Write-Host ''
+    Write-Host 'Fetching the pinned DLSS 5 NR runtime for RTX 40/50...' -ForegroundColor Cyan
+    $nrZip = Join-Path $Temp 'nvngx_dlssnr_310.8.0-RTX40.zip'
+    $nrDir = Join-Path $Temp 'dlssnr'
+    Download-File $NrPackageUrl $nrZip
+    Assert-SHA256 $nrZip $NrPackageHash
+    Expand-Archive -LiteralPath $nrZip -DestinationPath $nrDir -Force
+    $NrDll = Get-ChildItem -LiteralPath $nrDir -Filter 'nvngx_dlssnr.dll' -File -Recurse | Select-Object -First 1
+    if (-not $NrDll) { Fail 'nvngx_dlssnr.dll was not found in the pinned NR package.' }
+    Assert-SHA256 $NrDll.FullName $NrDllHash
+
+    Run $Git @('clone','--filter=blob:none',$RepoUrl,$Project) 'Cloning project source'
     Run $Git @('-C',$Project,'checkout',$Checkpoint) 'Checking out frozen A3-S5 checkpoint'
     $head = (& $Git -C $Project rev-parse HEAD).Trim()
     if ($head -ne $Checkpoint) { Fail "Wrong project revision: $head" }
@@ -159,10 +193,11 @@ try {
     $feederHash = Hash $Feeder
     $shimHash = Hash $Shim
     Write-Host ''
-    Write-Host 'Build outputs:' -ForegroundColor Cyan
-    Write-Host "  d3d9.dll            $bridgeHash"
-    Write-Host "  dlss5-feed.addon64  $feederHash"
-    Write-Host "  m3k-nvngx.dll       $shimHash"
+    Write-Host 'Build/runtime outputs:' -ForegroundColor Cyan
+    Write-Host "  d3d9.dll             $bridgeHash"
+    Write-Host "  dlss5-feed.addon64   $feederHash"
+    Write-Host "  m3k-nvngx.dll        $shimHash"
+    Write-Host "  nvngx_dlssnr.dll     $NrDllHash"
     if ($bridgeHash -eq $ReferenceBridgeHash) { Write-Host '  A3-S2 bridge matches the hardware-validated reference binary.' -ForegroundColor Green }
     else { Write-Host '  NOTE: A3-S2 bridge bytes differ from the CI reference (local compiler/toolchain), but pinned source + patch validation passed.' -ForegroundColor Yellow }
     if ($feederHash -eq $ReferenceFeederHash) { Write-Host '  A3-S5 Feeder matches the hardware-validated reference binary.' -ForegroundColor Green }
@@ -174,21 +209,22 @@ try {
     $Backup = Join-Path $Game ("_DLSS_FULL_PREINSTALL_BACKUP_" + $stamp)
     New-Item -ItemType Directory -Path $Backup -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $Backup '.trex\m3k') -Force | Out-Null
-    foreach ($rel in @('d3d9.dll','.trex\dlss5-feed.addon64','.trex\dlss5-feed.cfg','.trex\m3k-nr.ini','.trex\m3k\m3k-nvngx.dll')) {
+    foreach ($rel in @('d3d9.dll','.trex\dlss5-feed.addon64','.trex\dlss5-feed.cfg','.trex\m3k-nr.ini','.trex\m3k\m3k-nvngx.dll','.trex\m3k\nvngx_dlssnr.dll')) {
         Copy-IfExists (Join-Path $Game $rel) (Join-Path $Backup $rel)
     }
 
     Write-Host ''
-    Write-Host 'Installing DLSS Full runtime...' -ForegroundColor Cyan
+    Write-Host 'Installing DLSS 4.5 SR + DLSS 5 NR runtime...' -ForegroundColor Cyan
     Copy-Item -LiteralPath $Bridge -Destination (Join-Path $Game 'd3d9.dll') -Force
     Copy-Item -LiteralPath $Feeder -Destination (Join-Path $Trex 'dlss5-feed.addon64') -Force
     New-Item -ItemType Directory -Path (Join-Path $Trex 'm3k') -Force | Out-Null
     Copy-Item -LiteralPath $Shim -Destination (Join-Path $Trex 'm3k\m3k-nvngx.dll') -Force
+    Copy-Item -LiteralPath $NrDll.FullName -Destination (Join-Path $Trex 'm3k\nvngx_dlssnr.dll') -Force
 
     $ini = @(
         '[M3K]',
-        '; GTA IV DLSS Full - hardware-validated A3-S2 + A3-S5 path',
-        '; Mode 0 keeps Neural Rendering disabled. Install NR separately later.',
+        '; GTA IV DLSS 4.5 SR + DLSS 5 NR - hardware-validated A3-S2 + A3-S5 path',
+        '; Mode=0: NR OFF (default). Mode=2: native Feature 18 NR -> DLSS SR.',
         'Mode=0',
         'SourceProof=0',
         'SRProof=1',
@@ -218,46 +254,47 @@ try {
     Set-KeyEquals $feedCfg 'mode' '2'
     Set-KeyEquals $feedCfg 'work_resolution' '100'
 
-    $controlUrl = 'https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS5/main/install/DLSS-Full-Control.bat'
+    $controlUrl = 'https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/main/install/DLSS-Full-Control.bat'
     $controlPath = Join-Path $Game 'DLSS-Full-Control.bat'
     Write-Host 'Installing DLSS-Full-Control.bat...' -ForegroundColor Cyan
-    $curl = Get-Command curl.exe -ErrorAction SilentlyContinue
-    if ($curl) {
-        & curl.exe -L --fail --retry 3 --silent --show-error -o $controlPath $controlUrl
-        if ($LASTEXITCODE -ne 0) { Fail 'Could not download DLSS-Full-Control.bat.' }
-    } else {
-        Invoke-WebRequest -UseBasicParsing -Uri $controlUrl -OutFile $controlPath
-    }
+    Download-File $controlUrl $controlPath
 
     $receipt = @(
-        'GTA IV DLSS FULL installation receipt',
+        'GTA IV DLSS 4.5 SR + DLSS 5 NR installation receipt',
         "Installed=$(Get-Date -Format o)",
         "ProjectCheckpoint=$Checkpoint",
         "BBridgeCommit=$BBridgeCommit",
         "SRProfile=$profile",
+        'NeuralRendering=installed-off-by-default',
+        'M3KMode=0',
+        'NRPasses=1',
         'StartupPrime=1485x835',
         'StartupPrimeFrames=180',
         "d3d9.dll=$bridgeHash",
         "dlss5-feed.addon64=$feederHash",
         "m3k-nvngx.dll=$shimHash",
+        "nvngx_dlssnr.dll=$NrDllHash",
         "ReferenceA3S2Bridge=$ReferenceBridgeHash",
         "ReferenceA3S5Feeder=$ReferenceFeederHash",
         "ReferenceS27Shim=$ReferenceShimHash",
+        "NRPackage=$NrPackageUrl",
+        "NRPackageSHA256=$NrPackageHash",
         "Backup=$Backup"
     )
     Write-NoBom (Join-Path $Game 'DLSS_FULL_INSTALLED.txt') $receipt
 
     Write-Host ''
-    Write-Host '============================================================' -ForegroundColor Green
-    Write-Host ' DLSS FULL INSTALLED' -ForegroundColor Green
-    Write-Host '============================================================' -ForegroundColor Green
+    Write-Host '====================================================================' -ForegroundColor Green
+    Write-Host ' DLSS 4.5 SR + DLSS 5 NR INSTALLED' -ForegroundColor Green
+    Write-Host '====================================================================' -ForegroundColor Green
     Write-Host "Saved SRProfile: $profile"
-    Write-Host 'Neural Rendering: OFF (Mode=0)'
-    Write-Host 'Startup: 1485x835 prime -> 180 synchronized frames -> saved mode'
+    Write-Host 'Neural Rendering runtime: INSTALLED'
+    Write-Host 'Neural Rendering execution: OFF by default (Mode=0)'
+    Write-Host 'Startup: 1485x835 prime -> 180 synchronized frames -> saved SR mode'
     Write-Host "Rollback backup: $Backup"
     Write-Host ''
-    Write-Host 'Recommended launch: double-click DLSS-Full-Control.bat and choose L.' -ForegroundColor Yellow
-    Write-Host 'Normal game launch also contains the A3-S5 primer, but the helper guarantees 1485x835 is written before GTA starts.'
+    Write-Host 'Use DLSS-Full-Control.bat to choose SR quality, toggle NR ON/OFF, and launch primed.' -ForegroundColor Yellow
+    Write-Host 'NR ON = Mode=2, one native Feature 18 pass before DLSS SR.'
     Write-Host ''
 }
 catch {
