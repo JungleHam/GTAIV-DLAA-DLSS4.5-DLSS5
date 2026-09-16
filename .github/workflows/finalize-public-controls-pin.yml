@@ -1,0 +1,75 @@
+name: Finalize public controls pin
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/finalize-public-controls-pin.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  finalize-pin:
+    runs-on: windows-2022
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply validated public-controls pin
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $oldCommit = '6d31f05862eeb51f05e86455696c0838d4f62a71'
+          $newCommit = '4f80efdacccc7a65ffa735e931f34a0ac5f46d35'
+          $oldHashUpper = 'D0EA12FC652C21FD2D7FC7F56DF1F7703F361226BD5D26A26C6A9AAB3579D1C1'
+          $newHashUpper = '18D10AEBCB45739E15E52182CDFB890322553D8DED6E75265540524278326958'
+          $oldHashLower = $oldHashUpper.ToLowerInvariant()
+          $newHashLower = $newHashUpper.ToLowerInvariant()
+          $utf8 = New-Object Text.UTF8Encoding($false)
+
+          function Replace-Checked([string]$Path, [string]$Old, [string]$New, [int]$ExpectedCount) {
+              $text = [IO.File]::ReadAllText($Path)
+              $count = ([regex]::Matches($text, [regex]::Escape($Old))).Count
+              if ($count -ne $ExpectedCount) {
+                  throw "$Path expected $ExpectedCount matches for '$Old', found $count"
+              }
+              [IO.File]::WriteAllText($Path, $text.Replace($Old, $New), $utf8)
+          }
+
+          Replace-Checked 'install/Install-DLSS-Full.bat' $oldCommit $newCommit 1
+          Replace-Checked 'install/Install-DLSS-Full.bat' $oldHashUpper $newHashUpper 1
+
+          Replace-Checked 'manifests/versions.json' $oldCommit $newCommit 1
+          Replace-Checked 'manifests/versions.json' $oldHashLower $newHashLower 1
+
+          Replace-Checked '.github/workflows/dlss-full-module.yml' $oldCommit $newCommit 2
+          Replace-Checked '.github/workflows/dlss-full-module.yml' $oldHashUpper $newHashUpper 2
+
+          $installer = [IO.File]::ReadAllText('install/Install-DLSS-Full.bat')
+          $manifest = Get-Content 'manifests/versions.json' -Raw | ConvertFrom-Json
+          $workflow = [IO.File]::ReadAllText('.github/workflows/dlss-full-module.yml')
+          if (-not $installer.Contains("`$PublicControlsCommit = '$newCommit'")) { throw 'Installer commit pin verification failed' }
+          if (-not $installer.Contains("`$PublicControlsHash = '$newHashUpper'")) { throw 'Installer hash pin verification failed' }
+          if ($manifest.components.'dlss-full'.public_reshade_controls_commit -ne $newCommit) { throw 'Manifest commit pin verification failed' }
+          if ($manifest.components.'dlss-full'.public_reshade_controls_sha256.ToUpperInvariant() -ne $newHashUpper) { throw 'Manifest hash pin verification failed' }
+          if (($workflow.Split($newCommit).Count - 1) -ne 2) { throw 'Workflow commit expectation verification failed' }
+          if (($workflow.Split($newHashUpper).Count - 1) -ne 2) { throw 'Workflow hash expectation verification failed' }
+
+          git diff --check
+          if ($LASTEXITCODE -ne 0) { throw 'git diff --check failed' }
+
+      - name: Commit final pin and remove one-shot workflow
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add install/Install-DLSS-Full.bat manifests/versions.json .github/workflows/dlss-full-module.yml
+          git rm .github/workflows/finalize-public-controls-pin.yml
+          git commit -m 'Pin validated public ReShade controls stage'
+          if ($LASTEXITCODE -ne 0) { throw 'Pin commit failed' }
+          git push origin HEAD:main
+          if ($LASTEXITCODE -ne 0) { throw 'Pin push failed' }
