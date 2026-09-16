@@ -34,9 +34,6 @@ $PublicControlsHash = '0C602D710F62EB6DF15C86B7B5473A7F3E9F2E1CF3270AEA3976EA512
 $StartupPrimeFixCommit = '12ae20c8789495064b32a3e0bf71072796fd46dc'
 $StartupPrimeFixUrl = "https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/$StartupPrimeFixCommit/install/Public-Startup-Prime-Fix-Stage.ps1"
 $StartupPrimeFixHash = '639856C7AFBD5BBE7BC46A38E839BA8EC95D912EFE7190975315045DBB5313BF'
-$StartupUiFixCommit = 'd4e4c18ae1c4f0907c58b8cdd88813e19985e798'
-$StartupUiFixUrl = "https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/$StartupUiFixCommit/install/Public-BBridge-Startup-UI-Fix.py"
-$StartupUiFixHash = '45F4C4B7957D32BDFDC203375F1B66F500F57B8BD36419D25659BFB342435544'
 $ControlCommit = 'a6bd0080982398046b20cf39e858f3e016c03492'
 $ControlUrl = "https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/$ControlCommit/install/DLSS-Full-Control.bat"
 $ControlHash = 'F209610F26970939D5B12EFCC13BEE84BB08348B045B2C4442D3177ED142661D'
@@ -242,11 +239,6 @@ try {
     Download-File $StartupPrimeFixUrl $primeFixStage
     Assert-SHA256 $primeFixStage $StartupPrimeFixHash
 
-    Write-Host 'Adding the public first-launch GTA UI resync fix...' -ForegroundColor Cyan
-    $startupUiFix = Join-Path $Project 'tools\m3k-nr\public-bbridge-startup-ui-fix.py'
-    Download-File $StartupUiFixUrl $startupUiFix
-    Assert-SHA256 $startupUiFix $StartupUiFixHash
-
     $buildScript = Join-Path $Project 'tools\m3k-nr\build-a3-s5.ps1'
     $buildText = [IO.File]::ReadAllText($buildScript)
     $buildAnchor = @'
@@ -286,8 +278,6 @@ try {
     if ($LASTEXITCODE -ne 0) { Fail 'Bridge window/resolution patch failed.' }
     & $Python (Join-Path $Project 'tools\m3k-nr\a3-s2-bbridge-coherent-draw-jitter.py') $BBridge
     if ($LASTEXITCODE -ne 0) { Fail 'Temporal-synchronization patch failed.' }
-    & $Python $startupUiFix $BBridge
-    if ($LASTEXITCODE -ne 0) { Fail 'First-launch GTA UI resync patch failed.' }
     & $Git -C $BBridge diff --check
     if ($LASTEXITCODE -ne 0) { Fail 'Patched b-bridge source failed git diff --check.' }
 

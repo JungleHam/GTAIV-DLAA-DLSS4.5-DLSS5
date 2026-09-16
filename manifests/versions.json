@@ -1,5 +1,5 @@
 {
-  "project_status": "tested-core-with-public-startup-runtime-fixes-2026-09-16",
+  "project_status": "tested-core-with-prime-escape-startup-ui-resync-reverted-2026-09-16",
   "components": {
     "fusionfix": {
       "version": "5.0.1",
@@ -53,9 +53,7 @@
       "startup_prime_public_fix_commit": "12ae20c8789495064b32a3e0bf71072796fd46dc",
       "startup_prime_public_fix_sha256": "639856c7afbd5bbe7bc46a38e839ba8ec95d912efe7190975315045dbb5313bf",
       "startup_stabilization_frame_policy": "180 valid synchronized frames cumulative; explicit live DLSS/DLAA mode change cancels startup prime immediately",
-      "startup_ui_resync_commit": "d4e4c18ae1c4f0907c58b8cdd88813e19985e798",
-      "startup_ui_resync_sha256": "45f4c4b7957d32bdfdc203375f1b66f500f57b8bd36419d25659bfb342435544",
-      "startup_ui_resync_behavior": "Posts one logical WM_SIZE when b-bridge first attaches to GTA IV so HUD/map/weapon-wheel layout is initialized without forcing a display resolution."
+      "startup_ui_resync_status": "rejected-after-hardware-test-pre-legal-screen-hang; not installed"
     },
     "reshade": {
       "version": "6.8.0",
