@@ -117,11 +117,16 @@ jobs:
           $head = git -C _verify_project rev-parse HEAD
           if ($head.Trim() -ne '57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f') { throw "Wrong frozen project revision: $head" }
 
-      - name: Attach public ReShade controls stage
+      - name: Attach raw public ReShade controls stage
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          Copy-Item .\install\Public-ReShade-Controls-Stage.ps1 .\_verify_project\tools\m3k-nr\public-reshade-controls-stage.ps1 -Force
+          $rawStage = Join-Path $env:RUNNER_TEMP 'Public-ReShade-Controls-Stage.current.raw.ps1'
+          $rawUrl = "https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/$env:GITHUB_SHA/install/Public-ReShade-Controls-Stage.ps1"
+          Invoke-WebRequest -UseBasicParsing -Uri $rawUrl -OutFile $rawStage
+          $rawHash = (Get-FileHash -Algorithm SHA256 $rawStage).Hash.ToUpperInvariant()
+          Write-Host "CURRENT public controls raw SHA256: $rawHash"
+          Copy-Item $rawStage .\_verify_project\tools\m3k-nr\public-reshade-controls-stage.ps1 -Force
           $build = '.\_verify_project\tools\m3k-nr\build-a3-s5.ps1'
           $text = [IO.File]::ReadAllText($build)
           $anchor = @'
