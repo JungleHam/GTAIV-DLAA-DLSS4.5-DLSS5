@@ -18,7 +18,7 @@ jobs:
           $items = @(
             @{
               Name='PRIME_FIX';
-              Commit='dfc68aea19a295ca09f68c3a7ee07eb19068f41b';
+              Commit='12ae20c8789495064b32a3e0bf71072796fd46dc';
               Path='install/Public-Startup-Prime-Fix-Stage.ps1'
             },
             @{
