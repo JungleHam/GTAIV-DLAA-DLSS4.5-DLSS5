@@ -28,12 +28,15 @@ $NrDllHash = '4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05'
 $DxvkPresenterUrl = 'https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/m3k-dxvk-v3.0.2-a2s1b/d3d9vk_x64.dll'
 $DxvkPresenterHash = '511E0C2509E1922DB2EC38940507BA956908FE6DC5FD9B3DB9FEC489DC05F297'
 $DxvkPresenterUpstreamCommit = '6b20f622a77b87b2921fe5d2c1774d2f2ba3e9b7'
-$PublicControlsCommit = 'cb3d3635ab746b603d1155b92424d24a9469eb2c'
+$PublicControlsCommit = 'd65fb6c9df2e6206015bad53c24f96a75c2d10e0'
 $PublicControlsUrl = "https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/$PublicControlsCommit/install/Public-ReShade-Controls-Stage.ps1"
-$PublicControlsHash = '2AAAD1F94477BB16874F2047B65950B5C678759B8772FC566C4708E19B812EAE'
+$PublicControlsHash = '60F87F81DE0B7E78DF582223233524362FD98C2907C0EBFD38082C615269E827'
 $ControlCommit = 'a6bd0080982398046b20cf39e858f3e016c03492'
 $ControlUrl = "https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/$ControlCommit/install/DLSS-Full-Control.bat"
 $ControlHash = 'F209610F26970939D5B12EFCC13BEE84BB08348B045B2C4442D3177ED142661D'
+$UninstallerCommit = 'd65fb6c9df2e6206015bad53c24f96a75c2d10e0'
+$UninstallerUrl = "https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/$UninstallerCommit/install/Uninstall-DLSS-Full.bat"
+$UninstallerHash = '3F7E4103A8C58FF337142E4438D534BA7B4B9E5D3D6057A4857012AA88C29E34'
 $TranscriptStarted = $false
 
 function Fail([string]$Message) { throw $Message }
@@ -89,6 +92,54 @@ function Copy-IfExists([string]$Source,[string]$Destination) {
         if ($parent -and -not (Test-Path -LiteralPath $parent)) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
         Copy-Item -LiteralPath $Source -Destination $Destination -Force
     }
+}
+
+function Test-DlaaBaselineSnapshot([string]$Path) {
+    if (-not $Path -or -not (Test-Path -LiteralPath $Path -PathType Container)) { return $false }
+    foreach ($rel in @('d3d9.dll','.trex\NvRemixBridge.exe','.trex\d3d9vk_x64.dll','.trex\dlss5-feed.addon64','.trex\dlss5-feed.cfg')) {
+        if (-not (Test-Path -LiteralPath (Join-Path $Path $rel))) { return $false }
+    }
+    foreach ($rel in @('.trex\m3k-nr.ini','.trex\m3k\m3k-nvngx.dll','.trex\m3k\nvngx_dlssnr.dll')) {
+        if (Test-Path -LiteralPath (Join-Path $Path $rel)) { return $false }
+    }
+    return $true
+}
+
+function Save-DlaaBaselineIfPossible {
+    $canonical = Join-Path $Game '_DLSS_FULL_DLAA_BASELINE'
+    if (Test-DlaaBaselineSnapshot $canonical) { return $canonical }
+    if (Test-Path -LiteralPath $canonical) { Remove-Item -LiteralPath $canonical -Recurse -Force }
+
+    $source = $null
+    $currentLooksDlaa = $true
+    foreach ($rel in @('d3d9.dll','.trex\NvRemixBridge.exe','.trex\d3d9vk_x64.dll','.trex\dlss5-feed.addon64','.trex\dlss5-feed.cfg')) {
+        if (-not (Test-Path -LiteralPath (Join-Path $Game $rel))) { $currentLooksDlaa = $false; break }
+    }
+    foreach ($rel in @('.trex\m3k-nr.ini','.trex\m3k\m3k-nvngx.dll','.trex\m3k\nvngx_dlssnr.dll')) {
+        if (Test-Path -LiteralPath (Join-Path $Game $rel)) { $currentLooksDlaa = $false }
+    }
+    if ($currentLooksDlaa) { $source = $Game }
+    if (-not $source) {
+        $candidates = @(Get-ChildItem -LiteralPath $Game -Directory -Filter '_DLSS_FULL_PREINSTALL_BACKUP_*' -ErrorAction SilentlyContinue | Sort-Object Name)
+        foreach ($candidate in $candidates) {
+            if (Test-DlaaBaselineSnapshot $candidate.FullName) { $source = $candidate.FullName; break }
+        }
+    }
+    if (-not $source) {
+        Write-Host 'WARNING: Could not establish a trustworthy canonical DLAA rollback snapshot. Existing timestamped backups are left untouched.' -ForegroundColor Yellow
+        return $null
+    }
+
+    New-Item -ItemType Directory -Path $canonical -Force | Out-Null
+    foreach ($rel in @('d3d9.dll','.trex\NvRemixBridge.exe','.trex\d3d9vk_x64.dll','.trex\dlss5-feed.addon64','.trex\dlss5-feed.cfg')) {
+        Copy-IfExists (Join-Path $source $rel) (Join-Path $canonical $rel)
+    }
+    [IO.File]::WriteAllText((Join-Path $canonical 'BASELINE.txt'),
+        "DLAA-only rollback baseline`r`nCreated=$(Get-Date -Format o)`r`nSource=$source`r`n",
+        (New-Object Text.UTF8Encoding($false)))
+    if (-not (Test-DlaaBaselineSnapshot $canonical)) { Fail 'Canonical DLAA rollback baseline validation failed.' }
+    Write-Host "Canonical DLAA rollback baseline: $canonical" -ForegroundColor DarkGray
+    return $canonical
 }
 
 function Set-KeyEquals([string]$Path,[string]$Key,[string]$Value) {
@@ -275,6 +326,8 @@ try {
     if ($shimHash -eq $ReferenceShimHash) { Write-Host '  DLSS integration shim matches the hardware-tested reference binary.' -ForegroundColor Green }
     else { Write-Host '  NOTE: integration shim bytes differ from the reference build (local compiler/toolchain), but pinned source + CPU tests passed.' -ForegroundColor Yellow }
 
+    $DlaaBaseline = Save-DlaaBaselineIfPossible
+
     $stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
     $Backup = Join-Path $Game ("_DLSS_FULL_PREINSTALL_BACKUP_" + $stamp)
     New-Item -ItemType Directory -Path $Backup -Force | Out-Null
@@ -337,6 +390,13 @@ try {
     Assert-SHA256 $controlTemp $ControlHash
     Copy-Item -LiteralPath $controlTemp -Destination $controlPath -Force
 
+    $uninstallerPath = Join-Path $Game 'Uninstall-DLSS-Full.bat'
+    $uninstallerTemp = Join-Path $Temp 'Uninstall-DLSS-Full.bat'
+    Write-Host 'Installing Uninstall-DLSS-Full.bat (restore DLAA-only baseline)...' -ForegroundColor Cyan
+    Download-File $UninstallerUrl $uninstallerTemp
+    Assert-SHA256 $uninstallerTemp $UninstallerHash
+    Copy-Item -LiteralPath $uninstallerTemp -Destination $uninstallerPath -Force
+
     $receipt = @(
         'GTA IV DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering installation receipt',
         "Installed=$(Get-Date -Format o)",
@@ -350,6 +410,9 @@ try {
         'StartupStabilizationFrames=180',
         "PublicControlsCommit=$PublicControlsCommit",
         "PublicControlsSHA256=$PublicControlsHash",
+        "UninstallerCommit=$UninstallerCommit",
+        "UninstallerSHA256=$UninstallerHash",
+        "DlaaBaseline=$DlaaBaseline",
         "d3d9.dll=$bridgeHash",
         "NvRemixBridge.exe=$serverHash",
         "d3d9vk_x64.dll=$DxvkPresenterHash",
@@ -381,6 +444,7 @@ try {
     Write-Host 'Normal settings are now inside ReShade:' -ForegroundColor Yellow
     Write-Host '  Home -> Add-ons -> DLSS 5 Feed -> GTA IV DLSS'
     Write-Host 'Use DLSS-Full-Control.bat only for launch, repair, status, and logs.' -ForegroundColor Yellow
+    Write-Host 'Use Uninstall-DLSS-Full.bat to roll back to the preserved DLAA + ReShade input-patch baseline.' -ForegroundColor Yellow
     Write-Host ''
 }
 catch {

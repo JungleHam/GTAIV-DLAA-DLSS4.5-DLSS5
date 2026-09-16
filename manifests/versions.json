@@ -23,8 +23,8 @@
       "a3s5_reference_feeder_sha256": "c73d8d54271f55f8931f00d62a4cdf605118bea71d7c6bee0b61d0ca7c1cce4b",
       "a3s5_reference_feeder_scope": "pre-public-ReShade-controls hardware reference",
       "s27_reference_shim_sha256": "a2e4bedace8d99bc60b5d18e958bd7e98f8887ff40ec45a8674b892e2d1fcbbc",
-      "public_reshade_controls_commit": "cb3d3635ab746b603d1155b92424d24a9469eb2c",
-      "public_reshade_controls_sha256": "2aaad1f94477bb16874f2047b65950b5c678759b8772fc566c4708e19b812eae",
+      "public_reshade_controls_commit": "d65fb6c9df2e6206015bad53c24f96a75c2d10e0",
+      "public_reshade_controls_sha256": "60f87f81de0b7e78df582223233524362fd98c2907c0ebfd38082c615269e827",
       "settings_surface": "Home -> Add-ons -> DLSS 5 Feed -> GTA IV DLSS",
       "default_dlss_quality": "Quality",
       "startup_stabilization_resolution": "1485x835",
@@ -36,7 +36,19 @@
       "nr_passes": 1,
       "nr_passes_public_default": 1,
       "hardware_validation": "RTX 4070 Ti SUPER, 2560x1440 output. Temporal synchronization was stable across Custom Ultra Quality (77%), Quality, Balanced, Performance and Ultra Performance. Automatic 1485x835 startup stabilization was confirmed to remove cold-start vibration before returning to Ultra Performance. Native DLSS 5 Neural Rendering was also validated on the same GPU.",
-      "notes": "The combined module installs both Super Resolution and the Neural Rendering runtime while leaving Neural Rendering disabled by default. Normal quality/NR control lives in the ReShade GTA IV DLSS panel; DLSS-Full-Control.bat is launch/repair/diagnostics only. The frozen A3-S2/A3-S5 rendering core is preserved and a small post-checkpoint source stage adds the public ReShade controls. The listed A3-S5 Feeder hash is therefore the pre-UI hardware-reference binary, not the expected byte identity of the current public Feeder. The older startup_prime keys are retained for tooling compatibility. Local builds use frozen source plus build/CPU gates; PE hashes can differ with local MSVC revisions."
+      "notes": "The combined module installs both Super Resolution and the Neural Rendering runtime while leaving Neural Rendering disabled by default. Normal quality/NR control lives in the ReShade GTA IV DLSS panel; DLSS-Full-Control.bat is launch/repair/diagnostics only. The frozen A3-S2/A3-S5 rendering core is preserved and a small post-checkpoint source stage adds the public ReShade controls. The listed A3-S5 Feeder hash is therefore the pre-UI hardware-reference binary, not the expected byte identity of the current public Feeder. The older startup_prime keys are retained for tooling compatibility. Local builds use frozen source plus build/CPU gates; PE hashes can differ with local MSVC revisions.",
+      "public_modes": [
+        "DLAA Native",
+        "Custom Ultra Quality (77%)",
+        "Quality",
+        "Balanced",
+        "Performance",
+        "Ultra Performance"
+      ],
+      "uninstaller_commit": "d65fb6c9df2e6206015bad53c24f96a75c2d10e0",
+      "uninstaller_sha256": "3f7e4103a8c58ff337142e4438d534ba7b4b9e5d3d6057a4857012aa88c29e34",
+      "uninstaller_path": "Uninstall-DLSS-Full.bat",
+      "rollback_target": "DLAA-only baseline + ReShade input patch"
     },
     "reshade": {
       "version": "6.8.0",

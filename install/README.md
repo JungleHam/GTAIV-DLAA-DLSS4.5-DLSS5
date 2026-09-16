@@ -64,9 +64,10 @@ Add-ons -> DLSS 5 Feed -> GTA IV DLSS
 
 Use that panel for:
 
+- **DLSS / DLAA mode** — DLAA Native, Custom Ultra Quality (77%), Quality, Balanced, Performance, Ultra Performance;
+- **live resolution diagnostics** — true GTA render target and current DXVK source;
 - **Neural Rendering OFF / ON**;
-- **Neural Rendering passes (advanced)** — 1 is the tested public default;
-- **DLSS Super Resolution quality** — Custom Ultra Quality (77%), Quality, Balanced, Performance, Ultra Performance.
+- **Neural Rendering passes (advanced)** — 1 is the tested public default.
 
 These settings are saved automatically. There is no need to close the game or use a BAT file to change them.
 
@@ -98,6 +99,14 @@ Normal users do not need to configure those directly.
 `Install-DLAA.bat` and `Install-DLSS-Full.bat` show the temporary destination of every network download while they run. Downloaded archives, source checkouts, build environments and other installer-only files are kept under the installer's temporary work folder and are deleted automatically after use, including when installation fails.
 
 Files that are part of the finished installation are copied from the temporary work folder into their final GTA IV locations before cleanup. The DLSS Full installer also disables the pip download cache for its temporary Python build tools.
+
+## Removing DLSS Full
+
+Run `Uninstall-DLSS-Full.bat` beside `GTAIV.exe` with the game and bridge closed. It restores the preserved DLAA-only bridge/DXVK/Feeder baseline while leaving FusionFix, ReShade, the ReShade cross-process input patch, LumeniteFX and `nvngx_dlss.dll` in place.
+
+The uninstaller prefers `_DLSS_FULL_DLAA_BASELINE`. For older installations it safely falls back to the oldest `_DLSS_FULL_PREINSTALL_BACKUP_*` snapshot that validates as DLAA-only. It creates `_DLSS_FULL_UNINSTALL_SAFETY_*` before changing anything.
+
+After removal, launch once and verify DLAA before running `Install-DLSS-Full.bat` again.
 
 ## Backup
 
