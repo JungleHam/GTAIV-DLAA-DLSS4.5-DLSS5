@@ -1,0 +1,63 @@
+name: M3K DXVK Presenter Validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'install/Install-DLSS-Full.bat'
+      - 'manifests/versions.json'
+      - '.github/workflows/m3k-dxvk-presenter-validation.yml'
+
+jobs:
+  validate-presenter:
+    runs-on: windows-2022
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate installer and manifest contract
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $url = 'https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/m3k-dxvk-v3.0.2-a2s1b/d3d9vk_x64.dll'
+          $hash = '511E0C2509E1922DB2EC38940507BA956908FE6DC5FD9B3DB9FEC489DC05F297'
+          $upstream = '6b20f622a77b87b2921fe5d2c1774d2f2ba3e9b7'
+          $checkpoint = '57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f'
+
+          $installer = Get-Content install/Install-DLSS-Full.bat -Raw
+          foreach ($marker in @(
+            $url,
+            $hash,
+            $upstream,
+            '$DxvkPresenterTemp',
+            'Download-File $DxvkPresenterUrl $DxvkPresenterTemp',
+            'Assert-SHA256 $DxvkPresenterTemp $DxvkPresenterHash',
+            "'.trex\d3d9vk_x64.dll'",
+            "Copy-Item -LiteralPath `$DxvkPresenterTemp -Destination (Join-Path `$Trex 'd3d9vk_x64.dll') -Force",
+            'Installed M3K DXVK presenter hash verification failed.',
+            'd3d9vk_x64.dll=$DxvkPresenterHash')) {
+            if (-not $installer.Contains($marker)) { throw "Installer missing presenter contract marker: $marker" }
+          }
+
+          $manifest = Get-Content manifests/versions.json -Raw | ConvertFrom-Json
+          $p = $manifest.components.'m3k-dxvk-presenter'
+          if (-not $p) { throw 'Manifest missing m3k-dxvk-presenter component' }
+          if ($p.upstream_version -ne '3.0.2') { throw 'Presenter upstream version mismatch' }
+          if ($p.upstream_commit -ne $upstream) { throw 'Presenter upstream commit mismatch' }
+          if ($p.project_patch_checkpoint -ne $checkpoint) { throw 'Presenter project checkpoint mismatch' }
+          if ($p.url -ne $url) { throw 'Presenter release URL mismatch' }
+          if ($p.dll_sha256.ToUpperInvariant() -ne $hash) { throw 'Presenter manifest hash mismatch' }
+          if ($p.installed_path -ne '.trex/d3d9vk_x64.dll' -or -not $p.installed_automatically) { throw 'Presenter install contract mismatch' }
+
+      - name: Download and verify public presenter asset
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $url = 'https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/m3k-dxvk-v3.0.2-a2s1b/d3d9vk_x64.dll'
+          $expected = '511E0C2509E1922DB2EC38940507BA956908FE6DC5FD9B3DB9FEC489DC05F297'
+          $dest = Join-Path $env:RUNNER_TEMP 'd3d9vk_x64.dll'
+          Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $dest
+          $actual = (Get-FileHash -Algorithm SHA256 $dest).Hash.ToUpperInvariant()
+          if ($actual -ne $expected) { throw "Public presenter asset hash mismatch: expected $expected, got $actual" }
+          Write-Host "PUBLIC M3K DXVK PRESENTER VERIFIED: $actual" -ForegroundColor Green
