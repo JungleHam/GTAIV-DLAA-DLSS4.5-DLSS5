@@ -1,4 +1,4 @@
-name: DLSS Full Module Source Validation
+name: DLSS 4.5 SR + DLSS 5 NR Module Validation
 
 on:
   workflow_dispatch:
@@ -8,6 +8,8 @@ on:
       - 'install/Install-DLSS-Full.bat'
       - 'install/DLSS-Full-Control.bat'
       - 'docs/DLSS-FULL.md'
+      - 'docs/DLSS5.md'
+      - 'input/README.md'
       - 'manifests/versions.json'
       - '.github/workflows/dlss-full-module.yml'
 
@@ -19,7 +21,7 @@ jobs:
       - name: Checkout public module
         uses: actions/checkout@v4
 
-      - name: Static module checks
+      - name: Static combined-module checks
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -28,40 +30,55 @@ jobs:
           $manifest = Get-Content manifests/versions.json -Raw | ConvertFrom-Json
 
           foreach ($marker in @(
-            "57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f",
-            "1dad5e6d4dcf8647e354aa9a87f611256fb61142",
-            "6DD40F145A5D503624E3E05ECF0ADBAA094CF83B24278C0BB333318E3C52A912",
-            "C73D8D54271F55F8931F00D62A4CDF605118BEA71D7C6BEE0B61D0CA7C1CCE4B",
-            "A2E4BEDACE8D99BC60B5D18E958BD7E98F8887FF40EC45A8674B892E2D1FCBBC",
-            "StartupPrimeWidth=1485",
-            "StartupPrimeHeight=835",
-            "StartupPrimeFrames=180",
-            "Mode=0")) {
+            '57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f',
+            '1dad5e6d4dcf8647e354aa9a87f611256fb61142',
+            '6DD40F145A5D503624E3E05ECF0ADBAA094CF83B24278C0BB333318E3C52A912',
+            'C73D8D54271F55F8931F00D62A4CDF605118BEA71D7C6BEE0B61D0CA7C1CCE4B',
+            'A2E4BEDACE8D99BC60B5D18E958BD7E98F8887FF40EC45A8674B892E2D1FCBBC',
+            'https://github.com/RankFTW/rhi-repo/releases/download/dlssnr-310.8.0-RTX40/nvngx_dlssnr_310.8.0-RTX40.zip',
+            '46124CFAEF532AD5F6DA07494772EA8C1B3E719F934E254385697F38D1289E3F',
+            '4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05',
+            'StartupPrimeWidth=1485',
+            'StartupPrimeHeight=835',
+            'StartupPrimeFrames=180',
+            'Mode=0',
+            'NRPasses=1')) {
             if (-not $installer.Contains($marker)) { throw "Installer missing marker: $marker" }
           }
 
-          # The profile/launch helper must preserve Mode so a later NR module is not disabled.
-          $armStart = $control.IndexOf('function Arm-Prime')
-          $profileStart = $control.IndexOf('function Set-Profile')
-          if ($armStart -lt 0 -or $profileStart -le $armStart) { throw 'Could not locate Arm-Prime helper' }
-          $armBody = $control.Substring($armStart, $profileStart - $armStart)
-          if ($armBody -match "Set-Ini\s+'Mode'") { throw 'DLSS-Full-Control must preserve the installed NR Mode' }
-          foreach ($marker in @("Set-Ini 'RenderWidth' '1485'", "Set-Ini 'RenderHeight' '835'", "Set-Ini 'StartupPrimeFrames' '180'")) {
-            if (-not $armBody.Contains($marker)) { throw "Control helper missing marker: $marker" }
+          foreach ($marker in @(
+            "Set-Ini 'Mode' '2'",
+            "Set-Ini 'Mode' '0'",
+            "Set-Ini 'NRPasses' '1'",
+            "Set-Ini 'RenderWidth' '1485'",
+            "Set-Ini 'RenderHeight' '835'",
+            "Set-Ini 'StartupPrimeFrames' '180'")) {
+            if (-not $control.Contains($marker)) { throw "Control helper missing marker: $marker" }
           }
+
+          if ($control -notmatch 'function Set-NrMode') { throw 'Control helper has no NR ON/OFF function' }
+          if ($control -notmatch 'nvngx_dlssnr\.dll') { throw 'Control helper does not validate the NR runtime before enabling it' }
 
           $full = $manifest.components.'dlss-full'
           if ($full.project_checkpoint -ne '57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f') { throw 'Manifest checkpoint mismatch' }
+          if ($full.nr_default_mode -ne 0 -or $full.nr_enabled_mode -ne 2 -or $full.nr_passes -ne 1) { throw 'Manifest NR mode contract mismatch' }
           if ($full.a3s2_reference_d3d9_sha256.ToUpperInvariant() -ne '6DD40F145A5D503624E3E05ECF0ADBAA094CF83B24278C0BB333318E3C52A912') { throw 'Manifest A3-S2 reference hash mismatch' }
           if ($full.a3s5_reference_feeder_sha256.ToUpperInvariant() -ne 'C73D8D54271F55F8931F00D62A4CDF605118BEA71D7C6BEE0B61D0CA7C1CCE4B') { throw 'Manifest A3-S5 reference hash mismatch' }
           if ($full.s27_reference_shim_sha256.ToUpperInvariant() -ne 'A2E4BEDACE8D99BC60B5D18E958BD7E98F8887FF40EC45A8674B892E2D1FCBBC') { throw 'Manifest S2.7 reference hash mismatch' }
-          Write-Host 'Static module checks passed.'
+
+          $nr = $manifest.components.nvngx_dlssnr
+          if ($nr.package_sha256.ToUpperInvariant() -ne '46124CFAEF532AD5F6DA07494772EA8C1B3E719F934E254385697F38D1289E3F') { throw 'Manifest NR package hash mismatch' }
+          if ($nr.dll_sha256.ToUpperInvariant() -ne '4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05') { throw 'Manifest NR DLL hash mismatch' }
+          if (-not $nr.installed_automatically -or $nr.default_enabled) { throw 'Manifest NR install/default state mismatch' }
+
+          if ($manifest.components.PSObject.Properties.Name -contains 'deep-fried-chicken') { throw 'Legacy DFC component is still present in manifest' }
+          Write-Host 'Static combined-module checks passed.'
 
       - name: Checkout frozen A3-S5 project source
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          git clone --filter=blob:none https://github.com/JungleHam/GTAIV-DLAA-DLSS5.git _verify_project
+          git clone --filter=blob:none https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5.git _verify_project
           git -C _verify_project checkout 57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f
           $head = git -C _verify_project rev-parse HEAD
           if ($head.Trim() -ne '57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f') { throw "Wrong frozen project revision: $head" }
@@ -83,10 +100,10 @@ jobs:
           Write-Host "Current runner S2.7 shim:         $sh"
           Write-Host "Hardware-reference shim:          A2E4BEDACE8D99BC60B5D18E958BD7E98F8887FF40EC45A8674B892E2D1FCBBC"
           if ($fh -ne 'C73D8D54271F55F8931F00D62A4CDF605118BEA71D7C6BEE0B61D0CA7C1CCE4B') {
-            Write-Host 'Feeder PE hash differs from the earlier hardware-tested CI image; frozen source build and CPU tests still passed.' -ForegroundColor Yellow
+            Write-Host 'Feeder PE hash differs from the hardware-tested CI image; frozen source build and CPU tests still passed.' -ForegroundColor Yellow
           }
           if ($sh -ne 'A2E4BEDACE8D99BC60B5D18E958BD7E98F8887FF40EC45A8674B892E2D1FCBBC') {
-            Write-Host 'Shim PE hash differs from the earlier hardware-tested CI image; frozen source build and CPU tests still passed.' -ForegroundColor Yellow
+            Write-Host 'Shim PE hash differs from the hardware-tested CI image; frozen source build and CPU tests still passed.' -ForegroundColor Yellow
           }
 
       - name: Clone and patch frozen b-bridge
@@ -137,11 +154,11 @@ jobs:
           Write-Host "Current runner A3-S2 bridge: $bh"
           Write-Host 'Hardware-reference bridge:       6DD40F145A5D503624E3E05ECF0ADBAA094CF83B24278C0BB333318E3C52A912'
           if ($bh -ne '6DD40F145A5D503624E3E05ECF0ADBAA094CF83B24278C0BB333318E3C52A912') {
-            Write-Host 'Bridge PE hash differs from the earlier hardware-tested CI image; frozen source/patch/build validation still passed.' -ForegroundColor Yellow
+            Write-Host 'Bridge PE hash differs from the hardware-tested CI image; frozen source/patch/build validation still passed.' -ForegroundColor Yellow
           }
 
       - name: Module validation summary
         shell: pwsh
         run: |
-          Write-Host 'DLSS Full public module validated: frozen A3-S5 source built with CPU tests, frozen A3-S2 source patched all four draw paths and built x86, and installer/control/manifest contracts passed.' -ForegroundColor Green
-          Write-Host 'Hardware-tested PE hashes remain recorded as references; byte identity is not required across MSVC/runner-image revisions.' -ForegroundColor Green
+          Write-Host 'Combined module validated: installer/control/manifest contracts passed, frozen A3-S5 source built with CPU tests, and frozen A3-S2 source patched all four draw paths and built x86.' -ForegroundColor Green
+          Write-Host 'NR is bundled by the installer but defaults to Mode=0; control helper explicitly toggles Mode=2/0.' -ForegroundColor Green
