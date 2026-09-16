@@ -1,5 +1,5 @@
 {
-  "project_status": "tested-working-dlss-full-2026-09-16",
+  "project_status": "tested-working-dlss45-sr-dlss5-nr-2026-09-16",
   "components": {
     "fusionfix": {
       "version": "5.0.1",
@@ -14,6 +14,7 @@
       "sha256": "d5691ad68cca6e731bbe12b34b14b6a8288e2e7e319e8ef0e13e0f3a59c31c55"
     },
     "dlss-full": {
+      "product_name": "DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering",
       "project_checkpoint": "57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f",
       "bbridge_source_commit": "1dad5e6d4dcf8647e354aa9a87f611256fb61142",
       "a3s2_reference_d3d9_sha256": "6dd40f145a5d503624e3e05ecf0adbaa094cf83b24278c0bb333318e3c52a912",
@@ -21,8 +22,11 @@
       "s27_reference_shim_sha256": "a2e4bedace8d99bc60b5d18e958bd7e98f8887ff40ec45a8674b892e2d1fcbbc",
       "startup_prime": "1485x835",
       "startup_prime_synchronized_frames": 180,
-      "hardware_validation": "RTX 4070 Ti SUPER, 2560x1440 presenter; automatic prime -> Ultra Performance confirmed steady",
-      "notes": "Local builds use frozen source plus build/CPU gates. PE hashes can differ with local MSVC revisions, so the listed hashes are the hardware-validated CI reference binaries rather than a mandatory local-build identity."
+      "nr_default_mode": 0,
+      "nr_enabled_mode": 2,
+      "nr_passes": 1,
+      "hardware_validation": "RTX 4070 Ti SUPER, 2560x1440 presenter; A3-S2 jitter stable across UQ77/Quality/Balanced/Performance/Ultra Performance; A3-S5 automatic prime -> Ultra Performance confirmed steady; native Feature 18 path previously validated on the same GPU.",
+      "notes": "The combined module installs both SR and the NR runtime but leaves NR execution disabled by default. Local builds use frozen source plus build/CPU gates. PE hashes can differ with local MSVC revisions, so the listed bridge/Feeder/shim hashes are hardware-validated references rather than mandatory local-build identity."
     },
     "reshade": {
       "version": "6.8.0",
@@ -49,26 +53,23 @@
       ]
     },
     "nvngx_dlss": {
+      "product": "DLSS 4.5 Super Resolution / DLAA runtime",
       "version": "310.9.1",
       "package_url": "https://github.com/RankFTW/rhi-repo/releases/download/dlss-310.9.1/nvngx_dlss_310.9.1.zip",
       "package_sha256": "aaba83b288bd145c3808e8d7a0ba03cc8c8676d18ad984b1bfa6563046a3ba37",
       "dll_sha256": "3975567b8943c53acce397f2b72380092f84f162d00b0d2c7d08a1025c563983"
     },
-    "deep-fried-chicken": {
-      "version": "1.7.4 checkpoint 70",
-      "source": "https://discord.gg/g2v2XGqvR",
-      "archive_sha256": "91dc4137b1f2d7cdbd7f9eb4de9d33848b59e3af7a747d5d798271ee262eab09",
-      "archive_password": "chicken",
-      "redistributed": false
-    },
     "nvngx_dlssnr": {
-      "version": "310.8.0",
-      "variant": "310.8.0-RTX40 community build, sm_89",
-      "source_project": "https://github.com/Kizzuwatnaa/DLSS5-Autopilot",
-      "source_releases": "https://github.com/Kizzuwatnaa/DLSS5-Autopilot/releases",
+      "product": "DLSS 5 Neural Rendering / NGX Feature 18 runtime",
+      "version": "310.8.0-RTX40",
+      "variant": "community RTX 40/50 build, sm_89 compatible",
+      "package_url": "https://github.com/RankFTW/rhi-repo/releases/download/dlssnr-310.8.0-RTX40/nvngx_dlssnr_310.8.0-RTX40.zip",
+      "package_sha256": "46124cfaef532ad5f6da07494772ea8c1b3e719f934e254385697f38d1289e3f",
       "dll_sha256": "4b8d19bc3eff58a084f5eca7489c921501c203450169fb82ff4f649a4482ba05",
       "redistributed": false,
-      "notes": "RTX 40-series-compatible Neural Rendering runtime obtained through DLSS5 Autopilot. Known-good on the successful RTX 4070 Ti SUPER test. This is not the stock RTX 50 FP8 build."
+      "installed_automatically": true,
+      "default_enabled": false,
+      "notes": "Downloaded and hash-verified automatically by Install-DLSS-Full.bat. Known-good on RTX 4070 Ti SUPER. The module installs it to .trex/m3k/nvngx_dlssnr.dll and keeps M3K Mode=0 until the user enables NR."
     }
   }
 }
