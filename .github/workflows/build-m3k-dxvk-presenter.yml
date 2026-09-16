@@ -1,0 +1,67 @@
+name: Build M3K DXVK Presenter
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/build-m3k-dxvk-presenter.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-presenter:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Install DXVK build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mingw-w64 meson ninja-build glslang-tools
+
+      - name: Clone exact DXVK 3.0.2 source
+        run: |
+          git clone --recursive https://github.com/doitsujin/dxvk.git _dxvk
+          git -C _dxvk checkout 6b20f622a77b87b2921fe5d2c1774d2f2ba3e9b7
+          git -C _dxvk submodule update --init --recursive
+          test "$(git -C _dxvk rev-parse HEAD)" = "6b20f622a77b87b2921fe5d2c1774d2f2ba3e9b7"
+
+      - name: Apply frozen M3K source tap and presenter patches
+        run: |
+          git -C _dxvk apply "$GITHUB_WORKSPACE/tools/m3k-nr/dxvk-v3.0.2-m3k-source-tap.patch"
+          python3 tools/m3k-nr/a2-s1b-dxvk.py _dxvk
+          git -C _dxvk diff --check
+          grep -q 'M3K_QueryPresentSourceV1' _dxvk/src/d3d9/d3d9_swapchain.cpp
+          grep -q '\[M3K-S1B\] config' _dxvk/src/d3d9/d3d9_swapchain.cpp
+          grep -q 'M3kApplyRenderOverride' _dxvk/src/d3d9/d3d9_swapchain.cpp
+          grep -q 'M3kScheduleAutoResize' _dxvk/src/d3d9/d3d9_swapchain.cpp
+
+      - name: Configure and build x64 d3d9
+        working-directory: _dxvk
+        run: |
+          meson setup --cross-file build-win64.txt --buildtype release --prefix "$GITHUB_WORKSPACE/_dxvk_install" build.w64
+          meson compile -C build.w64 d3d9
+          meson install -C build.w64
+
+      - name: Verify presenter binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          dll="$(find _dxvk_install -type f -iname d3d9.dll | head -n1)"
+          test -n "$dll"
+          cp "$dll" d3d9vk_x64.dll
+          sha256sum d3d9vk_x64.dll
+          strings d3d9vk_x64.dll | grep -q '\[M3K-S1B\] config'
+          strings d3d9vk_x64.dll | grep -q 'M3K_QueryPresentSourceV1'
+          echo "M3K DXVK PRESENTER VERIFIED"
+
+      - name: Upload presenter artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3k-dxvk-v3.0.2-presenter
+          path: d3d9vk_x64.dll
+          if-no-files-found: error
