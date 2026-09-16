@@ -73,3 +73,4 @@ jobs:
           $tempLeft = @(Get-ChildItem $env:RUNNER_TEMP -Directory -Filter 'GTAIV_DLSS_FULL_UNINSTALL_*' -ErrorAction SilentlyContinue)
           if ($tempLeft.Count -ne 0) { throw 'Temporary uninstaller folder was not cleaned' }
           Write-Host 'Legacy backup end-to-end uninstall test PASSED.' -ForegroundColor Green
+          # rerun after .NET SHA-256 compatibility fix
