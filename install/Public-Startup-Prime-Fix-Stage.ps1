@@ -30,13 +30,18 @@ static UINT g_m3kStartupPrimeInitialProfile = 0xFFFFFFFFu;
 $vk = Replace-ExactOnce $vk $stateAnchor $stateNew 'initial profile state'
 
 # Patch only the configure function body so newline style in the generated source is irrelevant.
+# Anchor on the unique public-facing arm log instead of PowerShell String.Split overloads.
 $configureStart = $vk.IndexOf('static void M3kStartupPrimeConfigure(', [StringComparison]::Ordinal)
 $observeStart = $vk.IndexOf('static void M3kStartupPrimeObserve(', $configureStart, [StringComparison]::Ordinal)
 if ($configureStart -lt 0 -or $observeStart -le $configureStart) { throw 'Could not locate startup-prime configure boundaries' }
 $configure = $vk.Substring($configureStart, $observeStart - $configureStart)
-$epochLine = '    g_m3kStartupPrimeEpoch = -1;'
-if (($configure.Split($epochLine).Count - 1) -ne 1) { throw 'Startup-prime configure epoch anchor mismatch' }
-$configure = $configure.Replace($epochLine, $epochLine + "`r`n    g_m3kStartupPrimeInitialProfile = g_m3kSrProfileRequested;")
+$armLogMarker = '    Log("M3K-A3-S5: STARTUP PRIME armed '
+$armLog = $configure.IndexOf($armLogMarker, [StringComparison]::Ordinal)
+if ($armLog -lt 0) { throw 'Startup-prime configure arm-log anchor not found' }
+if ($configure.IndexOf($armLogMarker, $armLog + $armLogMarker.Length, [StringComparison]::Ordinal) -ge 0) {
+    throw 'Startup-prime configure arm-log anchor is not unique'
+}
+$configure = $configure.Insert($armLog, "    g_m3kStartupPrimeInitialProfile = g_m3kSrProfileRequested;`r`n")
 $vk = $vk.Substring(0,$configureStart) + $configure + $vk.Substring($observeStart)
 
 # The old hardware gate reset the 180-frame counter whenever a frame was not a valid
