@@ -45,10 +45,11 @@
         "Performance",
         "Ultra Performance"
       ],
-      "uninstaller_commit": "d65fb6c9df2e6206015bad53c24f96a75c2d10e0",
-      "uninstaller_sha256": "3f7e4103a8c58ff337142e4438d534ba7b4b9e5d3d6057a4857012aa88c29e34",
+      "uninstaller_commit": "62af76739c06c0915b64d293d623ec1f591cb0b7",
+      "uninstaller_sha256": "948acf211a23ee411b0d823663de7774c3ee35ffc137caf0268240cf6d3c14de",
       "uninstaller_path": "Uninstall-DLSS-Full.bat",
-      "rollback_target": "DLAA-only baseline + ReShade input patch"
+      "rollback_target": "DLAA-only baseline + ReShade input patch",
+      "uninstaller_legacy_backup_support": "Pre-presenter backups may omit .trex/d3d9vk_x64.dll; restore it from pinned b-bridge 0.1.0 package."
     },
     "reshade": {
       "version": "6.8.0",

@@ -34,9 +34,9 @@ $PublicControlsHash = '0C602D710F62EB6DF15C86B7B5473A7F3E9F2E1CF3270AEA3976EA512
 $ControlCommit = 'a6bd0080982398046b20cf39e858f3e016c03492'
 $ControlUrl = "https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/$ControlCommit/install/DLSS-Full-Control.bat"
 $ControlHash = 'F209610F26970939D5B12EFCC13BEE84BB08348B045B2C4442D3177ED142661D'
-$UninstallerCommit = 'd65fb6c9df2e6206015bad53c24f96a75c2d10e0'
+$UninstallerCommit = '62af76739c06c0915b64d293d623ec1f591cb0b7'
 $UninstallerUrl = "https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/$UninstallerCommit/install/Uninstall-DLSS-Full.bat"
-$UninstallerHash = '3F7E4103A8C58FF337142E4438D534BA7B4B9E5D3D6057A4857012AA88C29E34'
+$UninstallerHash = '948ACF211A23EE411B0D823663DE7774C3EE35FFC137CAF0268240CF6D3C14DE'
 $TranscriptStarted = $false
 
 function Fail([string]$Message) { throw $Message }
