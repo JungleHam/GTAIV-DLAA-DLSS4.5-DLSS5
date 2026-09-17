@@ -23,7 +23,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $installer = Get-Content install/Install-DLSS-Full.bat -Raw
           foreach ($marker in @(
-            'runtime-prebuilt-v1',
+            'v1.0.0',
             'GTAIV-DLSS-Full-Runtime.zip',
             "'d3d9.dll'='ECA7C9CF9CD1C4835CEA7FD57AD168A35E157F081C0EADBA51AF35F501026F28'",
             "'NvRemixBridge.exe'='8A89A3DBBC02D56BA98254941B14E52D88EFEF3F95E491C9C6AF5ADC65FECFFA'",
@@ -37,7 +37,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $url='https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/runtime-prebuilt-v1/GTAIV-DLSS-Full-Runtime.zip'
+          $url='https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/v1.0.0/GTAIV-DLSS-Full-Runtime.zip'
           $zip=Join-Path $env:RUNNER_TEMP 'runtime.zip'
           $dir=Join-Path $env:RUNNER_TEMP 'runtime'
           Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $zip
