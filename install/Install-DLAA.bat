@@ -79,12 +79,12 @@ try {
     $dlaaReady = (Test-Path -LiteralPath (Join-Path $Trex 'NvRemixBridge.exe')) -and
                  (Test-Path -LiteralPath (Join-Path $Trex 'dlss5-feed.addon64')) -and
                  (Test-Path -LiteralPath (Join-Path $Game 'DLAA_INSTALL_MANIFEST.txt'))
-    $reshadePatched = Has-PatchMarker 'C:\ProgramData\ReShade\ReShade64.dll'
+    $reshadePatchedBefore = Has-PatchMarker 'C:\ProgramData\ReShade\ReShade64.dll'
 
     Write-Host ''
     Write-Host "Game: $Game"
     Write-Host ("DLAA baseline: " + $(if ($dlaaReady) { 'already installed - will keep it' } else { 'will install' }))
-    Write-Host ("ReShade input patch: " + $(if ($reshadePatched) { 'already installed - will keep it' } else { 'will build and install' }))
+    Write-Host ("System-wide ReShade input patch: " + $(if ($reshadePatchedBefore) { 'currently detected - will verify again after DLAA/ReShade install' } else { 'not detected - will verify/build after DLAA/ReShade install' }))
     $ok = Read-Host 'Continue? [Y/n]'
     if ($ok -and $ok -notmatch '^(y|yes)$') { exit 0 }
 
@@ -109,6 +109,10 @@ try {
         Write-Host '[1/2] Existing DLAA baseline detected; skipping reinstall.' -ForegroundColor Green
     }
 
+    # Re-check after the DLAA core because ReShade setup can refresh the global Vulkan-layer DLL.
+    $reshadePatched = Has-PatchMarker 'C:\ProgramData\ReShade\ReShade64.dll'
+    Write-Host ("[2/2] System-wide ReShade input patch after DLAA/ReShade install: " + $(if ($reshadePatched) { 'detected' } else { 'not detected - installing now' }))
+
     if (-not $reshadePatched) {
         Write-Host ''
         Write-Host '[2/2] Building and installing the ReShade input patch...' -ForegroundColor Cyan
@@ -127,7 +131,7 @@ try {
         $p = Start-Process -FilePath (Join-Path $patchDir 'INSTALL.bat') -ArgumentList ('"' + $Game + '"') -WorkingDirectory $patchDir -Wait -PassThru
         if ($p.ExitCode -ne 0) { Fail 'ReShade input patch install failed. Re-run this same installer; it will keep the completed DLAA baseline.' }
     } else {
-        Write-Host '[2/2] ReShade input patch already detected; skipping rebuild.' -ForegroundColor Green
+        Write-Host '[2/2] System-wide ReShade input patch is already active; skipping rebuild.' -ForegroundColor Green
     }
 
     if (-not (Has-PatchMarker 'C:\ProgramData\ReShade\ReShade64.dll')) { Fail 'Final ReShade input-patch verification failed.' }
