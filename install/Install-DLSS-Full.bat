@@ -21,6 +21,7 @@ $BBridgeCommit = '1dad5e6d4dcf8647e354aa9a87f611256fb61142'
 $RepoUrl = 'https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5.git'
 $ReferenceBridgeHash = '6DD40F145A5D503624E3E05ECF0ADBAA094CF83B24278C0BB333318E3C52A912'
 $ReferenceCoreFeederHash = 'C73D8D54271F55F8931F00D62A4CDF605118BEA71D7C6BEE0B61D0CA7C1CCE4B'
+$ReferencePublicUxFeederHash = 'E22DD7EAF6D1C6A876AF486C939E3DCB980D6AE03A247B2C5772D0502224FCCD'
 $ReferenceShimHash = 'A2E4BEDACE8D99BC60B5D18E958BD7E98F8887FF40EC45A8674B892E2D1FCBBC'
 $NrPackageUrl = 'https://github.com/RankFTW/rhi-repo/releases/download/dlssnr-310.8.0-RTX40/nvngx_dlssnr_310.8.0-RTX40.zip'
 $NrPackageHash = '46124CFAEF532AD5F6DA07494772EA8C1B3E719F934E254385697F38D1289E3F'
@@ -34,6 +35,10 @@ $PublicControlsHash = '0C602D710F62EB6DF15C86B7B5473A7F3E9F2E1CF3270AEA3976EA512
 $StartupPrimeFixCommit = '12ae20c8789495064b32a3e0bf71072796fd46dc'
 $StartupPrimeFixUrl = "https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/$StartupPrimeFixCommit/install/Public-Startup-Prime-Fix-Stage.ps1"
 $StartupPrimeFixHash = '639856C7AFBD5BBE7BC46A38E839BA8EC95D912EFE7190975315045DBB5313BF'
+$PublicUxCommit = 'ddc95ef594a960820a70eee37767a2fc9583fb90'
+$PublicUxMasterStageBlob = '6e0ad36221acb4ff9ca35a0501daa0c4eb45b5b2'
+$PublicUxFixupBlob = 'f8b3a05b24ab912d643ec3661aa060b4257da7ee'
+$PublicUxV2FixupBlob = '9a079d97391ca70b1ab0a115e3c04288720e9d48'
 $ControlCommit = 'a6bd0080982398046b20cf39e858f3e016c03492'
 $ControlUrl = "https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/$ControlCommit/install/DLSS-Full-Control.bat"
 $ControlHash = 'F209610F26970939D5B12EFCC13BEE84BB08348B045B2C4442D3177ED142661D'
@@ -197,7 +202,7 @@ try {
 
     $profile = '2'
     Write-Host 'Default DLSS Super Resolution quality: Quality.' -ForegroundColor Yellow
-    Write-Host 'After installation, change quality and Neural Rendering directly inside the ReShade menu.' -ForegroundColor Yellow
+    Write-Host 'After installation, change processing, reconstruction and Neural Rendering directly inside the ReShade menu.' -ForegroundColor Yellow
 
     Remove-TemporaryInstallerFiles
     New-Item -ItemType Directory -Path $Temp -Force | Out-Null
@@ -239,6 +244,30 @@ try {
     Download-File $StartupPrimeFixUrl $primeFixStage
     Assert-SHA256 $primeFixStage $StartupPrimeFixHash
 
+    Write-Host 'Adding the hardware-validated ReShade UX + safe master bypass v2...' -ForegroundColor Cyan
+    Run $Git @('-C',$Project,'fetch','--depth=1','origin',$PublicUxCommit) 'Fetching pinned public UX/master commit'
+    Run $Git @('-C',$Project,'checkout',$PublicUxCommit,'--',
+        'install/Public-ReShade-UX-Master-Stage.ps1',
+        'install/Public-ReShade-UX-Master-Fixup.ps1',
+        'install/Public-ReShade-UX-Master-V2-Fixup.ps1') 'Checking out pinned public UX/master stages'
+
+    $uxMasterSource = Join-Path $Project 'install\Public-ReShade-UX-Master-Stage.ps1'
+    $uxFixupSource = Join-Path $Project 'install\Public-ReShade-UX-Master-Fixup.ps1'
+    $uxV2Source = Join-Path $Project 'install\Public-ReShade-UX-Master-V2-Fixup.ps1'
+    $uxMasterBlob = (& $Git hash-object -- $uxMasterSource).Trim().ToLowerInvariant()
+    $uxFixupBlob = (& $Git hash-object -- $uxFixupSource).Trim().ToLowerInvariant()
+    $uxV2Blob = (& $Git hash-object -- $uxV2Source).Trim().ToLowerInvariant()
+    if ($uxMasterBlob -ne $PublicUxMasterStageBlob) { Fail "Public UX master stage blob mismatch: $uxMasterBlob" }
+    if ($uxFixupBlob -ne $PublicUxFixupBlob) { Fail "Public UX fixup blob mismatch: $uxFixupBlob" }
+    if ($uxV2Blob -ne $PublicUxV2FixupBlob) { Fail "Public UX v2 fixup blob mismatch: $uxV2Blob" }
+
+    $uxMasterStage = Join-Path $Project 'tools\m3k-nr\public-reshade-ux-master-stage.ps1'
+    $uxFixupStage = Join-Path $Project 'tools\m3k-nr\public-reshade-ux-master-fixup.ps1'
+    $uxV2Stage = Join-Path $Project 'tools\m3k-nr\public-reshade-ux-master-v2-fixup.ps1'
+    Copy-Item -LiteralPath $uxMasterSource -Destination $uxMasterStage -Force
+    Copy-Item -LiteralPath $uxFixupSource -Destination $uxFixupStage -Force
+    Copy-Item -LiteralPath $uxV2Source -Destination $uxV2Stage -Force
+
     $buildScript = Join-Path $Project 'tools\m3k-nr\build-a3-s5.ps1'
     $buildText = [IO.File]::ReadAllText($buildScript)
     $buildAnchor = @'
@@ -248,9 +277,12 @@ try {
 & (Join-Path $toolRoot 'a3-s5-startup-prime-stage.ps1') -GeneratedRoot $generated
 & (Join-Path $toolRoot 'public-reshade-controls-stage.ps1') -GeneratedRoot $generated -FeederSource (Join-Path $feeder 'src\dlss5-feed.cpp')
 & (Join-Path $toolRoot 'public-startup-prime-fix-stage.ps1') -GeneratedRoot $generated -FeederSource (Join-Path $feeder 'src\dlss5-feed.cpp')
+& (Join-Path $toolRoot 'public-reshade-ux-master-stage.ps1') -GeneratedRoot $generated -FeederSource (Join-Path $feeder 'src\dlss5-feed.cpp')
+& (Join-Path $toolRoot 'public-reshade-ux-master-fixup.ps1') -FeederSource (Join-Path $feeder 'src\dlss5-feed.cpp')
+& (Join-Path $toolRoot 'public-reshade-ux-master-v2-fixup.ps1') -GeneratedRoot $generated -FeederSource (Join-Path $feeder 'src\dlss5-feed.cpp')
 '@
     $count = ([regex]::Matches($buildText,[regex]::Escape($buildAnchor))).Count
-    if ($count -ne 1) { Fail "Could not attach public ReShade controls stage to frozen build; anchor count=$count" }
+    if ($count -ne 1) { Fail "Could not attach public ReShade release stages to frozen build; anchor count=$count" }
     [IO.File]::WriteAllText($buildScript,$buildText.Replace($buildAnchor,$buildReplacement),(New-Object Text.UTF8Encoding($false)))
 
     Write-Host ''
@@ -330,8 +362,9 @@ try {
     Write-Host "  nvngx_dlssnr.dll     $NrDllHash"
     if ($bridgeHash -eq $ReferenceBridgeHash) { Write-Host '  Temporal-synchronization bridge matches the hardware-tested reference binary.' -ForegroundColor Green }
     else { Write-Host '  NOTE: bridge bytes differ from the reference build (local compiler/toolchain), but pinned source + patch validation passed.' -ForegroundColor Yellow }
-    if ($feederHash -eq $ReferenceCoreFeederHash) { Write-Host '  Feeder matches the pre-UI hardware-tested core reference binary.' -ForegroundColor Green }
-    else { Write-Host '  NOTE: Feeder differs from the pre-UI hardware reference as expected because the public ReShade controls are compiled into it; frozen rendering core + CPU tests passed.' -ForegroundColor Yellow }
+    if ($feederHash -eq $ReferencePublicUxFeederHash) { Write-Host '  Feeder matches the hardware-tested public ReShade UX/master v2 reference binary.' -ForegroundColor Green }
+    elseif ($feederHash -eq $ReferenceCoreFeederHash) { Write-Host '  WARNING: Feeder unexpectedly matches the pre-UI core reference; public release stages may not have been applied.' -ForegroundColor Yellow }
+    else { Write-Host '  NOTE: Feeder differs from the hardware-tested public reference (local compiler/toolchain), but pinned source + release-stage validation passed.' -ForegroundColor Yellow }
     if ($shimHash -eq $ReferenceShimHash) { Write-Host '  DLSS integration shim matches the hardware-tested reference binary.' -ForegroundColor Green }
     else { Write-Host '  NOTE: integration shim bytes differ from the reference build (local compiler/toolchain), but pinned source + CPU tests passed.' -ForegroundColor Yellow }
 
@@ -361,8 +394,12 @@ try {
     $ini = @(
         '[M3K]',
         '; GTA IV DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering',
-        '; Change DLSS quality and Neural Rendering from Home -> Add-ons -> DLSS 5 Feed -> GTA IV DLSS.',
+        '; Change processing, reconstruction and Neural Rendering from Home -> Add-ons -> DLSS 5 Feed -> GTA IV DLSS.',
         '; Mode=0: Neural Rendering OFF (default). Mode=2: Neural Rendering ON before DLSS Super Resolution.',
+        '; MasterEnabled=1 on every launch. In-menu OFF is session-only and restores the saved mode next launch.',
+        'MasterEnabled=1',
+        "LastSRProfile=$profile",
+        'LastNRMode=0',
         'Mode=0',
         'SourceProof=0',
         'SRProof=1',
@@ -412,6 +449,7 @@ try {
         "ProjectCheckpoint=$Checkpoint",
         "BBridgeCommit=$BBridgeCommit",
         'DefaultDLSSQuality=Quality',
+        'MasterProcessing=ON-by-default; OFF-session-only; staged-native-bypass-v2',
         'NeuralRendering=installed-off-by-default',
         'NRPasses=1',
         'SettingsSurface=ReShade Home > Add-ons > DLSS 5 Feed > GTA IV DLSS',
@@ -419,6 +457,13 @@ try {
         'StartupStabilizationFrames=180',
         "PublicControlsCommit=$PublicControlsCommit",
         "PublicControlsSHA256=$PublicControlsHash",
+        "StartupPrimeFixCommit=$StartupPrimeFixCommit",
+        "StartupPrimeFixSHA256=$StartupPrimeFixHash",
+        "PublicUxCommit=$PublicUxCommit",
+        "PublicUxMasterStageBlob=$PublicUxMasterStageBlob",
+        "PublicUxFixupBlob=$PublicUxFixupBlob",
+        "PublicUxV2FixupBlob=$PublicUxV2FixupBlob",
+        "ReferencePublicUxFeeder=$ReferencePublicUxFeederHash",
         "UninstallerCommit=$UninstallerCommit",
         "UninstallerSHA256=$UninstallerHash",
         "DlaaBaseline=$DlaaBaseline",
@@ -443,15 +488,17 @@ try {
     Write-Host '====================================================================' -ForegroundColor Green
     Write-Host ' DLSS 4.5 SUPER RESOLUTION + DLSS 5 NEURAL RENDERING INSTALLED' -ForegroundColor Green
     Write-Host '====================================================================' -ForegroundColor Green
-    Write-Host 'Default DLSS quality: Quality'
+    Write-Host 'DLSS / DLAA processing: ON by default (OFF is session-only)'
+    Write-Host 'Default reconstruction: Quality'
     Write-Host 'Neural Rendering runtime: INSTALLED'
     Write-Host 'Neural Rendering: OFF by default'
     Write-Host 'Neural Rendering passes: 1 (tested public default)'
     Write-Host 'Startup stabilization: 1485x835 -> 180 synchronized frames -> saved DLSS mode'
     Write-Host "Rollback backup: $Backup"
     Write-Host ''
-    Write-Host 'Normal settings are now inside ReShade:' -ForegroundColor Yellow
+    Write-Host 'Normal settings are inside ReShade:' -ForegroundColor Yellow
     Write-Host '  Home -> Add-ons -> DLSS 5 Feed -> GTA IV DLSS'
+    Write-Host '  Master processing, DLAA/DLSS mode, Neural Rendering, Advanced, Diagnostics'
     Write-Host 'Use DLSS-Full-Control.bat only for launch, repair, status, and logs.' -ForegroundColor Yellow
     Write-Host 'Use Uninstall-DLSS-Full.bat to roll back to the preserved DLAA + ReShade input-patch baseline.' -ForegroundColor Yellow
     Write-Host ''

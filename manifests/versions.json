@@ -1,5 +1,5 @@
 {
-  "project_status": "tested-core-with-prime-escape-startup-ui-resync-reverted-2026-09-16",
+  "project_status": "tested-core-with-hardware-validated-reshade-master-bypass-v2-2026-09-17",
   "components": {
     "fusionfix": {
       "version": "5.0.1",
@@ -25,6 +25,11 @@
       "s27_reference_shim_sha256": "a2e4bedace8d99bc60b5d18e958bd7e98f8887ff40ec45a8674b892e2d1fcbbc",
       "public_reshade_controls_commit": "11ac957138d4c6376d1e6ee6413f32cf9826b422",
       "public_reshade_controls_sha256": "0c602d710f62eb6df15c86b7b5473a7f3e9f2e1cf3270aea3976ea512f5907a3",
+      "public_reshade_ux_commit": "ddc95ef594a960820a70eee37767a2fc9583fb90",
+      "public_reshade_ux_master_stage_blob": "6e0ad36221acb4ff9ca35a0501daa0c4eb45b5b2",
+      "public_reshade_ux_fixup_blob": "f8b3a05b24ab912d643ec3661aa060b4257da7ee",
+      "public_reshade_ux_v2_fixup_blob": "9a079d97391ca70b1ab0a115e3c04288720e9d48",
+      "public_reshade_ux_reference_feeder_sha256": "e22dd7eaf6d1c6a876af486c939e3dcb980d6ae03a247b2c5772d0502224fccd",
       "settings_surface": "Home -> Add-ons -> DLSS 5 Feed -> GTA IV DLSS",
       "default_dlss_quality": "Quality",
       "startup_stabilization_resolution": "1485x835",
@@ -35,8 +40,12 @@
       "nr_enabled_mode": 2,
       "nr_passes": 1,
       "nr_passes_public_default": 1,
-      "hardware_validation": "RTX 4070 Ti SUPER, 2560x1440 output. Temporal synchronization was stable across Custom Ultra Quality (77%), Quality, Balanced, Performance and Ultra Performance. Automatic 1485x835 startup stabilization was confirmed to remove cold-start vibration before returning to Ultra Performance. Native DLSS 5 Neural Rendering was also validated on the same GPU.",
-      "notes": "The combined module installs both Super Resolution and the Neural Rendering runtime while leaving Neural Rendering disabled by default. Normal quality/NR control lives in the ReShade GTA IV DLSS panel; DLSS-Full-Control.bat is launch/repair/diagnostics only. The frozen A3-S2/A3-S5 rendering core is preserved and a small post-checkpoint source stage adds the public ReShade controls. The listed A3-S5 Feeder hash is therefore the pre-UI hardware-reference binary, not the expected byte identity of the current public Feeder. The older startup_prime keys are retained for tooling compatibility. Local builds use frozen source plus build/CPU gates; PE hashes can differ with local MSVC revisions.",
+      "master_processing_default": true,
+      "master_processing_off_scope": "session-only",
+      "master_processing_disable_policy": "switch through normal DLAA Native path, hold native for 30 stable frames, request temporal jitter off, wait 400 ms, then enter native raw passthrough",
+      "master_processing_resume_policy": "next launch always resumes processing ON and restores the saved reconstruction/NR state before A3-S5 startup stabilization",
+      "hardware_validation": "RTX 4070 Ti SUPER, 2560x1440 output. Temporal synchronization was stable across Custom Ultra Quality (77%), Quality, Balanced, Performance and Ultra Performance. Automatic 1485x835 startup stabilization was confirmed to remove cold-start vibration. The ReShade UX/master v2 build was hardware-tested with repeated DLAA/DLSS mode changes and repeated processing OFF/ON transitions; the staged native transition avoided the earlier low-resolution -> OFF crash, and relaunch after OFF restored the saved mode so the startup prime remained active.",
+      "notes": "The combined module installs both Super Resolution and the Neural Rendering runtime while leaving Neural Rendering disabled by default. Normal control lives in the ReShade GTA IV DLSS panel: master DLSS/DLAA processing, six reconstruction modes including DLAA Native, Neural Rendering, plus folded Advanced and Diagnostics sections. Master OFF is session-only and safely returns GTA to native before raw passthrough; the next launch restores the saved reconstruction/NR state and starts processing ON so A3-S5 can stabilize startup. DLSS-Full-Control.bat is launch/repair/diagnostics only. The frozen A3-S2/A3-S5 rendering core is preserved; pinned post-checkpoint stages add the public controls, startup-prime release fix and hardware-validated UX/master v2 behavior. The listed A3-S5 Feeder hash is the pre-UI hardware-reference binary; public_reshade_ux_reference_feeder_sha256 is the hardware-tested public v2 Feeder built on windows-2022. Local PE hashes can differ with MSVC revisions.",
       "public_modes": [
         "DLAA Native",
         "Custom Ultra Quality (77%)",
