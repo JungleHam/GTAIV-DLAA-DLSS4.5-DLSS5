@@ -14,6 +14,8 @@ From any folder, right-click **`install/Install-DLAA.bat` → Run as administrat
 
 Enter the folder that contains `GTAIV.exe`, confirm, and let it finish. This installs the DLAA baseline **and** the ReShade input patch in one step.
 
+The ReShade input patch is **system-wide**, so a clean GTA IV copy may still report that it is already present from an earlier install. The installer re-checks it after ReShade setup before deciding whether to rebuild it.
+
 Launch GTA IV once and press **Home**. ReShade should open and accept mouse/keyboard input.
 
 ### 3. Install DLSS Full + Neural Rendering
