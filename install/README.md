@@ -18,4 +18,12 @@ After Step 3, settings are in:
 Home -> Add-ons -> DLSS 5 Feed -> GTA IV DLSS
 ```
 
+## Uninstall
+
+**`Uninstall-DLSS-Full.bat`** removes DLSS Full and restores the preserved DLAA baseline.
+
+**`Uninstall-DLAA.bat` as Administrator** removes the entire project stack and restores the exact GTA IV + FusionFix state captured before Step 2. It also removes the ReShade Vulkan/input patch installed by this project. FusionFix itself stays installed.
+
+`Uninstall-DLAA.bat` can be run while either DLAA-only or DLSS Full is installed. It asks for the GTA IV folder and requires one confirmation.
+
 See the root [README](../README.md) for prerequisites and the short install guide.
