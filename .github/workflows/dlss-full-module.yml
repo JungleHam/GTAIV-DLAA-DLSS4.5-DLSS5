@@ -6,8 +6,11 @@ on:
     branches: [ main ]
     paths:
       - 'README.md'
+      - 'installer/**'
       - 'install/Install-DLAA.bat'
       - 'install/Install-DLSS-Full.bat'
+      - 'install/Uninstall-DLSS-Full.bat'
+      - 'install/Uninstall-DLAA.bat'
       - 'install/README.md'
       - 'manifests/versions.json'
       - '.github/workflows/dlss-full-module.yml'
@@ -28,13 +31,23 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $readme = Get-Content README.md -Raw
+          $setup = Get-Content installer/GTAIV-DLSS-Setup.iss -Raw
+          $runner = Get-Content installer/Run-Action.ps1 -Raw
           $dlaa = Get-Content install/Install-DLAA.bat -Raw
           $full = Get-Content install/Install-DLSS-Full.bat -Raw
           $manifest = Get-Content manifests/versions.json -Raw | ConvertFrom-Json
 
-          foreach ($marker in @('Install — 3 steps','Run as administrator','Install-DLAA.bat','Install-DLSS-Full.bat','manual ReShade installation are not required','RTX 50 Series','RTX 40 Series')) {
+          foreach ($marker in @('GTAIV-DLSS-Setup.exe','Full DLSS automatically installs','manual ReShade installation are not required','RTX 50 Series','RTX 40 Series','Remove DLSS Full only','Remove everything from this project')) {
             if (-not $readme.Contains($marker)) { throw "README missing release marker: $marker" }
           }
+          foreach ($marker in @('Install / repair DLAA','Install / repair Full DLSS','Remove DLSS Full only','Remove everything from this project','PrivilegesRequired=admin','Run-Action.ps1')) {
+            if (-not $setup.Contains($marker)) { throw "Unified setup missing: $marker" }
+          }
+          foreach ($marker in @("ValidateSet('DLAA','FULL','REMOVE_FULL','REMOVE_ALL')",'Invoke-DLAA','Invoke-Full','Invoke-RemoveFull','Invoke-RemoveAll','DLAA foundation is not installed. Installing it automatically first')) {
+            if (-not $runner.Contains($marker)) { throw "Setup action runner missing: $marker" }
+          }
+          [void][ScriptBlock]::Create($runner)
+
           foreach ($marker in @('runtime-prebuilt-v1','ReShade64-bbridge.dll','75976007A0A5DE5BAB364F98E2D01B377D046441C94E89B1DD279CEE856161A9','Install-DLAA-Core.bat','Has-PatchMarker','RunAs')) {
             if (-not $dlaa.Contains($marker)) { throw "DLAA installer missing: $marker" }
           }
