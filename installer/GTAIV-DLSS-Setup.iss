@@ -38,6 +38,7 @@ var
   SelectedAction: Integer;
   DetectedDLAA: Boolean;
   DetectedFull: Boolean;
+  DetectedFusionFixFirstRun: Boolean;
 
 function QuoteArg(const S: string): string;
 begin
@@ -62,6 +63,19 @@ begin
   end;
 
   Result := '';
+end;
+
+function FusionFixFirstRunDetected(const Root: string): Boolean;
+var
+  CfgName: string;
+begin
+  CfgName := 'GTAIV.EFLC.FusionFix.cfg';
+  Result :=
+    FileExists(AddBackslash(Root) + 'plugins\' + CfgName) or
+    FileExists(AddBackslash(Root) + CfgName) or
+    FileExists(AddBackslash(ExpandConstant('{localappdata}\Rockstar Games\GTA IV')) + CfgName) or
+    FileExists(AddBackslash(ExpandConstant('{localappdata}\GTAIV.EFLC.FusionFix')) + CfgName) or
+    FileExists(AddBackslash(ExpandConstant('{userdocs}\GTAIV.EFLC.FusionFix')) + CfgName);
 end;
 
 procedure DetectCurrentState;
@@ -121,7 +135,7 @@ begin
     wpWelcome,
     'Select GTA IV',
     'Choose the folder that contains GTAIV.exe',
-    'Select your GTA IV: Complete Edition folder. FusionFix must already be installed, then click Next.',
+    'FusionFix must already be installed. Launch GTA IV once with FusionFix, close the game, then select your GTA IV: Complete Edition folder.',
     False,
     '');
   GamePage.Add('');
@@ -173,6 +187,19 @@ begin
     GameDir := P;
     GamePage.Values[0] := P;
     DetectCurrentState;
+    DetectedFusionFixFirstRun := FusionFixFirstRunDetected(GameDir);
+
+    if (not DetectedFusionFixFirstRun) and (not DetectedDLAA) then
+    begin
+      MsgBox(
+        'FusionFix is installed, but its first-run runtime file was not found.' + #13#10 + #13#10 +
+        'Launch GTA IV normally once with FusionFix installed, wait until the game reaches the menu, close it, then run this setup again.' + #13#10 + #13#10 +
+        'The setup checks for GTAIV.EFLC.FusionFix.cfg, which FusionFix creates when it actually loads.',
+        mbInformation,
+        MB_OK);
+      Result := False;
+      exit;
+    end;
 
     ActionPage.Values[0] := False;
     ActionPage.Values[1] := False;
@@ -197,6 +224,19 @@ begin
     end;
 
     DetectCurrentState;
+    DetectedFusionFixFirstRun := FusionFixFirstRunDetected(GameDir);
+
+    if ((SelectedAction = 0) or (SelectedAction = 1)) and (not DetectedFusionFixFirstRun) then
+    begin
+      MsgBox(
+        'FusionFix first run was not detected.' + #13#10 + #13#10 +
+        'Launch GTA IV normally once with FusionFix installed, wait until the game reaches the menu, close it, then run this setup again.',
+        mbInformation,
+        MB_OK);
+      Result := False;
+      exit;
+    end;
+
     if (SelectedAction = 2) and (not DetectedFull) then
     begin
       MsgBox('DLSS Full is not detected in this GTA IV folder.', mbInformation, MB_OK);
@@ -222,6 +262,7 @@ begin
     '  ' + GameDir + NewLine + NewLine +
     'Action:' + NewLine +
     '  ' + ActionTitle(SelectedAction) + NewLine + NewLine +
+    'FusionFix first run: detected' + NewLine + NewLine +
     'The setup uses the project''s verified prebuilt release assets. No Git, Python, Visual Studio, or manual ReShade installation is required.';
 end;
 
