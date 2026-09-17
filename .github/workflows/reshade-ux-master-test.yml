@@ -7,6 +7,7 @@ on:
     paths:
       - 'install/Public-ReShade-UX-Master-Stage.ps1'
       - 'install/Public-ReShade-UX-Master-Fixup.ps1'
+      - 'install/Public-ReShade-UX-Master-V2-Fixup.ps1'
       - '.github/workflows/reshade-ux-master-test.yml'
 
 permissions:
@@ -28,7 +29,7 @@ jobs:
           git -C _project checkout 57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f
           if ((git -C _project rev-parse HEAD).Trim() -ne '57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f') { throw 'Wrong frozen project revision' }
 
-      - name: Attach public UI, startup fix, and UX master stage
+      - name: Attach public UI, startup fix, and UX master stages
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -37,6 +38,7 @@ jobs:
           Copy-Item .\install\Public-Startup-Prime-Fix-Stage.ps1 "$tool\public-startup-prime-fix-stage.ps1" -Force
           Copy-Item .\install\Public-ReShade-UX-Master-Stage.ps1 "$tool\public-reshade-ux-master-stage.ps1" -Force
           Copy-Item .\install\Public-ReShade-UX-Master-Fixup.ps1 "$tool\public-reshade-ux-master-fixup.ps1" -Force
+          Copy-Item .\install\Public-ReShade-UX-Master-V2-Fixup.ps1 "$tool\public-reshade-ux-master-v2-fixup.ps1" -Force
           $build = "$tool\build-a3-s5.ps1"
           $text = [IO.File]::ReadAllText($build)
           $anchor = "& (Join-Path `$toolRoot 'a3-s5-startup-prime-stage.ps1') -GeneratedRoot `$generated"
@@ -45,7 +47,8 @@ jobs:
             "& (Join-Path `$toolRoot 'public-reshade-controls-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
             "& (Join-Path `$toolRoot 'public-startup-prime-fix-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
             "& (Join-Path `$toolRoot 'public-reshade-ux-master-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
-            "& (Join-Path `$toolRoot 'public-reshade-ux-master-fixup.ps1') -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')"
+            "& (Join-Path `$toolRoot 'public-reshade-ux-master-fixup.ps1') -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-reshade-ux-master-v2-fixup.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')"
           )
           $replacement = $lines -join "`r`n"
           if (($text.Split($anchor).Count - 1) -ne 1) { throw 'Could not attach test stages exactly once' }
@@ -67,8 +70,13 @@ jobs:
           $src = Get-Content .\_project\tools\m3k-nr\_work\feeder\src\dlss5-feed.cpp -Raw
           if (-not (Test-Path $feed)) { throw 'Feeder output missing' }
           foreach ($marker in @(
-            'M3K-MASTER: OFF ACTIVE',
-            'M3kMasterNativePassthroughReady',
+            'M3K-MASTER-V2: OFF stage 1',
+            'M3K-MASTER-V2: OFF stage 2',
+            'M3K-MASTER-V2: OFF ACTIVE',
+            'previous session ended OFF; startup restored reconstruction=',
+            'master OFF is not carried across launches',
+            'M3kAdvanceMasterDisable();',
+            'GetTickCount64() - g_m3kMasterJitterOffTick < 400',
             'DLSS / DLAA processing##M3KMaster',
             'ImGuiCond_Appearing',
             'Advanced##M3KAdvanced',
@@ -76,18 +84,23 @@ jobs:
             'M3K-A3-S5: startup prime cancelled by live profile change')) {
             if (-not (($vk + $src).Contains($marker))) { throw "Generated marker missing: $marker" }
           }
-          if (-not $src.Contains('M3K-MASTER: OFF ACTIVE - native GTA frame passes through untouched')) { throw 'Generated Feeder raw-bypass block missing' }
           if (-not $src.Contains('ImGui::CollapsingHeader("GTA IV DLSS"')) { throw 'Generated GTA IV DLSS public panel missing' }
+          if ($vk.Contains('persistent state=OFF saved reconstruction=')) { throw 'v1 persistent-OFF behavior survived v2 fixup' }
           New-Item -ItemType Directory -Force test-artifact | Out-Null
           Copy-Item $feed test-artifact\dlss5-feed.addon64
           (Get-FileHash -Algorithm SHA256 test-artifact\dlss5-feed.addon64).Hash | Set-Content -Encoding ascii test-artifact\SHA256.txt
-          @('[M3K]','MasterEnabled=1','LastSRProfile=2','LastNRMode=0') | Set-Content -Encoding ascii test-artifact\NEW-INI-KEYS.txt
+          @(
+            '[M3K]',
+            'MasterEnabled=1  ; startup always resumes ON; OFF is session-only',
+            'LastSRProfile=2',
+            'LastNRMode=0'
+          ) | Set-Content -Encoding ascii test-artifact\NEW-INI-KEYS.txt
           Write-Host "Feeder SHA256: $((Get-FileHash -Algorithm SHA256 test-artifact\dlss5-feed.addon64).Hash)"
 
       - name: Upload hardware-test Feeder
         uses: actions/upload-artifact@v4
         with:
-          name: reshade-ux-master-feeder-v1
+          name: reshade-ux-master-feeder-v2
           path: test-artifact/
           if-no-files-found: error
           retention-days: 7
