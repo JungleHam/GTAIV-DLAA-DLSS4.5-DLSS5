@@ -1,20 +1,10 @@
-name: Build prebuilt runtime release
+name: Build prebuilt runtime artifacts
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
-    paths:
-      - '.github/workflows/prebuilt-runtime-release.yml'
-      - 'install/Public-ReShade-Controls-Stage.ps1'
-      - 'install/Public-Startup-Prime-Fix-Stage.ps1'
-      - 'install/Public-ReShade-UX-Master-Stage.ps1'
-      - 'install/Public-ReShade-UX-Master-Fixup.ps1'
-      - 'install/Public-ReShade-UX-Master-V2-Fixup.ps1'
-      - 'tools/reshade-bbridge-input/apply_patch.ps1'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build-reshade:
@@ -117,7 +107,7 @@ jobs:
           meson compile -C _prebuilt64 NvRemixBridge
           if ($LASTEXITCODE -ne 0) { throw "x64 bridge build failed: $LASTEXITCODE" }
           Pop-Location
-      - name: Collect tested runtime
+      - name: Collect reproducible runtime
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path .\out-runtime\m3k -Force | Out-Null
@@ -125,7 +115,7 @@ jobs:
           Copy-Item .\_bbridge\_prebuilt64\src\server\NvRemixBridge.exe .\out-runtime\NvRemixBridge.exe -Force
           Copy-Item .\_project\tools\m3k-nr\out-m3k-a3-s5\dlss5-feed.addon64 .\out-runtime\dlss5-feed.addon64 -Force
           Copy-Item .\_project\tools\m3k-nr\out-m3k-s27\m3k\m3k-nvngx.dll .\out-runtime\m3k\m3k-nvngx.dll -Force
-          Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/m3k-dxvk-v3.0.2-a2s1b/d3d9vk_x64.dll' -OutFile .\out-runtime\d3d9vk_x64.dll
+          Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/v1.0.0/d3d9vk_x64.dll' -OutFile .\out-runtime\d3d9vk_x64.dll
           $presenter = (Get-FileHash -Algorithm SHA256 .\out-runtime\d3d9vk_x64.dll).Hash.ToUpperInvariant()
           if ($presenter -ne '511E0C2509E1922DB2EC38940507BA956908FE6DC5FD9B3DB9FEC489DC05F297') { throw "Presenter hash mismatch: $presenter" }
           $expectedVersion = 'remix-main+1dad5e6d'
@@ -138,34 +128,3 @@ jobs:
         with:
           name: prebuilt-runtime
           path: out-runtime/**
-
-  publish:
-    needs: [build-reshade, build-runtime]
-    runs-on: windows-2022
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: prebuilt-reshade
-          path: release
-      - uses: actions/download-artifact@v4
-        with:
-          name: prebuilt-runtime
-          path: runtime
-      - name: Package and publish runtime assets
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          Compress-Archive -Path .\runtime\* -DestinationPath .\release\GTAIV-DLSS-Full-Runtime.zip -Force
-          $lines = New-Object System.Collections.Generic.List[string]
-          foreach ($p in @('.\release\ReShade64-bbridge.dll','.\release\GTAIV-DLSS-Full-Runtime.zip')) {
-            $h = Get-FileHash -Algorithm SHA256 $p
-            $lines.Add(('{0}  {1}' -f $h.Hash,[IO.Path]::GetFileName($p)))
-          }
-          Get-Content .\runtime\SHA256SUMS.txt | ForEach-Object { $lines.Add($_) }
-          $lines | Set-Content .\release\SHA256SUMS.txt -Encoding ASCII
-          if (-not (gh release view runtime-prebuilt-v1 --repo JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5 2>$null)) {
-            gh release create runtime-prebuilt-v1 --repo JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5 --title 'GTA IV prebuilt runtime v1' --notes 'Prebuilt, hash-verified runtime assets for the release installers. Built from pinned sources by GitHub Actions.' --prerelease
-          }
-          gh release upload runtime-prebuilt-v1 .\release\ReShade64-bbridge.dll .\release\GTAIV-DLSS-Full-Runtime.zip .\release\SHA256SUMS.txt --repo JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5 --clobber
