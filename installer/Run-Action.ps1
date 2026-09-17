@@ -24,6 +24,21 @@ function Normalize-GamePath([string]$Path) {
     Fail 'GTAIV.exe was not found in the selected folder.'
 }
 
+function Test-FusionFixFirstRun([string]$Root) {
+    $cfg = 'GTAIV.EFLC.FusionFix.cfg'
+    $candidates = @(
+        (Join-Path $Root ('plugins\' + $cfg)),
+        (Join-Path $Root $cfg),
+        (Join-Path $env:LOCALAPPDATA ('Rockstar Games\GTA IV\' + $cfg)),
+        (Join-Path $env:LOCALAPPDATA ('GTAIV.EFLC.FusionFix\' + $cfg)),
+        (Join-Path ([Environment]::GetFolderPath('MyDocuments')) ('GTAIV.EFLC.FusionFix\' + $cfg))
+    )
+    foreach ($candidate in $candidates) {
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $true }
+    }
+    return $false
+}
+
 function Test-DLAA([string]$Root) {
     return (Test-Path -LiteralPath (Join-Path $Root 'DLAA_INSTALL_MANIFEST.txt')) -and
            (Test-Path -LiteralPath (Join-Path $Root '.trex\NvRemixBridge.exe')) -and
@@ -115,6 +130,9 @@ function Invoke-RemoveAll([string]$Root) {
 $Game = Normalize-GamePath $Game
 if (-not (Test-Path -LiteralPath (Join-Path $Game 'dinput8.dll'))) {
     Fail 'FusionFix is not detected (dinput8.dll is missing). Install FusionFix first.'
+}
+if (($Action -eq 'DLAA' -or $Action -eq 'FULL') -and -not (Test-FusionFixFirstRun $Game)) {
+    Fail 'FusionFix is installed, but its first-run runtime file was not found. Launch GTA IV normally once with FusionFix installed, wait until the main menu appears, close the game, then run setup again.'
 }
 if (Get-Process GTAIV -ErrorAction SilentlyContinue) { Fail 'Close GTA IV before continuing.' }
 if (Get-Process NvRemixBridge -ErrorAction SilentlyContinue) { Fail 'Close NvRemixBridge.exe before continuing.' }
