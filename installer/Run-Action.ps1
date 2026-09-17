@@ -50,31 +50,46 @@ function Test-Full([string]$Root) {
            (Test-Path -LiteralPath (Join-Path $Root 'DLSS_FULL_INSTALLED.txt'))
 }
 
-function Invoke-InteractiveBat {
+function Prepare-NonInteractiveBat {
+    param(
+        [Parameter(Mandatory=$true)][string]$Path,
+        [Parameter(Mandatory=$true)][string]$Root
+    )
+
+    $text = [IO.File]::ReadAllText($Path)
+    $text = $text.Replace('$Game = Resolve-GameFolder', '$Game = $env:GTAIV_SETUP_GAME')
+    $text = $text.Replace('$ok = Read-Host ''Continue? [Y/n]''', '$ok = ''y''')
+    $text = $text.Replace('$ok = Read-Host ''Continue? [y/N]''', '$ok = ''y''')
+    $text = $text.Replace('Read-Host ''Press Enter to close''', '$null = $null')
+    [IO.File]::WriteAllText($Path, $text, [Text.UTF8Encoding]::new($false))
+    $env:GTAIV_SETUP_GAME = $Root
+}
+
+function Invoke-BundledBat {
     param(
         [Parameter(Mandatory=$true)][string]$Path,
         [Parameter(Mandatory=$true)][string]$WorkingDirectory,
-        [string[]]$InputLines = @()
+        [switch]$NonInteractive
     )
 
     if (-not (Test-Path -LiteralPath $Path)) { Fail "Installer component is missing: $Path" }
+    if ($NonInteractive) { Prepare-NonInteractiveBat -Path $Path -Root $WorkingDirectory }
 
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName = $env:ComSpec
     $psi.Arguments = '/d /c call "' + $Path + '"'
     $psi.WorkingDirectory = $WorkingDirectory
     $psi.UseShellExecute = $false
-    $psi.RedirectStandardInput = $true
+    $psi.RedirectStandardInput = $false
     $psi.RedirectStandardOutput = $false
     $psi.RedirectStandardError = $false
     $psi.CreateNoWindow = $false
+    if ($NonInteractive) { $psi.EnvironmentVariables['GTAIV_SETUP_GAME'] = $WorkingDirectory }
 
     $proc = New-Object System.Diagnostics.Process
     $proc.StartInfo = $psi
     if (-not $proc.Start()) { Fail "Could not start: $Path" }
 
-    foreach ($line in $InputLines) { $proc.StandardInput.WriteLine($line) }
-    $proc.StandardInput.Close()
     $proc.WaitForExit()
     $code = $proc.ExitCode
     $proc.Dispose()
@@ -83,7 +98,7 @@ function Invoke-InteractiveBat {
 
 function Invoke-DLAA([string]$Root) {
     $script = Join-Path $PSScriptRoot 'Install-DLAA.bat'
-    Invoke-InteractiveBat -Path $script -WorkingDirectory $Root -InputLines @($Root, 'y')
+    Invoke-BundledBat -Path $script -WorkingDirectory $Root -NonInteractive
 }
 
 function Invoke-Full([string]$Root) {
@@ -96,7 +111,7 @@ function Invoke-Full([string]$Root) {
     }
 
     $script = Join-Path $PSScriptRoot 'Install-DLSS-Full.bat'
-    Invoke-InteractiveBat -Path $script -WorkingDirectory $Root -InputLines @($Root, 'y')
+    Invoke-BundledBat -Path $script -WorkingDirectory $Root -NonInteractive
 }
 
 function Invoke-RemoveFull([string]$Root) {
@@ -105,13 +120,12 @@ function Invoke-RemoveFull([string]$Root) {
         return
     }
 
-    # The project uninstaller intentionally derives the game path from its own location.
-    # Copy the exact bundled uninstaller beside GTAIV.exe, run it, then remove the helper copy.
+    # The Full uninstaller intentionally derives the game path from its own location.
     $source = Join-Path $PSScriptRoot 'Uninstall-DLSS-Full.bat'
     $tempCopy = Join-Path $Root '_GTAIV_DLSS_MAINTENANCE_Uninstall-Full.bat'
     Copy-Item -LiteralPath $source -Destination $tempCopy -Force
     try {
-        Invoke-InteractiveBat -Path $tempCopy -WorkingDirectory $Root
+        Invoke-BundledBat -Path $tempCopy -WorkingDirectory $Root
     }
     finally {
         Remove-Item -LiteralPath $tempCopy -Force -ErrorAction SilentlyContinue
@@ -124,7 +138,7 @@ function Invoke-RemoveAll([string]$Root) {
         return
     }
     $script = Join-Path $PSScriptRoot 'Uninstall-DLAA.bat'
-    Invoke-InteractiveBat -Path $script -WorkingDirectory $Root -InputLines @($Root, 'y')
+    Invoke-BundledBat -Path $script -WorkingDirectory $Root -NonInteractive
 }
 
 $Game = Normalize-GamePath $Game
