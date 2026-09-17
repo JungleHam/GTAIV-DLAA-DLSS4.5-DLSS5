@@ -22,7 +22,7 @@ Launch GTA IV once and press **Home**. ReShade should open and accept mouse/keyb
 
 ### 3. Install DLSS Full + Neural Rendering
 
-Right-click **`install/Install-DLSS-Full.bat` → Run as administrator**.
+Right-click **`install/Install-DLSS-Full.bat` → ##Run as administrator**.
 
 Enter the same GTA IV folder and confirm. The installer downloads the verified prebuilt runtime and selects the correct Neural Rendering file:
 
@@ -31,7 +31,7 @@ Enter the same GTA IV folder and confirm. The installer downloads the verified p
 | **RTX 50 Series** | Original NVIDIA-signed DLSS NR 310.8.0 |
 | **RTX 40 Series** | Project-tested RTX 40 compatibility DLSS NR 310.8.0 |
 
-After install, open:
+After install, open in-game:
 
 ```text
 Home -> Add-ons -> DLSS 5 Feed -> GTA IV DLSS
