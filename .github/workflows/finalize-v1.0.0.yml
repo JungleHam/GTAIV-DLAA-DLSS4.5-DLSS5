@@ -50,14 +50,12 @@ jobs:
           }
           function ReplaceRequired([string]$Path,[string]$Old,[string]$New,[string]$Label) {
             $text = ReadText $Path
-            if (-not $text.Contains($Old)) { throw "$Label: expected text was not found in $Path" }
+            if (-not $text.Contains($Old)) { throw "${Label}: expected text was not found in $Path" }
             WriteText $Path ($text.Replace($Old,$New))
           }
 
-          # Public version, stable release tag, and no more release-candidate wording.
           ReplaceRequired 'installer/GTAIV-DLSS-Setup.iss' '#define MyAppVersion "1.0-rc1"' '#define MyAppVersion "1.0.0"' 'installer version'
 
-          # Stop ordinary build workflows from mutating a stable GitHub Release.
           $win = ReadText '.github/workflows/windows-installer.yml'
           $win = $win.Replace("permissions:`r`n  contents: write","permissions:`r`n  contents: read")
           $win = $win.Replace("permissions:`n  contents: write","permissions:`n  contents: read")
@@ -68,8 +66,8 @@ jobs:
           WriteText '.github/workflows/windows-installer.yml' $win
 
           $pre = ReadText '.github/workflows/prebuilt-runtime-release.yml'
-          $pre = [regex]::Replace($pre,'(?ms)^on:\r?\n  workflow_dispatch:\r?\n  push:.*?^permissions:','on:`r`n  workflow_dispatch:`r`n`r`npermissions:')
-          $pre = $pre.Replace("contents: write","contents: read")
+          $pre = [regex]::Replace($pre,'(?ms)^on:\r?\n  workflow_dispatch:\r?\n  push:.*?^permissions:',"on:`r`n  workflow_dispatch:`r`n`r`npermissions:")
+          $pre = $pre.Replace('contents: write','contents: read')
           $publishMarker = "`n  publish:`n"
           $p = $pre.IndexOf($publishMarker,[StringComparison]::Ordinal)
           if ($p -lt 0) {
@@ -81,7 +79,6 @@ jobs:
           $pre = $pre.Replace('name: Build prebuilt runtime release','name: Build prebuilt runtime artifacts')
           WriteText '.github/workflows/prebuilt-runtime-release.yml' $pre
 
-          # Retarget every public/internal support reference away from the disposable test releases.
           $tracked = @(git grep -Il -e 'runtime-prebuilt-v1' -e 'm3k-dxvk-v3.0.2-a2s1b' -- .)
           foreach ($file in $tracked) {
             $file = $file.Trim()
@@ -92,24 +89,17 @@ jobs:
             WriteText $file $text
           }
 
-          # Make the README release-ready and record the one known cosmetic limitation.
           $readme = ReadText 'README.md'
           $guardAnchor = '**Full DLSS automatically installs the DLAA foundation first.** Installation order cannot be wrong.'
           if (-not $readme.Contains('The setup also verifies that FusionFix has completed its first run')) {
             $readme = $readme.Replace($guardAnchor,$guardAnchor + "`r`n`r`nThe setup also verifies that FusionFix has completed its first run before installation is allowed.")
           }
           if (-not $readme.Contains('## Known limitation')) {
-            $known = @'
-## Known limitation
-
-Steam's built-in FPS counter currently disappears while a DLSS Super Resolution profile is active (Ultra Quality 77%, Quality, Balanced, Performance, or Ultra Performance). It remains visible in **DLAA Native** and with project processing **OFF**. This is an overlay-display limitation; DLSS/Neural Rendering processing continues to operate normally.
-
-'@
+            $known = "## Known limitation`r`n`r`nSteam's built-in FPS counter currently disappears while a DLSS Super Resolution profile is active (Ultra Quality 77%, Quality, Balanced, Performance, or Ultra Performance). It remains visible in **DLAA Native** and with project processing **OFF**. This is an overlay-display limitation; DLSS/Neural Rendering processing continues to operate normally.`r`n`r`n"
             $readme = $readme.Replace('## Troubleshooting', $known + '## Troubleshooting')
           }
           WriteText 'README.md' $readme
 
-          # Promote the machine-readable manifest and describe the hardware-tested overlay behavior accurately.
           $manifest = ReadText 'manifests/versions.json'
           $manifest = $manifest.Replace('"project_status": "release-candidate-prebuilt-install-2026-09-17"','"project_status": "v1.0.0-public-release-2026-09-17"')
           $oldHw = '"hardware_validation": "RTX 4070 Ti SUPER at 2560x1440. Live DLAA/DLSS mode switching, Neural Rendering, staged master OFF/ON, 1485x835 startup stabilization, and native-resolution Steam overlay startup were hardware-tested."'
@@ -117,60 +107,7 @@ Steam's built-in FPS counter currently disappears while a DLSS Super Resolution 
           if ($manifest.Contains($oldHw)) { $manifest = $manifest.Replace($oldHw,$newHw) }
           WriteText 'manifests/versions.json' $manifest
 
-          New-Item -ItemType Directory -Path docs -Force | Out-Null
-          $notes = @'
-# GTA IV DLAA + DLSS 4.5 + DLSS 5 Neural Rendering — v1.0.0
-
-The first public release. One installer handles installation, repair, upgrades, and removal. 🎀
-
-## Download
-
-**Most users only need `GTAIV-DLSS-Setup.exe` from the Assets section below.**
-
-The other release assets are verified support payloads used by the installer and are provided for transparency/reproducibility.
-
-## What you get
-
-- **DLAA Native** plus five DLSS Super Resolution profiles: Ultra Quality 77%, Quality, Balanced, Performance, and Ultra Performance.
-- **DLSS 5 Neural Rendering** with live on/off control and adjustable pass count.
-- **ReShade 6.8 Add-On Support** with the project's b-bridge input fix.
-- A single **Setup & Maintenance** wizard: install/repair DLAA, install/repair Full DLSS, remove Full while keeping DLAA, or remove the whole project while keeping FusionFix.
-- **FusionFix first-run detection** so the setup will not proceed until a clean FusionFix launch has initialized correctly.
-- **Prebuilt, SHA256-verified runtime assets**. No Git, Python, Visual Studio, or local compilation is required.
-
-## Before installing
-
-1. Start from GTA IV: Complete Edition with **FusionFix** installed.
-2. Launch GTA IV normally once, reach the menu, then quit normally.
-3. Run `GTAIV-DLSS-Setup.exe` as Administrator and select the folder containing `GTAIV.exe`.
-4. Keep GTA IV's own resolution set to your display's **native resolution**. The mod changes internal render resolution separately.
-
-## In-game controls
-
-Press **Home** and open:
-
-`Add-ons → DLSS 5 Feed → GTA IV DLSS`
-
-Neural Rendering defaults to **OFF** and DLSS defaults to **Quality**.
-
-## Hardware validation
-
-The complete public stack was hardware-tested on an **RTX 4070 Ti SUPER at 2560×1440**, including live DLAA/DLSS switching, Neural Rendering, startup stabilization, and the master processing toggle. The installer includes the RTX 40 compatibility NR path and the original NVIDIA-signed RTX 50 NR runtime path.
-
-## Known limitation
-
-Steam's built-in FPS counter disappears while a DLSS Super Resolution profile is active. It remains visible in **DLAA Native** and with project processing **OFF**. This affects the Steam overlay display, not DLSS or Neural Rendering itself.
-
-## Checksums
-
-`GTAIV-DLSS-Setup.sha256` contains the installer hash, and `SHA256SUMS.txt` covers the complete published payload set.
-
----
-
-Thanks to **FusionFix, b-bridge, DXVK, ReShade, DLSS5-Feeder, and LumeniteFX** for the projects this integration builds on.
-'@
-          WriteText 'docs/RELEASE-1.0.0.md' $notes
-
+          if (-not (Test-Path -LiteralPath 'docs/RELEASE-1.0.0.md')) { throw 'Release notes file is missing.' }
           git diff --check
 
           $leftovers = @(git grep -n -e 'runtime-prebuilt-v1' -e 'm3k-dxvk-v3.0.2-a2s1b' -- . ':(exclude).github/workflows/finalize-v1.0.0.yml' 2>$null)
@@ -181,16 +118,18 @@ Thanks to **FusionFix, b-bridge, DXVK, ReShade, DLSS5-Feeder, and LumeniteFX** f
 
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add README.md docs/RELEASE-1.0.0.md manifests/versions.json installer/GTAIV-DLSS-Setup.iss install/Install-DLAA.bat install/Install-DLSS-Full.bat .github/workflows/windows-installer.yml .github/workflows/prebuilt-runtime-release.yml
-          if (-not (git diff --cached --quiet)) {
+          git add -A
+          git diff --cached --quiet
+          if ($LASTEXITCODE -ne 0) {
             git commit -m 'Prepare v1.0.0 public release'
             git push origin HEAD:main
+            if ($LASTEXITCODE -ne 0) { throw 'Could not push v1.0.0 release-prep commit.' }
           }
           $releaseSha = (git rev-parse HEAD).Trim()
           "RELEASE_SHA=$releaseSha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           Write-Host "Release commit: $releaseSha" -ForegroundColor Green
 
-      - name: Download the hardware-tested support payloads
+      - name: Download hardware-tested support payloads
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -201,8 +140,9 @@ Thanks to **FusionFix, b-bridge, DXVK, ReShade, DLSS5-Feeder, and LumeniteFX** f
           }
           New-Item -ItemType Directory -Path release -Force | Out-Null
           gh release download $env:OLD_RUNTIME_TAG --repo $env:REPO --pattern 'GTAIV-DLSS-Full-Runtime.zip' --dir release
+          if ($LASTEXITCODE -ne 0) { throw 'Could not download the tested runtime archive.' }
           gh release download $env:OLD_RUNTIME_TAG --repo $env:REPO --pattern 'ReShade64-bbridge.dll' --dir release
-          if ($LASTEXITCODE -ne 0) { throw 'Could not download the tested runtime prerelease payloads.' }
+          if ($LASTEXITCODE -ne 0) { throw 'Could not download the tested ReShade runtime.' }
 
           function AssertHash([string]$Path,[string]$Expected) {
             $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash.ToUpperInvariant()
@@ -218,13 +158,14 @@ Thanks to **FusionFix, b-bridge, DXVK, ReShade, DLSS5-Feeder, and LumeniteFX** f
           AssertHash '.\runtime-check\dlss5-feed.addon64' $env:FEEDER_SHA256
           AssertHash '.\runtime-check\m3k\m3k-nvngx.dll' $env:SHIM_SHA256
           Copy-Item '.\runtime-check\d3d9vk_x64.dll' '.\release\d3d9vk_x64.dll' -Force
-          Write-Host 'All frozen support payload hashes match the hardware-tested release stack.' -ForegroundColor Green
+          Write-Host 'All frozen support payload hashes match the hardware-tested stack.' -ForegroundColor Green
 
       - name: Build final Windows setup
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           choco install innosetup --no-progress -y
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed.' }
           $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
           if (-not (Test-Path $iscc)) { throw 'ISCC.exe was not found after installing Inno Setup.' }
           & $iscc .\installer\GTAIV-DLSS-Setup.iss
@@ -236,7 +177,6 @@ Thanks to **FusionFix, b-bridge, DXVK, ReShade, DLSS5-Feeder, and LumeniteFX** f
           $hash | Set-Content '.\release\GTAIV-DLSS-Setup.sha256' -Encoding ASCII
           Write-Host "Final installer SHA256: $hash" -ForegroundColor Green
 
-          # Release contract smoke-checks.
           $full = [IO.File]::ReadAllText('.\install\Install-DLSS-Full.bat')
           $dlaa = [IO.File]::ReadAllText('.\install\Install-DLAA.bat')
           $iss = [IO.File]::ReadAllText('.\installer\GTAIV-DLSS-Setup.iss')
@@ -244,7 +184,7 @@ Thanks to **FusionFix, b-bridge, DXVK, ReShade, DLSS5-Feeder, and LumeniteFX** f
           if (-not $dlaa.Contains("`$RuntimeTag = 'v1.0.0'")) { throw 'DLAA installer is not pinned to v1.0.0.' }
           if (-not $iss.Contains('#define MyAppVersion "1.0.0"')) { throw 'Setup version is not 1.0.0.' }
 
-      - name: Create checksums and publish v1.0.0
+      - name: Publish v1.0.0
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -262,22 +202,10 @@ Thanks to **FusionFix, b-bridge, DXVK, ReShade, DLSS5-Feeder, and LumeniteFX** f
           }
           $sumLines | Set-Content '.\release\SHA256SUMS.txt' -Encoding ASCII
 
-          gh release create $env:FINAL_TAG `
-            --repo $env:REPO `
-            --target $env:RELEASE_SHA `
-            --title 'GTA IV DLAA + DLSS 4.5 + DLSS 5 NR — v1.0.0' `
-            --notes-file '.\docs\RELEASE-1.0.0.md' `
-            --latest
+          gh release create $env:FINAL_TAG --repo $env:REPO --target $env:RELEASE_SHA --title 'GTA IV DLAA + DLSS 4.5 + DLSS 5 NR — v1.0.0' --notes-file '.\docs\RELEASE-1.0.0.md' --latest
           if ($LASTEXITCODE -ne 0) { throw 'Failed to create v1.0.0 release.' }
 
-          gh release upload $env:FINAL_TAG `
-            '.\release\GTAIV-DLSS-Setup.exe' `
-            '.\release\GTAIV-DLSS-Setup.sha256' `
-            '.\release\GTAIV-DLSS-Full-Runtime.zip' `
-            '.\release\ReShade64-bbridge.dll' `
-            '.\release\d3d9vk_x64.dll' `
-            '.\release\SHA256SUMS.txt' `
-            --repo $env:REPO
+          gh release upload $env:FINAL_TAG '.\release\GTAIV-DLSS-Setup.exe' '.\release\GTAIV-DLSS-Setup.sha256' '.\release\GTAIV-DLSS-Full-Runtime.zip' '.\release\ReShade64-bbridge.dll' '.\release\d3d9vk_x64.dll' '.\release\SHA256SUMS.txt' --repo $env:REPO
           if ($LASTEXITCODE -ne 0) { throw 'Failed to upload v1.0.0 assets.' }
 
           $release = gh api "repos/$($env:REPO)/releases/tags/$($env:FINAL_TAG)" | ConvertFrom-Json
