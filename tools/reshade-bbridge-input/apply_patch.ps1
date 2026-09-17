@@ -16,6 +16,10 @@ function Read-Normalized([string]$Path) {
     return ([IO.File]::ReadAllText($Path) -replace "`r`n", "`n")
 }
 
+function Normalize-Text([string]$Text) {
+    return ($Text -replace "`r`n", "`n")
+}
+
 function Write-CrlfUtf8([string]$Path, [string]$Text) {
     $Text = $Text -replace "`r`n", "`n"
     $Text = $Text -replace "`n", "`r`n"
@@ -33,6 +37,7 @@ if ($input.Contains('b-bridge cross-process input relay')) {
 static std::atomic<bool> s_block_cursor_warping = false;
 
 '@
+    $anchor = Normalize-Text $anchor
 
     if (!$input.Contains($anchor)) {
         throw 'Could not find input_windows.cpp global-state anchor. Wrong ReShade version? Expected v6.8.0.'
@@ -168,6 +173,7 @@ void reshade_bridge_notify_ui_state(void *window, bool open)
 }
 
 '@
+    $relay = Normalize-Text $relay
     $input = $input.Replace($anchor, $relay)
 
     $oldCheck = @'
@@ -179,6 +185,7 @@ void reshade_bridge_notify_ui_state(void *window, bool open)
 		return nullptr;
 	}
 '@
+    $oldCheck = Normalize-Text $oldCheck
     $newCheck = @'
 	DWORD process_id = 0;
 	GetWindowThreadProcessId(static_cast<HWND>(window), &process_id);
@@ -189,6 +196,7 @@ void reshade_bridge_notify_ui_state(void *window, bool open)
 			"b-bridge input relay: accepting foreign render window %p owned by process %lu.", window, process_id);
 	}
 '@
+    $newCheck = Normalize-Text $newCheck
     if (!$input.Contains($oldCheck)) {
         throw 'Could not find ReShade cross-process rejection block. Wrong ReShade version? Expected v6.8.0.'
     }
@@ -199,6 +207,7 @@ void reshade_bridge_notify_ui_state(void *window, bool open)
 
 	if (insert.second || insert.first->second.expired())
 '@
+    $oldInsert = Normalize-Text $oldInsert
     $newInsert = @'
 	const auto insert = s_windows.emplace(static_cast<HWND>(window), std::weak_ptr<input>());
 
@@ -207,6 +216,7 @@ void reshade_bridge_notify_ui_state(void *window, bool open)
 
 	if (insert.second || insert.first->second.expired())
 '@
+    $newInsert = Normalize-Text $newInsert
     if (!$input.Contains($oldInsert)) {
         throw 'Could not find ReShade window-map insertion block.'
     }
@@ -231,6 +241,7 @@ if ($gui.Contains('reshade_bridge_notify_ui_state(get_hwnd(), open);')) {
 
 	if (open)
 '@
+    $oldOverlay = Normalize-Text $oldOverlay
     $newOverlay = @'
 	_show_overlay = open;
 
@@ -240,6 +251,7 @@ if ($gui.Contains('reshade_bridge_notify_ui_state(get_hwnd(), open);')) {
 
 	if (open)
 '@
+    $newOverlay = Normalize-Text $newOverlay
     if (!$gui.Contains($oldOverlay)) {
         throw 'Could not find runtime::open_overlay body in runtime_gui.cpp.'
     }
