@@ -6,8 +6,8 @@ on:
     branches: [ main ]
     paths:
       - 'install/Install-DLSS-Full.bat'
-      - 'install/core/Install-DLSS-Full-Core.bat'
       - 'manifests/versions.json'
+      - '.github/workflows/prebuilt-runtime-release.yml'
       - '.github/workflows/m3k-dxvk-presenter-validation.yml'
 
 jobs:
@@ -17,50 +17,49 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate wrapper, core and manifest contract
+      - name: Validate release installer and manifest contract
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $url = 'https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/m3k-dxvk-v3.0.2-a2s1b/d3d9vk_x64.dll'
-          $hash = '511E0C2509E1922DB2EC38940507BA956908FE6DC5FD9B3DB9FEC489DC05F297'
-          $upstream = '6b20f622a77b87b2921fe5d2c1774d2f2ba3e9b7'
-          $checkpoint = '57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f'
+          $hash='511E0C2509E1922DB2EC38940507BA956908FE6DC5FD9B3DB9FEC489DC05F297'
+          $runtimeZip='1E14F1508A1AC1FAC8EAB2DD0E3D8969C99275363B43C47406D0A86D5BE36987'
+          $upstream='6b20f622a77b87b2921fe5d2c1774d2f2ba3e9b7'
+          $checkpoint='57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f'
 
-          $wrapper = Get-Content install/Install-DLSS-Full.bat -Raw
-          if (-not $wrapper.Contains('Install-DLSS-Full-Core.bat')) { throw 'Release wrapper does not delegate to the frozen DLSS Full core.' }
-          $installer = Get-Content install/core/Install-DLSS-Full-Core.bat -Raw
-          foreach ($marker in @(
-            $url,
-            $hash,
-            $upstream,
-            '$DxvkPresenterTemp',
-            'Download-File $DxvkPresenterUrl $DxvkPresenterTemp',
-            'Assert-SHA256 $DxvkPresenterTemp $DxvkPresenterHash',
-            "'.trex\d3d9vk_x64.dll'",
-            "Copy-Item -LiteralPath `$DxvkPresenterTemp -Destination (Join-Path `$Trex 'd3d9vk_x64.dll') -Force",
-            'Installed M3K DXVK presenter hash verification failed.',
-            'd3d9vk_x64.dll=$DxvkPresenterHash')) {
-            if (-not $installer.Contains($marker)) { throw "Core installer missing presenter contract marker: $marker" }
+          $installer=Get-Content install/Install-DLSS-Full.bat -Raw
+          foreach($marker in @(
+            'runtime-prebuilt-v1',
+            'GTAIV-DLSS-Full-Runtime.zip',
+            $runtimeZip,
+            "'d3d9vk_x64.dll'='$hash'",
+            "Copy-Item -LiteralPath (Join-Path `$runtimeDir 'd3d9vk_x64.dll') -Destination (Join-Path `$Trex 'd3d9vk_x64.dll') -Force",
+            "Assert-SHA256 (Join-Path `$Trex 'd3d9vk_x64.dll') `$RuntimeHashes['d3d9vk_x64.dll']")) {
+            if(-not $installer.Contains($marker)){throw "Release installer missing presenter marker: $marker"}
           }
 
-          $manifest = Get-Content manifests/versions.json -Raw | ConvertFrom-Json
-          $p = $manifest.components.'m3k-dxvk-presenter'
-          if (-not $p) { throw 'Manifest missing m3k-dxvk-presenter component' }
-          if ($p.upstream_version -ne '3.0.2') { throw 'Presenter upstream version mismatch' }
-          if ($p.upstream_commit -ne $upstream) { throw 'Presenter upstream commit mismatch' }
-          if ($p.project_patch_checkpoint -ne $checkpoint) { throw 'Presenter project checkpoint mismatch' }
-          if ($p.url -ne $url) { throw 'Presenter release URL mismatch' }
-          if ($p.dll_sha256.ToUpperInvariant() -ne $hash) { throw 'Presenter manifest hash mismatch' }
-          if ($p.installed_path -ne '.trex/d3d9vk_x64.dll' -or -not $p.installed_automatically) { throw 'Presenter install contract mismatch' }
+          $manifest=Get-Content manifests/versions.json -Raw | ConvertFrom-Json
+          $p=$manifest.components.'m3k-dxvk-presenter'
+          if(-not $p){throw 'Manifest missing m3k-dxvk-presenter component'}
+          if($p.upstream_version -ne '3.0.2'){throw 'Presenter upstream version mismatch'}
+          if($p.upstream_commit -ne $upstream){throw 'Presenter upstream commit mismatch'}
+          if($p.project_patch_checkpoint -ne $checkpoint){throw 'Presenter project checkpoint mismatch'}
+          if($p.dll_sha256.ToUpperInvariant() -ne $hash){throw 'Presenter manifest hash mismatch'}
+          if($p.installed_path -ne '.trex/d3d9vk_x64.dll' -or -not $p.installed_automatically){throw 'Presenter install contract mismatch'}
+          if($manifest.components.prebuilt_release.dlss_full_runtime.files.'d3d9vk_x64.dll'.ToUpperInvariant() -ne $hash){throw 'Prebuilt runtime presenter hash mismatch in manifest'}
 
-      - name: Download and verify public presenter asset
+      - name: Download and verify presenter inside public runtime
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $url = 'https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/m3k-dxvk-v3.0.2-a2s1b/d3d9vk_x64.dll'
-          $expected = '511E0C2509E1922DB2EC38940507BA956908FE6DC5FD9B3DB9FEC489DC05F297'
-          $dest = Join-Path $env:RUNNER_TEMP 'd3d9vk_x64.dll'
-          Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $dest
-          $actual = (Get-FileHash -Algorithm SHA256 $dest).Hash.ToUpperInvariant()
-          if ($actual -ne $expected) { throw "Public presenter asset hash mismatch: expected $expected, got $actual" }
+          $url='https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/runtime-prebuilt-v1/GTAIV-DLSS-Full-Runtime.zip'
+          $zip=Join-Path $env:RUNNER_TEMP 'runtime.zip'
+          $dir=Join-Path $env:RUNNER_TEMP 'runtime'
+          Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $zip
+          $zipHash=(Get-FileHash -Algorithm SHA256 $zip).Hash.ToUpperInvariant()
+          if($zipHash -ne '1E14F1508A1AC1FAC8EAB2DD0E3D8969C99275363B43C47406D0A86D5BE36987'){throw "Runtime ZIP hash mismatch: $zipHash"}
+          Expand-Archive -LiteralPath $zip -DestinationPath $dir -Force
+          $presenter=Join-Path $dir 'd3d9vk_x64.dll'
+          $actual=(Get-FileHash -Algorithm SHA256 $presenter).Hash.ToUpperInvariant()
+          $expected='511E0C2509E1922DB2EC38940507BA956908FE6DC5FD9B3DB9FEC489DC05F297'
+          if($actual -ne $expected){throw "Presenter hash mismatch: expected $expected, got $actual"}
           Write-Host "PUBLIC M3K DXVK PRESENTER VERIFIED: $actual" -ForegroundColor Green
