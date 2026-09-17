@@ -1,0 +1,55 @@
+name: Build GTA IV DLSS Windows installer
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'installer/**'
+      - 'install/Install-DLAA.bat'
+      - 'install/Install-DLSS-Full.bat'
+      - 'install/Uninstall-DLSS-Full.bat'
+      - 'install/Uninstall-DLAA.bat'
+      - '.github/workflows/windows-installer.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build-installer:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Compile setup
+        shell: pwsh
+        run: |
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) { throw 'ISCC.exe was not found after installing Inno Setup.' }
+          & $iscc .\installer\GTAIV-DLSS-Setup.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup compile failed: $LASTEXITCODE" }
+          $exe = '.\installer\out\GTAIV-DLSS-Setup.exe'
+          if (-not (Test-Path $exe)) { throw 'Compiled installer is missing.' }
+          $hash = (Get-FileHash -Algorithm SHA256 $exe).Hash.ToUpperInvariant()
+          Write-Host "GTAIV-DLSS-Setup.exe SHA256: $hash" -ForegroundColor Green
+          $hash | Set-Content .\installer\out\GTAIV-DLSS-Setup.sha256 -Encoding ASCII
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GTAIV-DLSS-Setup
+          path: |
+            installer/out/GTAIV-DLSS-Setup.exe
+            installer/out/GTAIV-DLSS-Setup.sha256
+
+      - name: Publish installer to runtime prerelease
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view runtime-prebuilt-v1 --repo JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5 | Out-Null
+          gh release upload runtime-prebuilt-v1 .\installer\out\GTAIV-DLSS-Setup.exe .\installer\out\GTAIV-DLSS-Setup.sha256 --repo JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5 --clobber
