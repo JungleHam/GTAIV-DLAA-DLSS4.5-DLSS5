@@ -10,7 +10,7 @@ Install [GTA IV FusionFix](https://github.com/ThirteenAG/GTAIV.EFLC.FusionFix) f
 
 ### 2. Install DLAA + ReShade patch
 
-Right-click **`install/Install-DLAA.bat` → Run as administrator**.
+From anywhere, right-click **`install/Install-DLAA.bat` → Run as administrator**.
 
 Enter the folder that contains `GTAIV.exe`, confirm, and let it finish. This installs the DLAA baseline **and** the ReShade input patch in one step.
 
@@ -18,7 +18,7 @@ Launch GTA IV once and press **Home**. ReShade should open and accept mouse/keyb
 
 ### 3. Install DLSS Full + Neural Rendering
 
-Right-click **`install/Install-DLSS-Full.bat` → Run as administrator**.
+From any folder, right-click **`install/Install-DLSS-Full.bat` → Run as administrator**.
 
 Enter the same GTA IV folder and confirm. The installer detects RTX 40/50 and chooses the matching Neural Rendering runtime automatically.
 
