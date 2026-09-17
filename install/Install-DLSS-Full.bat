@@ -204,14 +204,12 @@ try {
     Copy-Item -LiteralPath (Join-Path $runtimeDir 'm3k\m3k-nvngx.dll') -Destination (Join-Path $Trex 'm3k\m3k-nvngx.dll') -Force
     Copy-Item -LiteralPath $nrFile.FullName -Destination (Join-Path $Trex 'm3k\nvngx_dlssnr.dll') -Force
 
-    foreach ($pair in @(
-        @((Join-Path $Game 'd3d9.dll'),$RuntimeHashes['d3d9.dll']),
-        @((Join-Path $Trex 'NvRemixBridge.exe'),$RuntimeHashes['NvRemixBridge.exe']),
-        @((Join-Path $Trex 'd3d9vk_x64.dll'),$RuntimeHashes['d3d9vk_x64.dll']),
-        @((Join-Path $Trex 'dlss5-feed.addon64'),$RuntimeHashes['dlss5-feed.addon64']),
-        @((Join-Path $Trex 'm3k\m3k-nvngx.dll'),$RuntimeHashes['m3k\m3k-nvngx.dll']),
-        @((Join-Path $Trex 'm3k\nvngx_dlssnr.dll'),$nrDll)
-    )) { Assert-SHA256 $pair[0] $pair[1] }
+    Assert-SHA256 (Join-Path $Game 'd3d9.dll') $RuntimeHashes['d3d9.dll']
+    Assert-SHA256 (Join-Path $Trex 'NvRemixBridge.exe') $RuntimeHashes['NvRemixBridge.exe']
+    Assert-SHA256 (Join-Path $Trex 'd3d9vk_x64.dll') $RuntimeHashes['d3d9vk_x64.dll']
+    Assert-SHA256 (Join-Path $Trex 'dlss5-feed.addon64') $RuntimeHashes['dlss5-feed.addon64']
+    Assert-SHA256 (Join-Path $Trex 'm3k\m3k-nvngx.dll') $RuntimeHashes['m3k\m3k-nvngx.dll']
+    Assert-SHA256 (Join-Path $Trex 'm3k\nvngx_dlssnr.dll') $nrDll
 
     Write-NoBom (Join-Path $Trex 'm3k-nr.ini') @(
         '[M3K]',
