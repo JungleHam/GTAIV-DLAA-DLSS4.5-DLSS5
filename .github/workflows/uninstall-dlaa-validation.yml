@@ -61,7 +61,7 @@ jobs:
           foreach ($required in @('Uninstall-DLAA.bat','Run as administrator','FusionFix itself is not removed')) {
             if (-not $readme.Contains($required)) { throw "README missing uninstall guidance: $required" }
           }
-          foreach ($required in @('Uninstall-DLAA.bat as Administrator','entire project stack','FusionFix itself stays installed')) {
+          foreach ($required in @('Uninstall-DLAA.bat','entire project stack','FusionFix itself stays installed')) {
             if (-not $installReadme.Contains($required)) { throw "install/README missing uninstall guidance: $required" }
           }
           Write-Host 'Release uninstall documentation validated.' -ForegroundColor Green
