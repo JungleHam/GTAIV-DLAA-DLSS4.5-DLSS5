@@ -4,19 +4,24 @@
     "fusionfix": {
       "version": "5.0.1",
       "url": "https://github.com/ThirteenAG/GTAIV.EFLC.FusionFix",
+      "sha256": "3c202398c133392be985854654f169514e055812cc302ef24e6aa97495975b41",
       "installed_by_project": false
     },
     "b-bridge": {
       "version": "0.1.0",
       "source_commit": "1dad5e6d4dcf8647e354aa9a87f611256fb61142",
+      "package_url": "https://github.com/gutbash/b-bridge/releases/download/v0.1.0/b-bridge-0.1.0.zip",
       "package_sha256": "d5691ad68cca6e731bbe12b34b14b6a8288e2e7e319e8ef0e13e0f3a59c31c55"
     },
     "dlss-full": {
       "product_name": "DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering",
       "project_checkpoint": "57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f",
       "bbridge_source_commit": "1dad5e6d4dcf8647e354aa9a87f611256fb61142",
+      "temporal_synchronization_internal_name": "A3-S2",
+      "startup_stabilization_internal_name": "A3-S5",
       "a3s2_reference_d3d9_sha256": "6dd40f145a5d503624e3e05ecf0adbaa094cf83b24278c0bb333318e3c52a912",
       "a3s5_reference_feeder_sha256": "c73d8d54271f55f8931f00d62a4cdf605118bea71d7c6bee0b61d0ca7c1cce4b",
+      "a3s5_reference_feeder_scope": "pre-public-ReShade-controls hardware reference",
       "s27_reference_shim_sha256": "a2e4bedace8d99bc60b5d18e958bd7e98f8887ff40ec45a8674b892e2d1fcbbc",
       "public_reshade_controls_commit": "11ac957138d4c6376d1e6ee6413f32cf9826b422",
       "public_reshade_controls_sha256": "0c602d710f62eb6df15c86b7b5473a7f3e9f2e1cf3270aea3976ea512f5907a3",
@@ -31,11 +36,15 @@
       "default_dlss_quality": "Quality",
       "startup_stabilization_resolution": "1485x835",
       "startup_stabilization_synchronized_frames": 180,
+      "startup_prime": "1485x835",
+      "startup_prime_synchronized_frames": 180,
+      "startup_stabilization_frame_policy": "180 valid synchronized frames cumulative; explicit live DLSS/DLAA mode change cancels startup prime immediately",
       "master_processing_default": true,
       "master_processing_off_scope": "session-only",
       "nr_default_mode": 0,
       "nr_enabled_mode": 2,
       "nr_passes": 1,
+      "nr_passes_public_default": 1,
       "public_modes": [
         "DLAA Native",
         "Custom Ultra Quality (77%)",
@@ -44,23 +53,34 @@
         "Performance",
         "Ultra Performance"
       ],
-      "hardware_validation": "RTX 4070 Ti SUPER at 2560x1440. Live DLAA/DLSS mode switching, Neural Rendering, staged master OFF/ON, and 1485x835 startup stabilization were hardware-tested.",
+      "hardware_validation": "RTX 4070 Ti SUPER at 2560x1440. Live DLAA/DLSS mode switching, Neural Rendering, staged master OFF/ON, 1485x835 startup stabilization, and native-resolution Steam overlay startup were hardware-tested.",
       "release_installers": {
         "dlaa_and_reshade": "install/Install-DLAA.bat",
-        "dlss_full": "install/Install-DLSS-Full.bat"
-      }
+        "dlss_full": "install/Install-DLSS-Full.bat",
+        "dlaa_core": "install/core/Install-DLAA-Core.bat",
+        "dlss_full_core": "install/core/Install-DLSS-Full-Core.bat"
+      },
+      "uninstaller_commit": "e4c600a96e1b3682d7004dbd04dffc1abace7b90",
+      "uninstaller_sha256": "0af505444e966fb61ab9c83eb7f4d8874a436e4302ab935caa2dba0039656733",
+      "uninstaller_path": "Uninstall-DLSS-Full.bat",
+      "rollback_target": "DLAA-only baseline + ReShade input patch",
+      "startup_ui_resync_status": "rejected-after-hardware-test-pre-legal-screen-hang; not installed"
     },
     "reshade": {
       "version": "6.8.0",
       "tag_commit": "18deaa52de0c425a78b329e9cb3c497281cd00ec",
+      "setup_url_primary": "https://reshade.me/downloads/ReShade_Setup_6.8.0_Addon.exe",
+      "setup_url_fallback": "https://www.reshade.me/releases/ReShade-6.8.0-Addon-setup.exe",
       "input_patch_source_commit": "b437e7646b262dc60863293348fd33369330a429"
     },
     "dlss5-feeder": {
       "version": "0.15.1",
-      "package_sha256": "2e44e81e691e75e532b9b7babc278a12615cb7f0fd9ef854da50e6ef17b272f4"
+      "url": "https://github.com/jlrouzies-fr/DLSS5-Feeder/releases/download/v0.15.1/DLSS5-Feeder-0.15.1.zip",
+      "sha256": "2e44e81e691e75e532b9b7babc278a12615cb7f0fd9ef854da50e6ef17b272f4"
     },
     "lumenitefx": {
-      "commit": "f8cbbb4eccfcb7adf0d74bb358ba349272e3c1e9"
+      "commit": "f8cbbb4eccfcb7adf0d74bb358ba349272e3c1e9",
+      "url": "https://codeload.github.com/umar-afzaal/LumeniteFX/zip/f8cbbb4eccfcb7adf0d74bb358ba349272e3c1e9"
     },
     "nvngx_dlss": {
       "product": "DLSS 4.5 Super Resolution / DLAA runtime",
@@ -70,8 +90,11 @@
       "dll_sha256": "3975567b8943c53acce397f2b72380092f84f162d00b0d2c7d08a1025c563983"
     },
     "nvngx_dlssnr": {
+      "product": "DLSS 5 Neural Rendering runtime",
+      "internal_ngx_identifier": "Feature 18 / NR18",
       "version": "310.8.0",
       "default_enabled": false,
+      "installed_path": ".trex/m3k/nvngx_dlssnr.dll",
       "variants": {
         "rtx50_original_nvidia_signed": {
           "gpu": "RTX 50 Series",
@@ -90,10 +113,15 @@
       }
     },
     "m3k-dxvk-presenter": {
+      "product": "M3K DXVK render/output presenter for DLSS Super Resolution",
       "upstream_version": "3.0.2",
       "upstream_commit": "6b20f622a77b87b2921fe5d2c1774d2f2ba3e9b7",
+      "project_patch_checkpoint": "57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f",
+      "release_tag": "m3k-dxvk-v3.0.2-a2s1b",
       "url": "https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/m3k-dxvk-v3.0.2-a2s1b/d3d9vk_x64.dll",
-      "dll_sha256": "511e0c2509e1922db2ec38940507ba956908fe6dc5fd9b3db9fec489dc05f297"
+      "dll_sha256": "511e0c2509e1922db2ec38940507ba956908fe6dc5fd9b3db9fec489dc05f297",
+      "installed_path": ".trex/d3d9vk_x64.dll",
+      "installed_automatically": true
     }
   }
 }

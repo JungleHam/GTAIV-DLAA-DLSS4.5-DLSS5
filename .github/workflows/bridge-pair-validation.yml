@@ -6,6 +6,7 @@ on:
     branches: [ main ]
     paths:
       - 'install/Install-DLSS-Full.bat'
+      - 'install/core/Install-DLSS-Full-Core.bat'
       - '.github/workflows/bridge-pair-validation.yml'
 
 jobs:
@@ -16,11 +17,13 @@ jobs:
       - name: Checkout module
         uses: actions/checkout@v4
 
-      - name: Verify installer installs a matched pair
+      - name: Verify release wrapper and core matched-pair contract
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $installer = Get-Content install/Install-DLSS-Full.bat -Raw
+          $wrapper = Get-Content install/Install-DLSS-Full.bat -Raw
+          if (-not $wrapper.Contains('Install-DLSS-Full-Core.bat')) { throw 'Release wrapper does not delegate to the frozen DLSS Full core.' }
+          $installer = Get-Content install/core/Install-DLSS-Full-Core.bat -Raw
           foreach ($marker in @(
             '_compDLSSFull32',
             '_compDLSSFull64',
@@ -28,9 +31,9 @@ jobs:
             "Copy-Item -LiteralPath `$BridgeServer -Destination (Join-Path `$Trex 'NvRemixBridge.exe') -Force",
             "NvRemixBridge.exe=`$serverHash",
             'Installed x64 bridge server hash verification failed.')) {
-            if (-not $installer.Contains($marker)) { throw "Installer missing matched-pair marker: $marker" }
+            if (-not $installer.Contains($marker)) { throw "Core installer missing matched-pair marker: $marker" }
           }
-          Write-Host 'Installer contains matched client/server bridge deployment.' -ForegroundColor Green
+          Write-Host 'Release wrapper + matched client/server bridge core verified.' -ForegroundColor Green
 
       - name: Clone frozen project and pinned b-bridge
         shell: pwsh
@@ -50,8 +53,7 @@ jobs:
 
       - name: Setup pinned Meson
         shell: pwsh
-        run: |
-          python -m pip install --disable-pip-version-check meson==0.64.1 ninja==1.11.1.1
+        run: python -m pip install --disable-pip-version-check meson==0.64.1 ninja==1.11.1.1
 
       - name: Build and verify matched x86 client + x64 server
         shell: pwsh
@@ -59,32 +61,27 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           . .\build_common.ps1
-
           SetupVS -Platform x86
           meson setup --buildtype release --backend ninja _compPair32 --debug
           if ($LASTEXITCODE -ne 0) { throw "x86 Meson setup failed: $LASTEXITCODE" }
           Copy-Item .\Directory.Build.Props -Destination .\_compPair32 -Force
           meson compile -C _compPair32 d3d9
           if ($LASTEXITCODE -ne 0) { throw "x86 d3d9 build failed: $LASTEXITCODE" }
-
           SetupVS -Platform x64
           meson setup --buildtype release --backend ninja _compPair64 --debug
           if ($LASTEXITCODE -ne 0) { throw "x64 Meson setup failed: $LASTEXITCODE" }
           Copy-Item .\Directory.Build.Props -Destination .\_compPair64 -Force
           meson compile -C _compPair64 NvRemixBridge
           if ($LASTEXITCODE -ne 0) { throw "x64 NvRemixBridge build failed: $LASTEXITCODE" }
-
           $client = '.\_compPair32\src\client\d3d9.dll'
           $server = '.\_compPair64\src\server\NvRemixBridge.exe'
           if (-not (Test-Path $client)) { throw 'Matched x86 d3d9.dll missing' }
           if (-not (Test-Path $server)) { throw 'Matched x64 NvRemixBridge.exe missing' }
-
           $expectedVersion = 'remix-main+1dad5e6d'
           $clientAscii = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($client))
           $serverAscii = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($server))
           if (-not $clientAscii.Contains($expectedVersion)) { throw "x86 client does not embed expected version $expectedVersion" }
           if (-not $serverAscii.Contains($expectedVersion)) { throw "x64 server does not embed expected version $expectedVersion" }
-
           Write-Host "x86 client SHA256: $((Get-FileHash -Algorithm SHA256 $client).Hash)"
           Write-Host "x64 server SHA256: $((Get-FileHash -Algorithm SHA256 $server).Hash)"
           Write-Host "MATCHED BRIDGE PAIR VERIFIED: $expectedVersion" -ForegroundColor Green

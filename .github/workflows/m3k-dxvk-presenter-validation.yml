@@ -6,6 +6,7 @@ on:
     branches: [ main ]
     paths:
       - 'install/Install-DLSS-Full.bat'
+      - 'install/core/Install-DLSS-Full-Core.bat'
       - 'manifests/versions.json'
       - '.github/workflows/m3k-dxvk-presenter-validation.yml'
 
@@ -16,7 +17,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate installer and manifest contract
+      - name: Validate wrapper, core and manifest contract
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -25,7 +26,9 @@ jobs:
           $upstream = '6b20f622a77b87b2921fe5d2c1774d2f2ba3e9b7'
           $checkpoint = '57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f'
 
-          $installer = Get-Content install/Install-DLSS-Full.bat -Raw
+          $wrapper = Get-Content install/Install-DLSS-Full.bat -Raw
+          if (-not $wrapper.Contains('Install-DLSS-Full-Core.bat')) { throw 'Release wrapper does not delegate to the frozen DLSS Full core.' }
+          $installer = Get-Content install/core/Install-DLSS-Full-Core.bat -Raw
           foreach ($marker in @(
             $url,
             $hash,
@@ -37,7 +40,7 @@ jobs:
             "Copy-Item -LiteralPath `$DxvkPresenterTemp -Destination (Join-Path `$Trex 'd3d9vk_x64.dll') -Force",
             'Installed M3K DXVK presenter hash verification failed.',
             'd3d9vk_x64.dll=$DxvkPresenterHash')) {
-            if (-not $installer.Contains($marker)) { throw "Installer missing presenter contract marker: $marker" }
+            if (-not $installer.Contains($marker)) { throw "Core installer missing presenter contract marker: $marker" }
           }
 
           $manifest = Get-Content manifests/versions.json -Raw | ConvertFrom-Json

@@ -9,7 +9,9 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $Self = $env:GTAIV_SETUP_SELF
 $Repo = 'JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5'
+$ReleaseCoreCommit = '7968ba5dc0c9dcbb70c1ff98b37441a9687fc9ff'
 $Temp = Join-Path $env:TEMP ("GTAIV_DLSS_RELEASE_" + $PID)
+$CoreTemp = $null
 $Nr50Url = 'https://github.com/RankFTW/rhi-repo/releases/download/dlssnr-310.8.0/nvngx_dlssnr_310.8.0.zip'
 $Nr50PackageHash = '388C0A7912E15EC911B9C9E11A692142B11FE387DDF2B637D8C358138FFFB3AC'
 $Nr50DllHash = 'E16BCF15E16E13F527491CDF7845B2FE6521A738D8F7C9C721866A8496E1FC8E'
@@ -20,7 +22,7 @@ $Nr40DllHash = '4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05
 function Is-Admin {
     $id = [Security.Principal.WindowsIdentity]::GetCurrent()
     $p = New-Object Security.Principal.WindowsPrincipal($id)
-    $p.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    return $p.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 function Fail([string]$m) { throw $m }
 function Download([string]$u,[string]$p) {
@@ -71,15 +73,17 @@ try {
     Check-BuildTools
 
     $gpu = Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue | Where-Object { $_.Name -match 'NVIDIA' } | Select-Object -First 1
-    $gpuName = if ($gpu) { [string]$gpu.Name } else { 'NVIDIA GPU not detected by WMI' }
-    if ($gpuName -match 'RTX\s*50') { $flavor='RTX50'; $nrLabel='Original NVIDIA-signed DLSS NR 310.8 (RTX 50)'; $nrUrl=$Nr50Url; $nrPkg=$Nr50PackageHash; $nrDll=$Nr50DllHash }
-    elseif ($gpuName -match 'RTX\s*40') { $flavor='RTX40'; $nrLabel='RTX 40 compatibility DLSS NR 310.8 (project-tested)'; $nrUrl=$Nr40Url; $nrPkg=$Nr40PackageHash; $nrDll=$Nr40DllHash }
-    else {
+    $gpuName = if ($gpu) { [string]$gpu.Name } else { 'NVIDIA GPU not detected by Windows' }
+    if ($gpuName -match 'RTX\s*50') {
+        $flavor='RTX50'; $nrLabel='Original NVIDIA-signed DLSS NR 310.8 (RTX 50)'; $nrUrl=$Nr50Url; $nrPkg=$Nr50PackageHash; $nrDll=$Nr50DllHash
+    } elseif ($gpuName -match 'RTX\s*40') {
+        $flavor='RTX40'; $nrLabel='RTX 40 compatibility DLSS NR 310.8 (project-tested)'; $nrUrl=$Nr40Url; $nrPkg=$Nr40PackageHash; $nrDll=$Nr40DllHash
+    } else {
         Write-Host ''
         Write-Host "Detected GPU: $gpuName" -ForegroundColor Yellow
-        Write-Host 'This release supports Neural Rendering runtime selection for RTX 40 and RTX 50.' -ForegroundColor Yellow
+        Write-Host 'Automatic NR runtime selection supports RTX 40 and RTX 50.' -ForegroundColor Yellow
         Write-Host '1 - RTX 50: original NVIDIA-signed runtime'
-        Write-Host '2 - RTX 40: compatibility runtime'
+        Write-Host '2 - RTX 40: project-tested compatibility runtime'
         $pick = Read-Host 'Choose 1 or 2'
         if ($pick -eq '1') { $flavor='RTX50'; $nrLabel='Original NVIDIA-signed DLSS NR 310.8 (RTX 50)'; $nrUrl=$Nr50Url; $nrPkg=$Nr50PackageHash; $nrDll=$Nr50DllHash }
         elseif ($pick -eq '2') { $flavor='RTX40'; $nrLabel='RTX 40 compatibility DLSS NR 310.8 (project-tested)'; $nrUrl=$Nr40Url; $nrPkg=$Nr40PackageHash; $nrDll=$Nr40DllHash }
@@ -90,30 +94,31 @@ try {
     Write-Host "Game: $Game"
     Write-Host "GPU:  $gpuName"
     Write-Host "NR:   $nrLabel"
-    Write-Host 'DLSS quality default: Quality; Neural Rendering default: OFF.'
+    Write-Host 'DLSS default: Quality | Neural Rendering default: OFF'
     $ok = Read-Host 'Continue? [Y/n]'
     if ($ok -and $ok -notmatch '^(y|yes)$') { exit 0 }
 
     New-Item -ItemType Directory -Path $Temp -Force | Out-Null
     $localCore = Join-Path (Split-Path -Parent $Self) 'core\Install-DLSS-Full-Core.bat'
-    $core = Join-Path $Game '_GTAIV_DLSS_Install-DLSS-Full-Core.bat'
-    if (Test-Path -LiteralPath $localCore) { Copy-Item -LiteralPath $localCore -Destination $core -Force }
-    else { Download "https://raw.githubusercontent.com/$Repo/main/install/core/Install-DLSS-Full-Core.bat" $core }
+    $CoreTemp = Join-Path $Game '_GTAIV_DLSS_Install-DLSS-Full-Core.bat'
+    if (Test-Path -LiteralPath $localCore) { Copy-Item -LiteralPath $localCore -Destination $CoreTemp -Force }
+    else { Download "https://raw.githubusercontent.com/$Repo/$ReleaseCoreCommit/install/core/Install-DLSS-Full-Core.bat" $CoreTemp }
 
-    # The production core is frozen around the RTX 40 package. For RTX 50, patch only
-    # the three verified runtime constants in this temporary copy before executing it.
+    # The frozen core is pinned to the hardware-tested RTX 40 package. RTX 50 changes only
+    # the verified NR package URL/hash/DLL hash in this temporary copy; renderer logic is untouched.
     if ($flavor -eq 'RTX50') {
-        $txt = [IO.File]::ReadAllText($core)
+        $txt = [IO.File]::ReadAllText($CoreTemp)
         $txt = $txt.Replace($Nr40Url,$Nr50Url)
         $txt = $txt.Replace($Nr40PackageHash,$Nr50PackageHash)
         $txt = $txt.Replace($Nr40DllHash,$Nr50DllHash)
         $txt = $txt.Replace('nvngx_dlssnr_310.8.0-RTX40.zip','nvngx_dlssnr_310.8.0.zip')
-        [IO.File]::WriteAllText($core,$txt,[Text.UTF8Encoding]::new($false))
+        [IO.File]::WriteAllText($CoreTemp,$txt,[Text.UTF8Encoding]::new($false))
     }
 
-    $p = Start-Process -FilePath $core -WorkingDirectory $Game -Wait -PassThru
+    $p = Start-Process -FilePath $CoreTemp -WorkingDirectory $Game -Wait -PassThru
     if ($p.ExitCode -ne 0) { Fail "DLSS Full installer failed with exit code $($p.ExitCode)." }
-    Remove-Item -LiteralPath $core -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $CoreTemp -Force -ErrorAction SilentlyContinue
+    $CoreTemp = $null
 
     $installedNr = Join-Path $Game '.trex\m3k\nvngx_dlssnr.dll'
     if (-not (Test-Path -LiteralPath $installedNr)) { Fail 'Neural Rendering runtime is missing after install.' }
@@ -139,5 +144,6 @@ catch {
     exit 1
 }
 finally {
+    if ($CoreTemp -and (Test-Path -LiteralPath $CoreTemp)) { Remove-Item -LiteralPath $CoreTemp -Force -ErrorAction SilentlyContinue }
     if (Test-Path -LiteralPath $Temp) { Remove-Item -LiteralPath $Temp -Recurse -Force -ErrorAction SilentlyContinue }
 }

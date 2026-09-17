@@ -9,13 +9,15 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $Self = $env:GTAIV_SETUP_SELF
 $Repo = 'JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5'
+$ReleaseCoreCommit = '7968ba5dc0c9dcbb70c1ff98b37441a9687fc9ff'
 $PatchCommit = 'b437e7646b262dc60863293348fd33369330a429'
 $Temp = Join-Path $env:TEMP ("GTAIV_DLAA_RELEASE_" + $PID)
+$CoreTemp = $null
 
 function Is-Admin {
     $id = [Security.Principal.WindowsIdentity]::GetCurrent()
     $p = New-Object Security.Principal.WindowsPrincipal($id)
-    $p.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    return $p.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 function Fail([string]$m) { throw $m }
 function Download([string]$u,[string]$p) {
@@ -47,6 +49,13 @@ function Check-BuildTools {
     if (-not $vsOk) { $missing += 'Visual Studio 2022 Build Tools -> Desktop development with C++: https://aka.ms/vs/17/release/vs_BuildTools.exe' }
     if ($missing.Count) { Fail ("Missing prerequisite(s):`n  - " + ($missing -join "`n  - ")) }
 }
+function Has-PatchMarker([string]$path) {
+    if (-not (Test-Path -LiteralPath $path)) { return $false }
+    try {
+        $ascii = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($path))
+        return $ascii.Contains('b-bridge input relay')
+    } catch { return $false }
+}
 
 if (-not (Is-Admin)) {
     Write-Host 'Administrator permission is required. Approve the Windows prompt.' -ForegroundColor Yellow
@@ -60,51 +69,68 @@ try {
     Write-Host ' GTA IV - DLAA + ReShade input patch' -ForegroundColor Green
     Write-Host '============================================================' -ForegroundColor Green
     $Game = Resolve-GameFolder
+    $Trex = Join-Path $Game '.trex'
     if (-not (Test-Path -LiteralPath (Join-Path $Game 'dinput8.dll'))) { Fail 'FusionFix is not detected. Install FusionFix first.' }
     if (Get-Process GTAIV -ErrorAction SilentlyContinue) { Fail 'Close GTA IV first.' }
     if (Get-Process NvRemixBridge -ErrorAction SilentlyContinue) { Fail 'Close NvRemixBridge.exe first.' }
+    if (Test-Path -LiteralPath (Join-Path $Trex 'm3k-nr.ini')) { Fail 'DLSS Full is already installed. Do not run the DLAA baseline installer over it.' }
     Check-BuildTools
+
+    $dlaaReady = (Test-Path -LiteralPath (Join-Path $Trex 'NvRemixBridge.exe')) -and
+                 (Test-Path -LiteralPath (Join-Path $Trex 'dlss5-feed.addon64')) -and
+                 (Test-Path -LiteralPath (Join-Path $Game 'DLAA_INSTALL_MANIFEST.txt'))
+    $reshadePatched = Has-PatchMarker 'C:\ProgramData\ReShade\ReShade64.dll'
 
     Write-Host ''
     Write-Host "Game: $Game"
-    Write-Host 'This installs the DLAA baseline and the ReShade Home/mouse/keyboard patch.'
+    Write-Host ("DLAA baseline: " + $(if ($dlaaReady) { 'already installed - will keep it' } else { 'will install' }))
+    Write-Host ("ReShade input patch: " + $(if ($reshadePatched) { 'already installed - will keep it' } else { 'will build and install' }))
     $ok = Read-Host 'Continue? [Y/n]'
     if ($ok -and $ok -notmatch '^(y|yes)$') { exit 0 }
 
     New-Item -ItemType Directory -Path $Temp -Force | Out-Null
-    $localCore = Join-Path (Split-Path -Parent $Self) 'core\Install-DLAA-Core.bat'
-    $core = Join-Path $Game '_GTAIV_DLSS_Install-DLAA-Core.bat'
-    if (Test-Path -LiteralPath $localCore) { Copy-Item -LiteralPath $localCore -Destination $core -Force }
-    else { Download "https://raw.githubusercontent.com/$Repo/main/install/core/Install-DLAA-Core.bat" $core }
-    # The legacy core pauses at its own end. The release wrapper owns the UX, so remove only those close prompts from this temporary copy.
-    $coreText = [IO.File]::ReadAllText($core)
-    $coreText = $coreText.Replace("    Read-Host 'Press Enter to close'; exit 0", '    exit 0')
-    $coreText = $coreText.Replace("    Read-Host 'Press Enter to close'; exit 1", '    exit 1')
-    [IO.File]::WriteAllText($core,$coreText,[Text.UTF8Encoding]::new($false))
 
-    Write-Host ''
-    Write-Host '[1/2] Installing DLAA baseline...' -ForegroundColor Cyan
-    $p = Start-Process -FilePath $core -WorkingDirectory $Game -Wait -PassThru
-    if ($p.ExitCode -ne 0) { Fail "DLAA installer failed with exit code $($p.ExitCode)." }
-    Remove-Item -LiteralPath $core -Force -ErrorAction SilentlyContinue
-
-    Write-Host ''
-    Write-Host '[2/2] Building and installing the ReShade input patch...' -ForegroundColor Cyan
-    $patchDir = Join-Path $Temp 'reshade-input'
-    New-Item -ItemType Directory -Path $patchDir -Force | Out-Null
-    $base = "https://raw.githubusercontent.com/$Repo/$PatchCommit/tools/reshade-bbridge-input"
-    foreach ($name in @('BUILD.bat','INSTALL.bat','apply_patch.ps1')) { Download "$base/$name" (Join-Path $patchDir $name) }
-    foreach ($name in @('BUILD.bat','INSTALL.bat')) {
-        $path = Join-Path $patchDir $name
-        $txt = [IO.File]::ReadAllText($path)
-        $txt = [regex]::Replace($txt,'(?m)^\s*pause\s*$','rem pause')
-        [IO.File]::WriteAllText($path,$txt,[Text.UTF8Encoding]::new($false))
+    if (-not $dlaaReady) {
+        Write-Host ''
+        Write-Host '[1/2] Installing DLAA baseline...' -ForegroundColor Cyan
+        $localCore = Join-Path (Split-Path -Parent $Self) 'core\Install-DLAA-Core.bat'
+        $CoreTemp = Join-Path $Game '_GTAIV_DLSS_Install-DLAA-Core.bat'
+        if (Test-Path -LiteralPath $localCore) { Copy-Item -LiteralPath $localCore -Destination $CoreTemp -Force }
+        else { Download "https://raw.githubusercontent.com/$Repo/$ReleaseCoreCommit/install/core/Install-DLAA-Core.bat" $CoreTemp }
+        $coreText = [IO.File]::ReadAllText($CoreTemp)
+        $coreText = $coreText.Replace("    Read-Host 'Press Enter to close'; exit 0", '    exit 0')
+        $coreText = $coreText.Replace("    Read-Host 'Press Enter to close'; exit 1", '    exit 1')
+        [IO.File]::WriteAllText($CoreTemp,$coreText,[Text.UTF8Encoding]::new($false))
+        $p = Start-Process -FilePath $CoreTemp -WorkingDirectory $Game -Wait -PassThru
+        if ($p.ExitCode -ne 0) { Fail "DLAA installer failed with exit code $($p.ExitCode)." }
+        Remove-Item -LiteralPath $CoreTemp -Force -ErrorAction SilentlyContinue
+        $CoreTemp = $null
+    } else {
+        Write-Host '[1/2] Existing DLAA baseline detected; skipping reinstall.' -ForegroundColor Green
     }
-    $p = Start-Process -FilePath (Join-Path $patchDir 'BUILD.bat') -WorkingDirectory $patchDir -Wait -PassThru
-    if ($p.ExitCode -ne 0) { Fail 'ReShade input patch build failed.' }
-    $p = Start-Process -FilePath (Join-Path $patchDir 'INSTALL.bat') -ArgumentList ('"' + $Game + '"') -WorkingDirectory $patchDir -Wait -PassThru
-    if ($p.ExitCode -ne 0) { Fail 'ReShade input patch install failed.' }
 
+    if (-not $reshadePatched) {
+        Write-Host ''
+        Write-Host '[2/2] Building and installing the ReShade input patch...' -ForegroundColor Cyan
+        $patchDir = Join-Path $Temp 'reshade-input'
+        New-Item -ItemType Directory -Path $patchDir -Force | Out-Null
+        $base = "https://raw.githubusercontent.com/$Repo/$PatchCommit/tools/reshade-bbridge-input"
+        foreach ($name in @('BUILD.bat','INSTALL.bat','apply_patch.ps1')) { Download "$base/$name" (Join-Path $patchDir $name) }
+        foreach ($name in @('BUILD.bat','INSTALL.bat')) {
+            $path = Join-Path $patchDir $name
+            $txt = [IO.File]::ReadAllText($path)
+            $txt = [regex]::Replace($txt,'(?m)^\s*pause\s*$','rem pause')
+            [IO.File]::WriteAllText($path,$txt,[Text.UTF8Encoding]::new($false))
+        }
+        $p = Start-Process -FilePath (Join-Path $patchDir 'BUILD.bat') -WorkingDirectory $patchDir -Wait -PassThru
+        if ($p.ExitCode -ne 0) { Fail 'ReShade input patch build failed. Re-run this same installer after fixing the shown prerequisite/build error; it will keep the completed DLAA baseline.' }
+        $p = Start-Process -FilePath (Join-Path $patchDir 'INSTALL.bat') -ArgumentList ('"' + $Game + '"') -WorkingDirectory $patchDir -Wait -PassThru
+        if ($p.ExitCode -ne 0) { Fail 'ReShade input patch install failed. Re-run this same installer; it will keep the completed DLAA baseline.' }
+    } else {
+        Write-Host '[2/2] ReShade input patch already detected; skipping rebuild.' -ForegroundColor Green
+    }
+
+    if (-not (Has-PatchMarker 'C:\ProgramData\ReShade\ReShade64.dll')) { Fail 'Final ReShade input-patch verification failed.' }
     Write-Host ''
     Write-Host 'DONE - DLAA + ReShade input patch installed.' -ForegroundColor Green
     Write-Host 'Launch GTA IV once. Press Home and confirm ReShade opens and accepts mouse/keyboard input.' -ForegroundColor White
@@ -115,10 +141,10 @@ try {
 catch {
     Write-Host ''
     Write-Host ('INSTALL FAILED: ' + $_.Exception.Message) -ForegroundColor Red
-    Write-Host 'No further step was started.' -ForegroundColor Yellow
     Read-Host 'Press Enter to close'
     exit 1
 }
 finally {
+    if ($CoreTemp -and (Test-Path -LiteralPath $CoreTemp)) { Remove-Item -LiteralPath $CoreTemp -Force -ErrorAction SilentlyContinue }
     if (Test-Path -LiteralPath $Temp) { Remove-Item -LiteralPath $Temp -Recurse -Force -ErrorAction SilentlyContinue }
 }
