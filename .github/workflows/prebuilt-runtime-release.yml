@@ -29,8 +29,8 @@ jobs:
       - name: Apply b-bridge input patch
         shell: pwsh
         run: |
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\reshade-bbridge-input\apply_patch.ps1 .\reshade-src
-          if ($LASTEXITCODE -ne 0) { throw "ReShade patch failed: $LASTEXITCODE" }
+          & .\tools\reshade-bbridge-input\apply_patch.ps1 .\reshade-src
+          if (-not $?) { throw 'ReShade patch failed' }
           $src = Get-Content .\reshade-src\source\input_windows.cpp -Raw
           if (-not $src.Contains('b-bridge cross-process input relay')) { throw 'Patched ReShade source marker missing' }
       - name: Build patched ReShade x64
@@ -151,7 +151,7 @@ jobs:
         with:
           name: prebuilt-runtime
           path: runtime
-      - name: Package and publish immutable runtime assets
+      - name: Package and publish runtime assets
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
