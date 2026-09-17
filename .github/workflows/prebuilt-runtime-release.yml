@@ -1,0 +1,171 @@
+name: Build prebuilt runtime release
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/prebuilt-runtime-release.yml'
+      - 'install/Public-ReShade-Controls-Stage.ps1'
+      - 'install/Public-Startup-Prime-Fix-Stage.ps1'
+      - 'install/Public-ReShade-UX-Master-Stage.ps1'
+      - 'install/Public-ReShade-UX-Master-Fixup.ps1'
+      - 'install/Public-ReShade-UX-Master-V2-Fixup.ps1'
+      - 'tools/reshade-bbridge-input/apply_patch.ps1'
+
+permissions:
+  contents: write
+
+jobs:
+  build-reshade:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Clone ReShade 6.8.0
+        shell: pwsh
+        run: |
+          git clone --depth 1 --branch v6.8.0 --recurse-submodules --shallow-submodules https://github.com/crosire/reshade.git reshade-src
+      - name: Apply b-bridge input patch
+        shell: pwsh
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\reshade-bbridge-input\apply_patch.ps1 .\reshade-src
+          if ($LASTEXITCODE -ne 0) { throw "ReShade patch failed: $LASTEXITCODE" }
+          $src = Get-Content .\reshade-src\source\input_windows.cpp -Raw
+          if (-not $src.Contains('b-bridge cross-process input relay')) { throw 'Patched ReShade source marker missing' }
+      - name: Build patched ReShade x64
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          $vsroot = (& $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath | Select-Object -First 1)
+          if (-not $vsroot) { throw 'Visual Studio C++ build tools unavailable' }
+          $msbuild = Join-Path $vsroot 'MSBuild\Current\Bin\MSBuild.exe'
+          & $msbuild .\reshade-src\ReShade.sln /t:Rebuild /m /p:Configuration=Release '/p:Platform=64-bit' /v:minimal
+          if ($LASTEXITCODE -ne 0) { throw "ReShade build failed: $LASTEXITCODE" }
+          $dll = '.\reshade-src\bin\x64\Release\ReShade64.dll'
+          if (-not (Test-Path $dll)) { throw 'ReShade64.dll missing after build' }
+          $ascii = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($dll))
+          if (-not $ascii.Contains('b-bridge input relay')) { throw 'Built ReShade DLL patch marker missing' }
+          New-Item -ItemType Directory -Path .\out-reshade -Force | Out-Null
+          Copy-Item $dll .\out-reshade\ReShade64-bbridge.dll -Force
+          (Get-FileHash -Algorithm SHA256 .\out-reshade\ReShade64-bbridge.dll).Hash | Set-Content .\out-reshade\ReShade64-bbridge.sha256 -Encoding ASCII
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prebuilt-reshade
+          path: out-reshade/*
+
+  build-runtime:
+    runs-on: windows-2022
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout frozen rendering core
+        shell: pwsh
+        run: |
+          git clone --filter=blob:none https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5.git _project
+          git -C _project checkout 57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f
+          if ((git -C _project rev-parse HEAD).Trim() -ne '57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f') { throw 'Wrong frozen project core' }
+      - name: Attach production ReShade stages
+        shell: pwsh
+        run: |
+          $tool = '.\_project\tools\m3k-nr'
+          Copy-Item .\install\Public-ReShade-Controls-Stage.ps1 "$tool\public-reshade-controls-stage.ps1" -Force
+          Copy-Item .\install\Public-Startup-Prime-Fix-Stage.ps1 "$tool\public-startup-prime-fix-stage.ps1" -Force
+          Copy-Item .\install\Public-ReShade-UX-Master-Stage.ps1 "$tool\public-reshade-ux-master-stage.ps1" -Force
+          Copy-Item .\install\Public-ReShade-UX-Master-Fixup.ps1 "$tool\public-reshade-ux-master-fixup.ps1" -Force
+          Copy-Item .\install\Public-ReShade-UX-Master-V2-Fixup.ps1 "$tool\public-reshade-ux-master-v2-fixup.ps1" -Force
+          $build = "$tool\build-a3-s5.ps1"
+          $text = [IO.File]::ReadAllText($build)
+          $anchor = "& (Join-Path `$toolRoot 'a3-s5-startup-prime-stage.ps1') -GeneratedRoot `$generated"
+          $replacement = @(
+            $anchor,
+            "& (Join-Path `$toolRoot 'public-reshade-controls-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-startup-prime-fix-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-reshade-ux-master-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-reshade-ux-master-fixup.ps1') -FeederSource (Join-Path `$feeder 'src\\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-reshade-ux-master-v2-fixup.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\\dlss5-feed.cpp')"
+          ) -join "`r`n"
+          if (($text.Split($anchor).Count - 1) -ne 1) { throw 'Could not attach production stages exactly once' }
+          [IO.File]::WriteAllText($build,$text.Replace($anchor,$replacement),[Text.UTF8Encoding]::new($false))
+      - name: Build production feeder and shim
+        shell: pwsh
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\_project\tools\m3k-nr\build-a3-s5.ps1
+          if ($LASTEXITCODE -ne 0) { throw "Feeder build failed: $LASTEXITCODE" }
+          if (-not (Test-Path .\_project\tools\m3k-nr\out-m3k-a3-s5\dlss5-feed.addon64)) { throw 'Feeder output missing' }
+          if (-not (Test-Path .\_project\tools\m3k-nr\out-m3k-s27\m3k\m3k-nvngx.dll)) { throw 'Shim output missing' }
+      - name: Build matched temporal bridge pair
+        shell: pwsh
+        run: |
+          git clone --filter=blob:none https://github.com/gutbash/b-bridge.git _bbridge
+          git -C _bbridge checkout 1dad5e6d4dcf8647e354aa9a87f611256fb61142
+          git -C _bbridge submodule update --init --recursive
+          python .\_project\tools\m3k-nr\a2-s21-bbridge-ui.py .\_bbridge
+          python .\_project\tools\m3k-nr\a3-s2-bbridge-coherent-draw-jitter.py .\_bbridge
+          git -C _bbridge diff --check
+          python -m pip install --disable-pip-version-check meson==0.64.1 ninja==1.11.1.1
+          Push-Location _bbridge
+          . .\build_common.ps1
+          SetupVS -Platform x86
+          meson setup --buildtype release --backend ninja _prebuilt32 --debug
+          Copy-Item .\Directory.Build.Props .\_prebuilt32 -Force
+          meson compile -C _prebuilt32 d3d9
+          if ($LASTEXITCODE -ne 0) { throw "x86 d3d9 build failed: $LASTEXITCODE" }
+          SetupVS -Platform x64
+          meson setup --buildtype release --backend ninja _prebuilt64 --debug
+          Copy-Item .\Directory.Build.Props .\_prebuilt64 -Force
+          meson compile -C _prebuilt64 NvRemixBridge
+          if ($LASTEXITCODE -ne 0) { throw "x64 bridge build failed: $LASTEXITCODE" }
+          Pop-Location
+      - name: Collect tested runtime
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path .\out-runtime\m3k -Force | Out-Null
+          Copy-Item .\_bbridge\_prebuilt32\src\client\d3d9.dll .\out-runtime\d3d9.dll -Force
+          Copy-Item .\_bbridge\_prebuilt64\src\server\NvRemixBridge.exe .\out-runtime\NvRemixBridge.exe -Force
+          Copy-Item .\_project\tools\m3k-nr\out-m3k-a3-s5\dlss5-feed.addon64 .\out-runtime\dlss5-feed.addon64 -Force
+          Copy-Item .\_project\tools\m3k-nr\out-m3k-s27\m3k\m3k-nvngx.dll .\out-runtime\m3k\m3k-nvngx.dll -Force
+          Invoke-WebRequest -UseBasicParsing -Uri 'https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/m3k-dxvk-v3.0.2-a2s1b/d3d9vk_x64.dll' -OutFile .\out-runtime\d3d9vk_x64.dll
+          $presenter = (Get-FileHash -Algorithm SHA256 .\out-runtime\d3d9vk_x64.dll).Hash.ToUpperInvariant()
+          if ($presenter -ne '511E0C2509E1922DB2EC38940507BA956908FE6DC5FD9B3DB9FEC489DC05F297') { throw "Presenter hash mismatch: $presenter" }
+          $expectedVersion = 'remix-main+1dad5e6d'
+          foreach ($p in @('.\out-runtime\d3d9.dll','.\out-runtime\NvRemixBridge.exe')) {
+            $ascii = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($p))
+            if (-not $ascii.Contains($expectedVersion)) { throw "$p does not embed $expectedVersion" }
+          }
+          Get-ChildItem .\out-runtime -Recurse -File | ForEach-Object { $h=Get-FileHash -Algorithm SHA256 $_.FullName; '{0}  {1}' -f $h.Hash,$_.FullName.Substring((Resolve-Path .\out-runtime).Path.Length+1) } | Set-Content .\out-runtime\SHA256SUMS.txt -Encoding ASCII
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prebuilt-runtime
+          path: out-runtime/**
+
+  publish:
+    needs: [build-reshade, build-runtime]
+    runs-on: windows-2022
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: prebuilt-reshade
+          path: release
+      - uses: actions/download-artifact@v4
+        with:
+          name: prebuilt-runtime
+          path: runtime
+      - name: Package and publish immutable runtime assets
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Compress-Archive -Path .\runtime\* -DestinationPath .\release\GTAIV-DLSS-Full-Runtime.zip -Force
+          $lines = New-Object System.Collections.Generic.List[string]
+          foreach ($p in @('.\release\ReShade64-bbridge.dll','.\release\GTAIV-DLSS-Full-Runtime.zip')) {
+            $h = Get-FileHash -Algorithm SHA256 $p
+            $lines.Add(('{0}  {1}' -f $h.Hash,[IO.Path]::GetFileName($p)))
+          }
+          Get-Content .\runtime\SHA256SUMS.txt | ForEach-Object { $lines.Add($_) }
+          $lines | Set-Content .\release\SHA256SUMS.txt -Encoding ASCII
+          if (-not (gh release view runtime-prebuilt-v1 --repo JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5 2>$null)) {
+            gh release create runtime-prebuilt-v1 --repo JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5 --title 'GTA IV prebuilt runtime v1' --notes 'Prebuilt, hash-verified runtime assets for the release installers. Built from pinned sources by GitHub Actions.' --prerelease
+          }
+          gh release upload runtime-prebuilt-v1 .\release\ReShade64-bbridge.dll .\release\GTAIV-DLSS-Full-Runtime.zip .\release\SHA256SUMS.txt --repo JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5 --clobber
