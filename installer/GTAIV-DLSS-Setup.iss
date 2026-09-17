@@ -14,7 +14,6 @@ DefaultDirName={tmp}\GTAIV-DLSS-Setup
 CreateAppDir=no
 DisableProgramGroupPage=yes
 PrivilegesRequired=admin
-PrivilegesRequiredOverridesAllowed=dialog
 OutputDir=out
 OutputBaseFilename=GTAIV-DLSS-Setup
 Compression=lzma2
