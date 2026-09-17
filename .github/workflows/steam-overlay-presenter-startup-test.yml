@@ -1,0 +1,74 @@
+name: Steam Overlay Presenter Startup Test
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'install/Public-DXVK-Steam-Startup-Output-Fix.py'
+      - '.github/workflows/steam-overlay-presenter-startup-test.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-presenter-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Install DXVK build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mingw-w64 meson ninja-build glslang-tools
+
+      - name: Clone exact frozen project and DXVK
+        run: |
+          git clone --filter=blob:none https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5.git _project
+          git -C _project checkout 57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f
+          test "$(git -C _project rev-parse HEAD)" = "57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f"
+
+          git clone --recursive https://github.com/doitsujin/dxvk.git _dxvk
+          git -C _dxvk checkout 6b20f622a77b87b2921fe5d2c1774d2f2ba3e9b7
+          git -C _dxvk submodule update --init --recursive
+          test "$(git -C _dxvk rev-parse HEAD)" = "6b20f622a77b87b2921fe5d2c1774d2f2ba3e9b7"
+
+      - name: Apply frozen presenter patches plus startup sizing test
+        run: |
+          git -C _dxvk apply "$GITHUB_WORKSPACE/_project/tools/m3k-nr/dxvk-v3.0.2-m3k-source-tap.patch"
+          python3 _project/tools/m3k-nr/a2-s1b-dxvk.py _dxvk
+          python3 install/Public-DXVK-Steam-Startup-Output-Fix.py _dxvk
+          git -C _dxvk diff --check
+          grep -q '\[M3K-S1B\] config' _dxvk/src/d3d9/d3d9_swapchain.cpp
+          grep -q '\[M3K-STEAM-PRESENTER\] startup output prime' _dxvk/src/d3d9/d3d9_swapchain.cpp
+          grep -q 'M3kPrimeOutputWindow(m_window, m_presentParams.Windowed)' _dxvk/src/d3d9/d3d9_swapchain.cpp
+
+      - name: Configure and build x64 d3d9 presenter
+        working-directory: _dxvk
+        run: |
+          meson setup --cross-file build-win64.txt --buildtype release --prefix "$GITHUB_WORKSPACE/_dxvk_install" build.w64
+          meson compile -C build.w64 d3d9
+          meson install -C build.w64
+
+      - name: Verify and package test presenter
+        shell: bash
+        run: |
+          set -euo pipefail
+          dll="$(find _dxvk_install -type f -iname d3d9.dll | head -n1)"
+          test -n "$dll"
+          cp "$dll" d3d9vk_x64.dll
+          strings d3d9vk_x64.dll | grep -q '\[M3K-S1B\] config'
+          strings d3d9vk_x64.dll | grep -q '\[M3K-STEAM-PRESENTER\] startup output prime'
+          sha256sum d3d9vk_x64.dll | tee SHA256.txt
+
+      - name: Upload presenter test artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: steam-overlay-presenter-startup-v1
+          path: |
+            d3d9vk_x64.dll
+            SHA256.txt
+          if-no-files-found: error
+          retention-days: 7
