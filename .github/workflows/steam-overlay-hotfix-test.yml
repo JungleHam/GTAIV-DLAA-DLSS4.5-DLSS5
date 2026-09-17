@@ -5,6 +5,7 @@ on:
     branches: [ main ]
     paths:
       - 'install/Public-BBridge-Steam-Overlay-Fix.py'
+      - 'install/Public-BBridge-Steam-D3D9-Probe.py'
       - '.github/workflows/steam-overlay-hotfix-test.yml'
   workflow_dispatch:
 
@@ -39,6 +40,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Temporal synchronization patch failed' }
           python .\install\Public-BBridge-Steam-Overlay-Fix.py .\_bbridge
           if ($LASTEXITCODE -ne 0) { throw 'Steam overlay WM_SIZE split patch failed' }
+          python .\install\Public-BBridge-Steam-D3D9-Probe.py .\_bbridge
+          if ($LASTEXITCODE -ne 0) { throw 'Steam D3D9 sizing probe patch failed' }
 
           git -C _bbridge diff --check
           if ($LASTEXITCODE -ne 0) { throw 'Patched source diff check failed' }
@@ -48,6 +51,24 @@ jobs:
             if (-not $window.Contains($marker)) { throw "Missing Steam hotfix marker: $marker" }
           }
           if ($window.Contains('[M3K-UI-STARTUP]')) { throw 'Rejected startup-resync patch leaked into hotfix build' }
+
+          $probeSources = @(
+            (Get-Content .\_bbridge\src\client\d3d9_device.cpp -Raw),
+            (Get-Content .\_bbridge\src\client\d3d9_swapchain.cpp -Raw),
+            (Get-Content .\_bbridge\src\client\d3d9_surface.cpp -Raw)
+          ) -join "`n"
+          foreach ($marker in @(
+            '[M3K-STEAM-D3D] Device::GetDisplayMode',
+            '[M3K-STEAM-D3D] Device::SetViewport',
+            '[M3K-STEAM-D3D] Device::GetViewport',
+            '[M3K-STEAM-D3D] SwapChain::Present',
+            '[M3K-STEAM-D3D] SwapChain::GetBackBuffer',
+            '[M3K-STEAM-D3D] SwapChain::GetPresentParameters',
+            '[M3K-STEAM-D3D] Surface::GetDesc'
+          )) {
+            if (-not $probeSources.Contains($marker)) { throw "Missing D3D probe marker: $marker" }
+          }
+          if (-not (Test-Path .\_bbridge\src\client\m3k_steam_probe.h)) { throw 'Steam probe helper header missing' }
 
       - name: Setup pinned Meson
         shell: pwsh
@@ -63,24 +84,24 @@ jobs:
           meson setup --buildtype release --backend ninja _compSteam32 --debug
           Copy-Item .\Directory.Build.Props -Destination .\_compSteam32 -Force
           meson compile -C _compSteam32 d3d9
-          if ($LASTEXITCODE -ne 0) { throw 'x86 Steam hotfix build failed' }
+          if ($LASTEXITCODE -ne 0) { throw 'x86 Steam probe build failed' }
 
           $dll = '.\_compSteam32\src\client\d3d9.dll'
           if (-not (Test-Path $dll)) { throw 'd3d9.dll missing' }
           $bytes = [IO.File]::ReadAllBytes($dll)
           $ascii = [Text.Encoding]::ASCII.GetString($bytes)
-          foreach ($marker in @('remix-main+1dad5e6d','[M3K-UI] config','[M3K-STEAM-V4]')) {
+          foreach ($marker in @('remix-main+1dad5e6d','[M3K-UI] config','[M3K-STEAM-V4]','[M3K-STEAM-D3D]')) {
             if (-not $ascii.Contains($marker)) { throw "Built DLL missing marker: $marker" }
           }
           if ($ascii.Contains('[M3K-UI-STARTUP]')) { throw 'Built DLL contains rejected startup-resync patch' }
           $hash = (Get-FileHash -Algorithm SHA256 $dll).Hash.ToUpperInvariant()
           Set-Content -LiteralPath '.\_compSteam32\src\client\SHA256.txt' -Value $hash -Encoding ascii
-          Write-Host "STEAM_HOTFIX_D3D9_SHA256=$hash"
+          Write-Host "STEAM_PROBE_D3D9_SHA256=$hash"
 
-      - name: Upload isolated hotfix binary
+      - name: Upload isolated probe binary
         uses: actions/upload-artifact@v4
         with:
-          name: steam-overlay-hotfix-d3d9-v4
+          name: steam-overlay-d3d9-probe-v5
           path: |
             _bbridge/_compSteam32/src/client/d3d9.dll
             _bbridge/_compSteam32/src/client/SHA256.txt
