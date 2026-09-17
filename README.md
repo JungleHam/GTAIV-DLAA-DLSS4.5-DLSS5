@@ -10,7 +10,7 @@ Install [GTA IV FusionFix](https://github.com/ThirteenAG/GTAIV.EFLC.FusionFix) f
 
 ### 2. Install DLAA + ReShade patch
 
-From anywhere, right-click **`install/Install-DLAA.bat` → Run as administrator**.
+From any folder, right-click **`install/Install-DLAA.bat` → Run as administrator**.
 
 Enter the folder that contains `GTAIV.exe`, confirm, and let it finish. This installs the DLAA baseline **and** the ReShade input patch in one step.
 
