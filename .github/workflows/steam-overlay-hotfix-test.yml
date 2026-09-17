@@ -44,7 +44,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Patched source diff check failed' }
 
           $window = Get-Content .\_bbridge\src\client\window.cpp -Raw
-          foreach ($marker in @('[M3K-UI] config','[M3K-STEAM-V3]','gameoverlayrenderer.dll','M3kStackContainsSteamOverlay','DETOURS_ATTACH__UNICODE(CallWindowProc)','Steam downstream CallWindowProc rewrites WM_SIZE','top Steam WndProc gets physical WM_SIZE')) {
+          foreach ($marker in @('[M3K-UI] config','[M3K-STEAM-V4]','Steam WM_SIZE chain confirmed','entering downstream WndProc chain with physical WM_SIZE','Steam saw physical WM_SIZE; downstream GTA chain switched to logical','g_m3kSteamChainConfirmed','g_m3kSteamSplitActive','DETOURS_ATTACH__UNICODE(CallWindowProc)')) {
             if (-not $window.Contains($marker)) { throw "Missing Steam hotfix marker: $marker" }
           }
           if ($window.Contains('[M3K-UI-STARTUP]')) { throw 'Rejected startup-resync patch leaked into hotfix build' }
@@ -69,7 +69,7 @@ jobs:
           if (-not (Test-Path $dll)) { throw 'd3d9.dll missing' }
           $bytes = [IO.File]::ReadAllBytes($dll)
           $ascii = [Text.Encoding]::ASCII.GetString($bytes)
-          foreach ($marker in @('remix-main+1dad5e6d','[M3K-UI] config','[M3K-STEAM-V3]')) {
+          foreach ($marker in @('remix-main+1dad5e6d','[M3K-UI] config','[M3K-STEAM-V4]')) {
             if (-not $ascii.Contains($marker)) { throw "Built DLL missing marker: $marker" }
           }
           if ($ascii.Contains('[M3K-UI-STARTUP]')) { throw 'Built DLL contains rejected startup-resync patch' }
@@ -80,7 +80,7 @@ jobs:
       - name: Upload isolated hotfix binary
         uses: actions/upload-artifact@v4
         with:
-          name: steam-overlay-hotfix-d3d9-v3
+          name: steam-overlay-hotfix-d3d9-v4
           path: |
             _bbridge/_compSteam32/src/client/d3d9.dll
             _bbridge/_compSteam32/src/client/SHA256.txt
