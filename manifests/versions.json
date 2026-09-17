@@ -1,11 +1,35 @@
 {
-  "project_status": "release-candidate-streamlined-install-2026-09-17",
+  "project_status": "release-candidate-prebuilt-install-2026-09-17",
   "components": {
     "fusionfix": {
       "version": "5.0.1",
       "url": "https://github.com/ThirteenAG/GTAIV.EFLC.FusionFix",
       "sha256": "3c202398c133392be985854654f169514e055812cc302ef24e6aa97495975b41",
       "installed_by_project": false
+    },
+    "prebuilt_release": {
+      "tag": "runtime-prebuilt-v1",
+      "release_url": "https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/tag/runtime-prebuilt-v1",
+      "reshade_input_patch": {
+        "asset": "ReShade64-bbridge.dll",
+        "url": "https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/runtime-prebuilt-v1/ReShade64-bbridge.dll",
+        "sha256": "75976007a0a5de5bab364f98e2d01b377d046441c94e89b1dd279cee856161a9",
+        "source": "ReShade 6.8.0 + tools/reshade-bbridge-input/apply_patch.ps1",
+        "build": "GitHub Actions"
+      },
+      "dlss_full_runtime": {
+        "asset": "GTAIV-DLSS-Full-Runtime.zip",
+        "url": "https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/runtime-prebuilt-v1/GTAIV-DLSS-Full-Runtime.zip",
+        "sha256": "1e14f1508a1ac1fac8eab2dd0e3d8969c99275363b43c47406d0a86d5be36987",
+        "files": {
+          "d3d9.dll": "eca7c9cf9cd1c4835cea7fd57ad168a35e157f081c0eadba51af35f501026f28",
+          "NvRemixBridge.exe": "8a89a3dbbc02d56ba98254941b14e52d88efef3f95e491c9c6af5adc65fecffa",
+          "d3d9vk_x64.dll": "511e0c2509e1922db2ec38940507ba956908fe6dc5fd9b3db9fec489dc05f297",
+          "dlss5-feed.addon64": "95259612c7aa82dfc913e6ac4405a27b41c29f0de4975592e972a9a1435879b2",
+          "m3k/m3k-nvngx.dll": "69d63d238780f93f8abc3d59c97c9e577a7845c557c1dc7a8f28ff3a84aae51a"
+        },
+        "build": "GitHub Actions from pinned sources"
+      }
     },
     "b-bridge": {
       "version": "0.1.0",
@@ -36,14 +60,11 @@
       "default_dlss_quality": "Quality",
       "startup_stabilization_resolution": "1485x835",
       "startup_stabilization_synchronized_frames": 180,
-      "startup_prime": "1485x835",
-      "startup_prime_synchronized_frames": 180,
       "startup_stabilization_frame_policy": "180 valid synchronized frames cumulative; explicit live DLSS/DLAA mode change cancels startup prime immediately",
       "master_processing_default": true,
       "master_processing_off_scope": "session-only",
       "nr_default_mode": 0,
       "nr_enabled_mode": 2,
-      "nr_passes": 1,
       "nr_passes_public_default": 1,
       "public_modes": [
         "DLAA Native",
@@ -57,12 +78,12 @@
       "release_installers": {
         "dlaa_and_reshade": "install/Install-DLAA.bat",
         "dlss_full": "install/Install-DLSS-Full.bat",
-        "dlaa_core": "install/core/Install-DLAA-Core.bat",
-        "dlss_full_core": "install/core/Install-DLSS-Full-Core.bat"
+        "full_project_uninstall": "install/Uninstall-DLAA.bat",
+        "source_build_core_dlaa": "install/core/Install-DLAA-Core.bat",
+        "source_build_core_dlss_full": "install/core/Install-DLSS-Full-Core.bat"
       },
       "uninstaller_commit": "e4c600a96e1b3682d7004dbd04dffc1abace7b90",
       "uninstaller_sha256": "0af505444e966fb61ab9c83eb7f4d8874a436e4302ab935caa2dba0039656733",
-      "uninstaller_path": "Uninstall-DLSS-Full.bat",
       "rollback_target": "DLAA-only baseline + ReShade input patch",
       "startup_ui_resync_status": "rejected-after-hardware-test-pre-legal-screen-hang; not installed"
     },
@@ -71,7 +92,8 @@
       "tag_commit": "18deaa52de0c425a78b329e9cb3c497281cd00ec",
       "setup_url_primary": "https://reshade.me/downloads/ReShade_Setup_6.8.0_Addon.exe",
       "setup_url_fallback": "https://www.reshade.me/releases/ReShade-6.8.0-Addon-setup.exe",
-      "input_patch_source_commit": "b437e7646b262dc60863293348fd33369330a429"
+      "input_patch_source": "tools/reshade-bbridge-input/apply_patch.ps1",
+      "input_patch_build": "prebuilt by GitHub Actions for release installs"
     },
     "dlss5-feeder": {
       "version": "0.15.1",
