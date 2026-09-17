@@ -1,4 +1,4 @@
-name: Release install + DLSS module validation
+name: Release install + runtime validation
 
 on:
   workflow_dispatch:
@@ -8,16 +8,10 @@ on:
       - 'README.md'
       - 'install/Install-DLAA.bat'
       - 'install/Install-DLSS-Full.bat'
-      - 'install/core/**'
-      - 'install/Public-ReShade-Controls-Stage.ps1'
-      - 'install/Public-Startup-Prime-Fix-Stage.ps1'
-      - 'install/Public-ReShade-UX-Master-Stage.ps1'
-      - 'install/Public-ReShade-UX-Master-Fixup.ps1'
-      - 'install/Public-ReShade-UX-Master-V2-Fixup.ps1'
       - 'install/README.md'
-      - 'docs/DLSS-FULL.md'
       - 'manifests/versions.json'
       - '.github/workflows/dlss-full-module.yml'
+      - '.github/workflows/prebuilt-runtime-release.yml'
 
 permissions:
   contents: read
@@ -25,10 +19,9 @@ permissions:
 jobs:
   validate-release:
     runs-on: windows-2022
-    timeout-minutes: 60
+    timeout-minutes: 30
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Validate release-facing files
         shell: pwsh
@@ -37,21 +30,19 @@ jobs:
           $readme = Get-Content README.md -Raw
           $dlaa = Get-Content install/Install-DLAA.bat -Raw
           $full = Get-Content install/Install-DLSS-Full.bat -Raw
-          $dlaaCore = Get-Content install/core/Install-DLAA-Core.bat -Raw
-          $fullCore = Get-Content install/core/Install-DLSS-Full-Core.bat -Raw
           $manifest = Get-Content manifests/versions.json -Raw | ConvertFrom-Json
 
-          foreach ($marker in @('Install — 3 steps','Run as administrator','Install-DLAA.bat','Install-DLSS-Full.bat','Git for Windows','Python 3','Visual Studio 2022 Build Tools','RTX 50','RTX 40')) {
+          foreach ($marker in @('Install — 3 steps','Run as administrator','Install-DLAA.bat','Install-DLSS-Full.bat','manual ReShade installation are not required','RTX 50 Series','RTX 40 Series')) {
             if (-not $readme.Contains($marker)) { throw "README missing release marker: $marker" }
           }
-          foreach ($marker in @('Resolve-GameFolder','Check-BuildTools','Install-DLAA-Core.bat','ReleaseCoreCommit','BUILD.bat','INSTALL.bat','RunAs','Has-PatchMarker')) {
-            if (-not $dlaa.Contains($marker)) { throw "DLAA release installer missing: $marker" }
+          foreach ($marker in @('runtime-prebuilt-v1','ReShade64-bbridge.dll','75976007A0A5DE5BAB364F98E2D01B377D046441C94E89B1DD279CEE856161A9','Install-DLAA-Core.bat','Has-PatchMarker','RunAs')) {
+            if (-not $dlaa.Contains($marker)) { throw "DLAA installer missing: $marker" }
           }
-          foreach ($marker in @('Resolve-GameFolder','Check-BuildTools','Install-DLSS-Full-Core.bat','ReleaseCoreCommit','E16BCF15E16E13F527491CDF7845B2FE6521A738D8F7C9C721866A8496E1FC8E','4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05','Get-AuthenticodeSignature','RunAs')) {
-            if (-not $full.Contains($marker)) { throw "DLSS Full release installer missing: $marker" }
+          foreach ($marker in @('runtime-prebuilt-v1','GTAIV-DLSS-Full-Runtime.zip','1E14F1508A1AC1FAC8EAB2DD0E3D8969C99275363B43C47406D0A86D5BE36987','ECA7C9CF9CD1C4835CEA7FD57AD168A35E157F081C0EADBA51AF35F501026F28','95259612C7AA82DFC913E6AC4405A27B41C29F0DE4975592E972A9A1435879B2','E16BCF15E16E13F527491CDF7845B2FE6521A738D8F7C9C721866A8496E1FC8E','4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05','Get-AuthenticodeSignature','StartupPrimeWidth=1485','RunAs')) {
+            if (-not $full.Contains($marker)) { throw "DLSS Full installer missing: $marker" }
           }
+          if ($dlaa.Contains('Check-BuildTools') -or $full.Contains('Check-BuildTools')) { throw 'Release installers still require local build tools' }
 
-          # Parse the embedded PowerShell portions without executing the interactive installers.
           foreach ($path in @('install/Install-DLAA.bat','install/Install-DLSS-Full.bat')) {
             $text = [IO.File]::ReadAllText($path)
             $marker = '#==POWERSHELL==#'
@@ -60,128 +51,65 @@ jobs:
             [void][ScriptBlock]::Create($text.Substring($i + $marker.Length))
           }
 
-          foreach ($marker in @('DLSS5 Neural Rendering: NOT INSTALLED','ReShade 6.8.0 Full Add-On Support','nvngx_dlss.dll: 310.9.1')) {
-            if (-not $dlaaCore.Contains($marker)) { throw "DLAA core missing: $marker" }
-          }
-          foreach ($marker in @('57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f','_compDLSSFull32','_compDLSSFull64','public-reshade-ux-master-v2-fixup.ps1','StartupPrimeWidth=1485','StartupPrimeFrames=180','E22DD7EAF6D1C6A876AF486C939E3DCB980D6AE03A247B2C5772D0502224FCCD')) {
-            if (-not $fullCore.Contains($marker)) { throw "DLSS Full core missing: $marker" }
-          }
-          $nr = $manifest.components.nvngx_dlssnr.variants
-          if ($nr.rtx50_original_nvidia_signed.package_sha256.ToUpperInvariant() -ne '388C0A7912E15EC911B9C9E11A692142B11FE387DDF2B637D8C358138FFFB3AC') { throw 'RTX 50 NR package manifest mismatch' }
-          if ($nr.rtx50_original_nvidia_signed.dll_sha256.ToUpperInvariant() -ne 'E16BCF15E16E13F527491CDF7845B2FE6521A738D8F7C9C721866A8496E1FC8E') { throw 'RTX 50 NR DLL manifest mismatch' }
-          if ($nr.rtx40_compatibility.package_sha256.ToUpperInvariant() -ne '46124CFAEF532AD5F6DA07494772EA8C1B3E719F934E254385697F38D1289E3F') { throw 'RTX 40 NR package manifest mismatch' }
-          if ($nr.rtx40_compatibility.dll_sha256.ToUpperInvariant() -ne '4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05') { throw 'RTX 40 NR DLL manifest mismatch' }
-          Write-Host 'Release-facing checks passed.' -ForegroundColor Green
+          $pre = $manifest.components.prebuilt_release
+          if ($pre.tag -ne 'runtime-prebuilt-v1') { throw 'Prebuilt runtime tag mismatch' }
+          if ($pre.reshade_input_patch.sha256.ToUpperInvariant() -ne '75976007A0A5DE5BAB364F98E2D01B377D046441C94E89B1DD279CEE856161A9') { throw 'Prebuilt ReShade hash mismatch in manifest' }
+          if ($pre.dlss_full_runtime.sha256.ToUpperInvariant() -ne '1E14F1508A1AC1FAC8EAB2DD0E3D8969C99275363B43C47406D0A86D5BE36987') { throw 'Prebuilt runtime ZIP hash mismatch in manifest' }
+          Write-Host 'Release-facing files validated.' -ForegroundColor Green
 
-      - name: Verify both Neural Rendering runtime choices
+      - name: Verify prebuilt ReShade input patch
         shell: pwsh
         run: |
-          $ErrorActionPreference = 'Stop'
+          $url='https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/runtime-prebuilt-v1/ReShade64-bbridge.dll'
+          $dll=Join-Path $env:RUNNER_TEMP 'ReShade64-bbridge.dll'
+          Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $dll
+          $hash=(Get-FileHash -Algorithm SHA256 $dll).Hash.ToUpperInvariant()
+          if ($hash -ne '75976007A0A5DE5BAB364F98E2D01B377D046441C94E89B1DD279CEE856161A9') { throw "ReShade asset hash mismatch: $hash" }
+          $ascii=[Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($dll))
+          if (-not $ascii.Contains('b-bridge input relay')) { throw 'Prebuilt ReShade patch marker missing' }
+          Write-Host "Prebuilt ReShade verified: $hash" -ForegroundColor Green
+
+      - name: Verify prebuilt DLSS runtime archive
+        shell: pwsh
+        run: |
+          $url='https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/runtime-prebuilt-v1/GTAIV-DLSS-Full-Runtime.zip'
+          $zip=Join-Path $env:RUNNER_TEMP 'runtime.zip'
+          $dir=Join-Path $env:RUNNER_TEMP 'runtime'
+          Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $zip
+          $zipHash=(Get-FileHash -Algorithm SHA256 $zip).Hash.ToUpperInvariant()
+          if ($zipHash -ne '1E14F1508A1AC1FAC8EAB2DD0E3D8969C99275363B43C47406D0A86D5BE36987') { throw "Runtime ZIP mismatch: $zipHash" }
+          Expand-Archive -LiteralPath $zip -DestinationPath $dir -Force
+          $expected=@{
+            'd3d9.dll'='ECA7C9CF9CD1C4835CEA7FD57AD168A35E157F081C0EADBA51AF35F501026F28';
+            'NvRemixBridge.exe'='8A89A3DBBC02D56BA98254941B14E52D88EFEF3F95E491C9C6AF5ADC65FECFFA';
+            'd3d9vk_x64.dll'='511E0C2509E1922DB2EC38940507BA956908FE6DC5FD9B3DB9FEC489DC05F297';
+            'dlss5-feed.addon64'='95259612C7AA82DFC913E6AC4405A27B41C29F0DE4975592E972A9A1435879B2';
+            'm3k\m3k-nvngx.dll'='69D63D238780F93F8ABC3D59C97C9E577A7845C557C1DC7A8F28FF3A84AAE51A'
+          }
+          foreach($rel in $expected.Keys){
+            $p=Join-Path $dir $rel
+            if(-not(Test-Path $p)){throw "Missing runtime file: $rel"}
+            $h=(Get-FileHash -Algorithm SHA256 $p).Hash.ToUpperInvariant()
+            if($h -ne $expected[$rel]){throw "$rel hash mismatch: $h"}
+          }
+          Write-Host 'Prebuilt DLSS runtime verified.' -ForegroundColor Green
+
+      - name: Verify both Neural Rendering choices
+        shell: pwsh
+        run: |
           $variants = @(
-            @{
-              Name='RTX50 original NVIDIA-signed';
-              Url='https://github.com/RankFTW/rhi-repo/releases/download/dlssnr-310.8.0/nvngx_dlssnr_310.8.0.zip';
-              Zip='388C0A7912E15EC911B9C9E11A692142B11FE387DDF2B637D8C358138FFFB3AC';
-              Dll='E16BCF15E16E13F527491CDF7845B2FE6521A738D8F7C9C721866A8496E1FC8E';
-              NvidiaSigned=$true
-            },
-            @{
-              Name='RTX40 compatibility';
-              Url='https://github.com/RankFTW/rhi-repo/releases/download/dlssnr-310.8.0-RTX40/nvngx_dlssnr_310.8.0-RTX40.zip';
-              Zip='46124CFAEF532AD5F6DA07494772EA8C1B3E719F934E254385697F38D1289E3F';
-              Dll='4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05';
-              NvidiaSigned=$false
-            }
+            @{Name='RTX50 original NVIDIA-signed';Url='https://github.com/RankFTW/rhi-repo/releases/download/dlssnr-310.8.0/nvngx_dlssnr_310.8.0.zip';Zip='388C0A7912E15EC911B9C9E11A692142B11FE387DDF2B637D8C358138FFFB3AC';Dll='E16BCF15E16E13F527491CDF7845B2FE6521A738D8F7C9C721866A8496E1FC8E';Signed=$true},
+            @{Name='RTX40 compatibility';Url='https://github.com/RankFTW/rhi-repo/releases/download/dlssnr-310.8.0-RTX40/nvngx_dlssnr_310.8.0-RTX40.zip';Zip='46124CFAEF532AD5F6DA07494772EA8C1B3E719F934E254385697F38D1289E3F';Dll='4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05';Signed=$false}
           )
-          foreach ($v in $variants) {
-            $zip = Join-Path $env:RUNNER_TEMP (($v.Name -replace '[^A-Za-z0-9]','_') + '.zip')
-            $dir = $zip + '.dir'
+          foreach($v in $variants){
+            $zip=Join-Path $env:RUNNER_TEMP (($v.Name -replace '[^A-Za-z0-9]','_')+'.zip')
+            $dir=$zip+'.dir'
             Invoke-WebRequest -UseBasicParsing -Uri $v.Url -OutFile $zip
-            $zipHash = (Get-FileHash -Algorithm SHA256 $zip).Hash.ToUpperInvariant()
-            if ($zipHash -ne $v.Zip) { throw "$($v.Name) package hash mismatch: $zipHash" }
+            if((Get-FileHash -Algorithm SHA256 $zip).Hash.ToUpperInvariant() -ne $v.Zip){throw "$($v.Name) package hash mismatch"}
             Expand-Archive -LiteralPath $zip -DestinationPath $dir -Force
-            $dll = Get-ChildItem -LiteralPath $dir -Recurse -File -Filter nvngx_dlssnr.dll | Select-Object -First 1
-            if (-not $dll) { throw "$($v.Name) package did not contain nvngx_dlssnr.dll" }
-            $dllHash = (Get-FileHash -Algorithm SHA256 $dll.FullName).Hash.ToUpperInvariant()
-            if ($dllHash -ne $v.Dll) { throw "$($v.Name) DLL hash mismatch: $dllHash" }
-            if ($v.NvidiaSigned) {
-              $sig = Get-AuthenticodeSignature -LiteralPath $dll.FullName
-              if ($sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notmatch 'NVIDIA') { throw 'RTX50 runtime is not a valid NVIDIA-signed DLL' }
-            }
-            Write-Host "$($v.Name) verified: $dllHash" -ForegroundColor Green
+            $dll=Get-ChildItem $dir -Recurse -File -Filter nvngx_dlssnr.dll | Select-Object -First 1
+            if(-not $dll){throw "$($v.Name) DLL missing"}
+            if((Get-FileHash -Algorithm SHA256 $dll.FullName).Hash.ToUpperInvariant() -ne $v.Dll){throw "$($v.Name) DLL hash mismatch"}
+            if($v.Signed){$sig=Get-AuthenticodeSignature $dll.FullName;if($sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notmatch 'NVIDIA'){throw 'RTX50 runtime signature check failed'}}
           }
-
-      - name: Checkout frozen rendering core
-        shell: pwsh
-        run: |
-          git clone --filter=blob:none https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5.git _project
-          git -C _project checkout 57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f
-          if ((git -C _project rev-parse HEAD).Trim() -ne '57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f') { throw 'Wrong frozen core' }
-
-      - name: Attach production ReShade stages
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $tool = '.\_project\tools\m3k-nr'
-          Copy-Item .\install\Public-ReShade-Controls-Stage.ps1 "$tool\public-reshade-controls-stage.ps1" -Force
-          Copy-Item .\install\Public-Startup-Prime-Fix-Stage.ps1 "$tool\public-startup-prime-fix-stage.ps1" -Force
-          Copy-Item .\install\Public-ReShade-UX-Master-Stage.ps1 "$tool\public-reshade-ux-master-stage.ps1" -Force
-          Copy-Item .\install\Public-ReShade-UX-Master-Fixup.ps1 "$tool\public-reshade-ux-master-fixup.ps1" -Force
-          Copy-Item .\install\Public-ReShade-UX-Master-V2-Fixup.ps1 "$tool\public-reshade-ux-master-v2-fixup.ps1" -Force
-          $build = "$tool\build-a3-s5.ps1"
-          $text = [IO.File]::ReadAllText($build)
-          $anchor = "& (Join-Path `$toolRoot 'a3-s5-startup-prime-stage.ps1') -GeneratedRoot `$generated"
-          $replacement = @(
-            $anchor,
-            "& (Join-Path `$toolRoot 'public-reshade-controls-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\\dlss5-feed.cpp')",
-            "& (Join-Path `$toolRoot 'public-startup-prime-fix-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\\dlss5-feed.cpp')",
-            "& (Join-Path `$toolRoot 'public-reshade-ux-master-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\\dlss5-feed.cpp')",
-            "& (Join-Path `$toolRoot 'public-reshade-ux-master-fixup.ps1') -FeederSource (Join-Path `$feeder 'src\\dlss5-feed.cpp')",
-            "& (Join-Path `$toolRoot 'public-reshade-ux-master-v2-fixup.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\\dlss5-feed.cpp')"
-          ) -join "`r`n"
-          if (($text.Split($anchor).Count - 1) -ne 1) { throw 'Could not attach production stages exactly once' }
-          [IO.File]::WriteAllText($build,$text.Replace($anchor,$replacement),[Text.UTF8Encoding]::new($false))
-
-      - name: Build and validate production Feeder
-        shell: pwsh
-        run: |
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\_project\tools\m3k-nr\build-a3-s5.ps1
-          if ($LASTEXITCODE -ne 0) { throw "Feeder build failed: $LASTEXITCODE" }
-          $feed = '.\_project\tools\m3k-nr\out-m3k-a3-s5\dlss5-feed.addon64'
-          if (-not (Test-Path $feed)) { throw 'Feeder missing' }
-          $vk = Get-Content .\_project\tools\m3k-nr\_work\m3k-src-a3-s5\m3k_vk.h -Raw
-          $src = Get-Content .\_project\tools\m3k-nr\_work\feeder\src\dlss5-feed.cpp -Raw
-          foreach ($marker in @('M3K-MASTER-V2: OFF stage 1','M3K-MASTER-V2: OFF stage 2','M3K-MASTER-V2: OFF ACTIVE','master OFF is not carried across launches','DLSS / DLAA processing##M3KMaster','Diagnostics##M3KDiagnostics','M3K-A3-S5: startup prime cancelled by live profile change')) {
-            if (-not (($vk + $src).Contains($marker))) { throw "Generated production marker missing: $marker" }
-          }
-          if ($src.Contains('reshade::register_overlay("M3K Capture Lab"')) { throw 'Production Feeder unexpectedly registers Capture Lab' }
-          $hash = (Get-FileHash -Algorithm SHA256 $feed).Hash.ToUpperInvariant()
-          $reference = 'E22DD7EAF6D1C6A876AF486C939E3DCB980D6AE03A247B2C5772D0502224FCCD'
-          if ($hash -eq $reference) { Write-Host "Feeder matches hardware-tested PE reference: $hash" -ForegroundColor Green }
-          else { Write-Host "Feeder PE hash differs on this runner ($hash); frozen source + production marker/CPU gates passed. Hardware reference is $reference" -ForegroundColor Yellow }
-
-      - name: Build frozen temporal bridge pair
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          git clone --filter=blob:none https://github.com/gutbash/b-bridge.git _bbridge
-          git -C _bbridge checkout 1dad5e6d4dcf8647e354aa9a87f611256fb61142
-          git -C _bbridge submodule update --init --recursive
-          python .\_project\tools\m3k-nr\a2-s21-bbridge-ui.py .\_bbridge
-          python .\_project\tools\m3k-nr\a3-s2-bbridge-coherent-draw-jitter.py .\_bbridge
-          git -C _bbridge diff --check
-          python -m pip install --disable-pip-version-check meson==0.64.1 ninja==1.11.1.1
-          Push-Location _bbridge
-          . .\build_common.ps1
-          SetupVS -Platform x86
-          meson setup --buildtype release --backend ninja _release32 --debug
-          Copy-Item .\Directory.Build.Props .\_release32 -Force
-          meson compile -C _release32 d3d9
-          SetupVS -Platform x64
-          meson setup --buildtype release --backend ninja _release64 --debug
-          Copy-Item .\Directory.Build.Props .\_release64 -Force
-          meson compile -C _release64 NvRemixBridge
-          Pop-Location
-          if (-not (Test-Path .\_bbridge\_release32\src\client\d3d9.dll)) { throw 'x86 bridge missing' }
-          if (-not (Test-Path .\_bbridge\_release64\src\server\NvRemixBridge.exe)) { throw 'x64 bridge missing' }
-          Write-Host 'Release validation passed.' -ForegroundColor Green
+          Write-Host 'Both Neural Rendering choices verified.' -ForegroundColor Green
