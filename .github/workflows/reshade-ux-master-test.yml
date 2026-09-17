@@ -6,6 +6,7 @@ on:
     branches: [ main ]
     paths:
       - 'install/Public-ReShade-UX-Master-Stage.ps1'
+      - 'install/Public-ReShade-UX-Master-Fixup.ps1'
       - '.github/workflows/reshade-ux-master-test.yml'
 
 permissions:
@@ -35,6 +36,7 @@ jobs:
           Copy-Item .\install\Public-ReShade-Controls-Stage.ps1 "$tool\public-reshade-controls-stage.ps1" -Force
           Copy-Item .\install\Public-Startup-Prime-Fix-Stage.ps1 "$tool\public-startup-prime-fix-stage.ps1" -Force
           Copy-Item .\install\Public-ReShade-UX-Master-Stage.ps1 "$tool\public-reshade-ux-master-stage.ps1" -Force
+          Copy-Item .\install\Public-ReShade-UX-Master-Fixup.ps1 "$tool\public-reshade-ux-master-fixup.ps1" -Force
           $build = "$tool\build-a3-s5.ps1"
           $text = [IO.File]::ReadAllText($build)
           $anchor = "& (Join-Path `$toolRoot 'a3-s5-startup-prime-stage.ps1') -GeneratedRoot `$generated"
@@ -42,7 +44,8 @@ jobs:
             $anchor,
             "& (Join-Path `$toolRoot 'public-reshade-controls-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
             "& (Join-Path `$toolRoot 'public-startup-prime-fix-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
-            "& (Join-Path `$toolRoot 'public-reshade-ux-master-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')"
+            "& (Join-Path `$toolRoot 'public-reshade-ux-master-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-reshade-ux-master-fixup.ps1') -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')"
           )
           $replacement = $lines -join "`r`n"
           if (($text.Split($anchor).Count - 1) -ne 1) { throw 'Could not attach test stages exactly once' }
