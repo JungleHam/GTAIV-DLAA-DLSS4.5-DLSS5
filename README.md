@@ -67,6 +67,14 @@ Neural Rendering is installed **OFF by default**. DLSS quality defaults to **Qua
 - ReShade controls that work through the 32-bit GTA IV / 64-bit renderer bridge.
 - Safe in-game master OFF/ON toggle for DLSS, DLAA, NR and temporal jitter.
 
+## Uninstall
+
+To remove **DLSS Full only** and return to DLAA, run `Uninstall-DLSS-Full.bat` from the GTA IV folder.
+
+To remove **everything installed by this project** and return to the GTA IV + FusionFix state from before Step 2, right-click **`install/Uninstall-DLAA.bat` → Run as administrator**, enter the GTA IV folder, and confirm.
+
+`Uninstall-DLAA.bat` removes `.trex`, DLAA/DLSS/NR, the project ReShade Vulkan/input patch, helpers/logs/receipts and project rollback folders, then restores the exact pre-DLAA FusionFix configuration from the installer's backup. **FusionFix itself is not removed.**
+
 ## Troubleshooting
 
 Main log:
@@ -82,12 +90,6 @@ Useful docs:
 - [ReShade input patch](docs/RESHade-INPUT-PATCH.md)
 
 `DLSS-Full-Control.bat` is only for launch, startup repair, status and logs. Normal settings belong in ReShade.
-
-## Uninstall / rollback
-
-Run `Uninstall-DLSS-Full.bat` from the GTA IV folder to return to the preserved DLAA baseline.
-
-The installers create backups before replacing the working stack.
 
 ## Credits
 
