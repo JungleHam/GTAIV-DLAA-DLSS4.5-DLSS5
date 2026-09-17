@@ -35,15 +35,17 @@ jobs:
           git -C _dxvk submodule update --init --recursive
           test "$(git -C _dxvk rev-parse HEAD)" = "6b20f622a77b87b2921fe5d2c1774d2f2ba3e9b7"
 
-      - name: Apply frozen presenter patches plus startup sizing test
+      - name: Apply frozen presenter patches plus safe startup sizing test
         run: |
           git -C _dxvk apply "$GITHUB_WORKSPACE/_project/tools/m3k-nr/dxvk-v3.0.2-m3k-source-tap.patch"
           python3 _project/tools/m3k-nr/a2-s1b-dxvk.py _dxvk
           python3 install/Public-DXVK-Steam-Startup-Output-Fix.py _dxvk
           git -C _dxvk diff --check
           grep -q '\[M3K-S1B\] config' _dxvk/src/d3d9/d3d9_swapchain.cpp
-          grep -q '\[M3K-STEAM-PRESENTER\] startup output prime' _dxvk/src/d3d9/d3d9_swapchain.cpp
-          grep -q 'M3kPrimeOutputWindow(m_window, m_presentParams.Windowed)' _dxvk/src/d3d9/d3d9_swapchain.cpp
+          grep -q '\[M3K-STEAM-PRESENTER-V2\]' _dxvk/src/d3d9/d3d9_swapchain.cpp
+          grep -q 'M3kScheduleAutoResize(m_window, m_presentParams.Windowed)' _dxvk/src/d3d9/d3d9_swapchain.cpp
+          ! grep -q 'M3kPrimeOutputWindow' _dxvk/src/d3d9/d3d9_swapchain.cpp
+          ! grep -q '\[M3K-STEAM-PRESENTER\] startup output prime' _dxvk/src/d3d9/d3d9_swapchain.cpp
 
       - name: Configure and build x64 d3d9 presenter
         working-directory: _dxvk
@@ -60,13 +62,17 @@ jobs:
           test -n "$dll"
           cp "$dll" d3d9vk_x64.dll
           strings d3d9vk_x64.dll | grep -q '\[M3K-S1B\] config'
-          strings d3d9vk_x64.dll | grep -q '\[M3K-STEAM-PRESENTER\] startup output prime'
+          strings d3d9vk_x64.dll | grep -q '\[M3K-STEAM-PRESENTER-V2\]'
+          if strings d3d9vk_x64.dll | grep -q '\[M3K-STEAM-PRESENTER\] startup output prime'; then
+            echo 'Rejected synchronous v1 marker leaked into binary' >&2
+            exit 1
+          fi
           sha256sum d3d9vk_x64.dll | tee SHA256.txt
 
       - name: Upload presenter test artifact
         uses: actions/upload-artifact@v4
         with:
-          name: steam-overlay-presenter-startup-v1
+          name: steam-overlay-presenter-startup-v2
           path: |
             d3d9vk_x64.dll
             SHA256.txt
