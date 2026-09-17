@@ -121,7 +121,9 @@ begin
     wpWelcome,
     'Select GTA IV',
     'Choose the folder that contains GTAIV.exe',
-    'Select your GTA IV: Complete Edition folder. FusionFix must already be installed, then click Next.');
+    'Select your GTA IV: Complete Edition folder. FusionFix must already be installed, then click Next.',
+    False,
+    '');
   GamePage.Add('');
 
   ActionPage := CreateInputOptionPage(
@@ -141,6 +143,7 @@ end;
 function NextButtonClick(CurPageID: Integer): Boolean;
 var
   P: string;
+  ShellResult: Integer;
 begin
   Result := True;
 
@@ -162,7 +165,7 @@ begin
         'Open the FusionFix download page now?',
         mbError,
         MB_YESNO) = IDYES then
-        ShellExec('open', 'https://github.com/ThirteenAG/GTAIV.EFLC.FusionFix', '', '', SW_SHOWNORMAL, ewNoWait, P);
+        ShellExec('open', 'https://github.com/ThirteenAG/GTAIV.EFLC.FusionFix', '', '', SW_SHOWNORMAL, ewNoWait, ShellResult);
       Result := False;
       exit;
     end;
