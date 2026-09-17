@@ -43,7 +43,7 @@ jobs:
             'd3d9Hooked.dll',
             'DLSS_FULL_INSTALLED.txt',
             '_DLSS_FULL_DLAA_BASELINE',
-            'GTAIV.EFLC.FusionFix.cfg',
+            "*FusionFix*.cfg",
             'dinput8.dll',
             'Has-PatchMarker',
             'RunAs')) {
