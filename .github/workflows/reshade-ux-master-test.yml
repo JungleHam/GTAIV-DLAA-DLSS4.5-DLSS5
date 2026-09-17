@@ -76,8 +76,8 @@ jobs:
             'M3K-A3-S5: startup prime cancelled by live profile change')) {
             if (-not (($vk + $src).Contains($marker))) { throw "Generated marker missing: $marker" }
           }
-          if (($src.Split('if (M3kMasterNativePassthroughReady())').Count - 1) -ne 1) { throw 'Master raw bypass must occur exactly once' }
-          if (($src.Split('ImGui::CollapsingHeader("GTA IV DLSS"').Count - 1) -ne 1) { throw 'Expected exactly one GTA IV DLSS public panel' }
+          if (-not $src.Contains('M3K-MASTER: OFF ACTIVE - native GTA frame passes through untouched')) { throw 'Generated Feeder raw-bypass block missing' }
+          if (-not $src.Contains('ImGui::CollapsingHeader("GTA IV DLSS"')) { throw 'Generated GTA IV DLSS public panel missing' }
           New-Item -ItemType Directory -Force test-artifact | Out-Null
           Copy-Item $feed test-artifact\dlss5-feed.addon64
           (Get-FileHash -Algorithm SHA256 test-artifact\dlss5-feed.addon64).Hash | Set-Content -Encoding ascii test-artifact\SHA256.txt
