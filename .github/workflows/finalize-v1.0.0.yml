@@ -37,7 +37,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Prepare release-facing tree
+      - name: Prepare non-workflow release files
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -48,57 +48,21 @@ jobs:
           function WriteText([string]$Path,[string]$Text) {
             [IO.File]::WriteAllText((Join-Path (Get-Location) $Path),$Text,[Text.UTF8Encoding]::new($false))
           }
-          function ReplaceRequired([string]$Path,[string]$Old,[string]$New,[string]$Label) {
-            $text = ReadText $Path
-            if (-not $text.Contains($Old)) { throw "${Label}: expected text was not found in $Path" }
-            WriteText $Path ($text.Replace($Old,$New))
-          }
 
-          ReplaceRequired 'installer/GTAIV-DLSS-Setup.iss' '#define MyAppVersion "1.0-rc1"' '#define MyAppVersion "1.0.0"' 'installer version'
+          if (-not (Test-Path -LiteralPath 'docs/RELEASE-1.0.0.md')) { throw 'Release notes file is missing.' }
+          $iss = ReadText 'installer/GTAIV-DLSS-Setup.iss'
+          if (-not $iss.Contains('#define MyAppVersion "1.0.0"')) { throw 'Installer version is not v1.0.0.' }
 
-          $win = ReadText '.github/workflows/windows-installer.yml'
-          $win = $win.Replace("permissions:`r`n  contents: write","permissions:`r`n  contents: read")
-          $win = $win.Replace("permissions:`n  contents: write","permissions:`n  contents: read")
-          $marker = '      - name: Publish installer to runtime prerelease'
-          $pos = $win.IndexOf($marker,[StringComparison]::Ordinal)
-          if ($pos -lt 0) { throw 'windows-installer publish step marker not found' }
-          $win = $win.Substring(0,$pos).TrimEnd() + "`r`n"
-          WriteText '.github/workflows/windows-installer.yml' $win
-
-          $pre = ReadText '.github/workflows/prebuilt-runtime-release.yml'
-          $pre = [regex]::Replace($pre,'(?ms)^on:\r?\n  workflow_dispatch:\r?\n  push:.*?^permissions:',"on:`r`n  workflow_dispatch:`r`n`r`npermissions:")
-          $pre = $pre.Replace('contents: write','contents: read')
-          $publishMarker = "`n  publish:`n"
-          $p = $pre.IndexOf($publishMarker,[StringComparison]::Ordinal)
-          if ($p -lt 0) {
-            $publishMarker = "`r`n  publish:`r`n"
-            $p = $pre.IndexOf($publishMarker,[StringComparison]::Ordinal)
-          }
-          if ($p -lt 0) { throw 'prebuilt runtime publish job marker not found' }
-          $pre = $pre.Substring(0,$p).TrimEnd() + "`r`n"
-          $pre = $pre.Replace('name: Build prebuilt runtime release','name: Build prebuilt runtime artifacts')
-          WriteText '.github/workflows/prebuilt-runtime-release.yml' $pre
-
-          $tracked = @(git grep -Il -e 'runtime-prebuilt-v1' -e 'm3k-dxvk-v3.0.2-a2s1b' -- .)
+          # Retarget non-workflow release-facing files away from disposable test releases.
+          $tracked = @(git grep -Il -e 'runtime-prebuilt-v1' -e 'm3k-dxvk-v3.0.2-a2s1b' -- . ':(exclude).github/**' 2>$null)
           foreach ($file in $tracked) {
             $file = $file.Trim()
-            if (-not $file -or $file -eq '.github/workflows/finalize-v1.0.0.yml') { continue }
+            if (-not $file) { continue }
             $text = ReadText $file
             $text = $text.Replace('runtime-prebuilt-v1','v1.0.0')
             $text = $text.Replace('m3k-dxvk-v3.0.2-a2s1b','v1.0.0')
             WriteText $file $text
           }
-
-          $readme = ReadText 'README.md'
-          $guardAnchor = '**Full DLSS automatically installs the DLAA foundation first.** Installation order cannot be wrong.'
-          if (-not $readme.Contains('The setup also verifies that FusionFix has completed its first run')) {
-            $readme = $readme.Replace($guardAnchor,$guardAnchor + "`r`n`r`nThe setup also verifies that FusionFix has completed its first run before installation is allowed.")
-          }
-          if (-not $readme.Contains('## Known limitation')) {
-            $known = "## Known limitation`r`n`r`nSteam's built-in FPS counter currently disappears while a DLSS Super Resolution profile is active (Ultra Quality 77%, Quality, Balanced, Performance, or Ultra Performance). It remains visible in **DLAA Native** and with project processing **OFF**. This is an overlay-display limitation; DLSS/Neural Rendering processing continues to operate normally.`r`n`r`n"
-            $readme = $readme.Replace('## Troubleshooting', $known + '## Troubleshooting')
-          }
-          WriteText 'README.md' $readme
 
           $manifest = ReadText 'manifests/versions.json'
           $manifest = $manifest.Replace('"project_status": "release-candidate-prebuilt-install-2026-09-17"','"project_status": "v1.0.0-public-release-2026-09-17"')
@@ -107,23 +71,30 @@ jobs:
           if ($manifest.Contains($oldHw)) { $manifest = $manifest.Replace($oldHw,$newHw) }
           WriteText 'manifests/versions.json' $manifest
 
-          if (-not (Test-Path -LiteralPath 'docs/RELEASE-1.0.0.md')) { throw 'Release notes file is missing.' }
-          git diff --check
+          $full = ReadText 'install/Install-DLSS-Full.bat'
+          $dlaa = ReadText 'install/Install-DLAA.bat'
+          if (-not $full.Contains("`$RuntimeTag = 'v1.0.0'")) { throw 'Full installer was not retargeted to v1.0.0.' }
+          if (-not $dlaa.Contains("`$RuntimeTag = 'v1.0.0'")) { throw 'DLAA installer was not retargeted to v1.0.0.' }
 
-          $leftovers = @(git grep -n -e 'runtime-prebuilt-v1' -e 'm3k-dxvk-v3.0.2-a2s1b' -- . ':(exclude).github/workflows/finalize-v1.0.0.yml' 2>$null)
+          $manifestObj = (ReadText 'manifests/versions.json') | ConvertFrom-Json
+          if ($manifestObj.components.prebuilt_release.tag -ne 'v1.0.0') { throw 'Manifest prebuilt tag was not retargeted.' }
+          if ($manifestObj.components.'m3k-dxvk-presenter'.release_tag -ne 'v1.0.0') { throw 'Manifest presenter tag was not retargeted.' }
+
+          git diff --check
+          $leftovers = @(git grep -n -e 'runtime-prebuilt-v1' -e 'm3k-dxvk-v3.0.2-a2s1b' -- . ':(exclude).github/**' 2>$null)
           if ($leftovers.Count -gt 0) {
             $leftovers | ForEach-Object { Write-Host $_ -ForegroundColor Red }
-            throw 'Disposable release tag references remain in the release-facing tree.'
+            throw 'Disposable release references remain in non-workflow release files.'
           }
 
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
+          git add -A -- ':!.github/**'
           git diff --cached --quiet
           if ($LASTEXITCODE -ne 0) {
-            git commit -m 'Prepare v1.0.0 public release'
+            git commit -m 'Prepare v1.0.0 public release files'
             git push origin HEAD:main
-            if ($LASTEXITCODE -ne 0) { throw 'Could not push v1.0.0 release-prep commit.' }
+            if ($LASTEXITCODE -ne 0) { throw 'Could not push v1.0.0 release-file commit.' }
           }
           $releaseSha = (git rev-parse HEAD).Trim()
           "RELEASE_SHA=$releaseSha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
@@ -176,13 +147,6 @@ jobs:
           $hash = (Get-FileHash -Algorithm SHA256 '.\release\GTAIV-DLSS-Setup.exe').Hash.ToUpperInvariant()
           $hash | Set-Content '.\release\GTAIV-DLSS-Setup.sha256' -Encoding ASCII
           Write-Host "Final installer SHA256: $hash" -ForegroundColor Green
-
-          $full = [IO.File]::ReadAllText('.\install\Install-DLSS-Full.bat')
-          $dlaa = [IO.File]::ReadAllText('.\install\Install-DLAA.bat')
-          $iss = [IO.File]::ReadAllText('.\installer\GTAIV-DLSS-Setup.iss')
-          if (-not $full.Contains("`$RuntimeTag = 'v1.0.0'")) { throw 'Full installer is not pinned to v1.0.0.' }
-          if (-not $dlaa.Contains("`$RuntimeTag = 'v1.0.0'")) { throw 'DLAA installer is not pinned to v1.0.0.' }
-          if (-not $iss.Contains('#define MyAppVersion "1.0.0"')) { throw 'Setup version is not 1.0.0.' }
 
       - name: Publish v1.0.0
         shell: pwsh
