@@ -1,0 +1,67 @@
+name: Full project uninstall validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'install/Uninstall-DLAA.bat'
+      - 'README.md'
+      - 'install/README.md'
+      - '.github/workflows/uninstall-dlaa-validation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-uninstaller:
+    runs-on: windows-2022
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Parse and validate Uninstall-DLAA.bat
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $path = 'install/Uninstall-DLAA.bat'
+          $text = Get-Content $path -Raw
+          $marker = '#==POWERSHELL==#'
+          $i = $text.IndexOf($marker)
+          if ($i -lt 0) { throw 'Uninstall-DLAA.bat is missing its PowerShell marker' }
+          [void][ScriptBlock]::Create($text.Substring($i + $marker.Length))
+
+          foreach ($required in @(
+            'Resolve-GameFolder',
+            'Find-DlaaPreinstallBackup',
+            '_DLAA_PREINSTALL_BACKUP_',
+            'ReShade_Setup_6.8.0_Addon.exe',
+            "'--state','uninstall'",
+            'Restore-PreinstallState',
+            'Validate-RestoredState',
+            "Join-Path `$Game '.trex'",
+            'd3d9Hooked.dll',
+            'DLSS_FULL_INSTALLED.txt',
+            '_DLSS_FULL_DLAA_BASELINE',
+            'GTAIV.EFLC.FusionFix.cfg',
+            'dinput8.dll',
+            'Has-PatchMarker',
+            'RunAs')) {
+            if (-not $text.Contains($required)) { throw "Uninstaller missing safety/cleanup marker: $required" }
+          }
+
+          if ($text -match "Remove-Item[^\r\n]+dinput8\.dll") { throw 'Uninstaller must never remove FusionFix dinput8.dll' }
+          Write-Host 'Uninstall-DLAA syntax and cleanup contract validated.' -ForegroundColor Green
+
+      - name: Validate release documentation
+        shell: pwsh
+        run: |
+          $readme = Get-Content README.md -Raw
+          $installReadme = Get-Content install/README.md -Raw
+          foreach ($required in @('Uninstall-DLAA.bat','Run as administrator','FusionFix itself is not removed')) {
+            if (-not $readme.Contains($required)) { throw "README missing uninstall guidance: $required" }
+          }
+          foreach ($required in @('Uninstall-DLAA.bat as Administrator','entire project stack','FusionFix itself stays installed')) {
+            if (-not $installReadme.Contains($required)) { throw "install/README missing uninstall guidance: $required" }
+          }
+          Write-Host 'Release uninstall documentation validated.' -ForegroundColor Green
