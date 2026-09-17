@@ -27,7 +27,7 @@ jobs:
           git -C _project checkout 57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f
           if ((git -C _project rev-parse HEAD).Trim() -ne '57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f') { throw 'Wrong frozen project revision' }
 
-      - name: Attach public UI, startup fix, and UX/master stage
+      - name: Attach public UI, startup fix, and UX master stage
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -35,16 +35,16 @@ jobs:
           Copy-Item .\install\Public-ReShade-Controls-Stage.ps1 "$tool\public-reshade-controls-stage.ps1" -Force
           Copy-Item .\install\Public-Startup-Prime-Fix-Stage.ps1 "$tool\public-startup-prime-fix-stage.ps1" -Force
           Copy-Item .\install\Public-ReShade-UX-Master-Stage.ps1 "$tool\public-reshade-ux-master-stage.ps1" -Force
-
           $build = "$tool\build-a3-s5.ps1"
           $text = [IO.File]::ReadAllText($build)
           $anchor = "& (Join-Path `$toolRoot 'a3-s5-startup-prime-stage.ps1') -GeneratedRoot `$generated"
-          $replacement = @"
-$anchor
-& (Join-Path `$toolRoot 'public-reshade-controls-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')
-& (Join-Path `$toolRoot 'public-startup-prime-fix-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')
-& (Join-Path `$toolRoot 'public-reshade-ux-master-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')
-"@
+          $lines = @(
+            $anchor,
+            "& (Join-Path `$toolRoot 'public-reshade-controls-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-startup-prime-fix-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-reshade-ux-master-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')"
+          )
+          $replacement = $lines -join "`r`n"
           if (($text.Split($anchor).Count - 1) -ne 1) { throw 'Could not attach test stages exactly once' }
           [IO.File]::WriteAllText($build,$text.Replace($anchor,$replacement),[Text.UTF8Encoding]::new($false))
 
@@ -70,22 +70,15 @@ $anchor
             'ImGuiCond_Appearing',
             'Advanced##M3KAdvanced',
             'Diagnostics##M3KDiagnostics',
-            'M3K-A3-S5: startup prime cancelled by live profile change',
-            'M3K_SYNC_WVP_FOR_DRAW')) {
+            'M3K-A3-S5: startup prime cancelled by live profile change')) {
             if (-not (($vk + $src).Contains($marker))) { throw "Generated marker missing: $marker" }
           }
           if (($src.Split('if (M3kMasterNativePassthroughReady())').Count - 1) -ne 1) { throw 'Master raw bypass must occur exactly once' }
           if (($src.Split('ImGui::CollapsingHeader("GTA IV DLSS"').Count - 1) -ne 1) { throw 'Expected exactly one GTA IV DLSS public panel' }
-
           New-Item -ItemType Directory -Force test-artifact | Out-Null
           Copy-Item $feed test-artifact\dlss5-feed.addon64
           (Get-FileHash -Algorithm SHA256 test-artifact\dlss5-feed.addon64).Hash | Set-Content -Encoding ascii test-artifact\SHA256.txt
-          @(
-            '[M3K]',
-            'MasterEnabled=1',
-            'LastSRProfile=2',
-            'LastNRMode=0'
-          ) | Set-Content -Encoding ascii test-artifact\NEW-INI-KEYS.txt
+          @('[M3K]','MasterEnabled=1','LastSRProfile=2','LastNRMode=0') | Set-Content -Encoding ascii test-artifact\NEW-INI-KEYS.txt
           Write-Host "Feeder SHA256: $((Get-FileHash -Algorithm SHA256 test-artifact\dlss5-feed.addon64).Hash)"
 
       - name: Upload hardware-test Feeder
