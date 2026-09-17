@@ -6,23 +6,30 @@ A streamlined DLAA / DLSS stack for **GTA IV: Complete Edition**. Tested on **RT
 
 ### 1. Install FusionFix
 
-Install [GTA IV FusionFix](https://github.com/ThirteenAG/GTAIV.EFLC.FusionFix) first, launch the game once, then close it.
+Install [GTA IV FusionFix](https://github.com/ThirteenAG/GTAIV.EFLC.FusionFix), launch GTA IV once, then close it.
 
 ### 2. Install DLAA + ReShade patch
 
-From any folder, right-click **`install/Install-DLAA.bat` → Run as administrator**.
+Right-click **`install/Install-DLAA.bat` → Run as administrator**.
 
-Enter the folder that contains `GTAIV.exe`, confirm, and let it finish. This installs the DLAA baseline **and** the ReShade input patch in one step.
+Enter the folder containing `GTAIV.exe` and confirm. The installer automatically installs:
 
-The ReShade input patch is **system-wide**, so a clean GTA IV copy may still report that it is already present from an earlier install. The installer re-checks it after ReShade setup before deciding whether to rebuild it.
+- DLAA baseline
+- official ReShade 6.8.0 Add-On Support
+- the verified prebuilt ReShade input patch
 
 Launch GTA IV once and press **Home**. ReShade should open and accept mouse/keyboard input.
 
 ### 3. Install DLSS Full + Neural Rendering
 
-From any folder, right-click **`install/Install-DLSS-Full.bat` → Run as administrator**.
+Right-click **`install/Install-DLSS-Full.bat` → Run as administrator**.
 
-Enter the same GTA IV folder and confirm. The installer detects RTX 40/50 and chooses the matching Neural Rendering runtime automatically.
+Enter the same GTA IV folder and confirm. The installer downloads the verified prebuilt runtime and selects the correct Neural Rendering file:
+
+| GPU | Neural Rendering runtime |
+|---|---|
+| **RTX 50 Series** | Original NVIDIA-signed DLSS NR 310.8.0 |
+| **RTX 40 Series** | Project-tested RTX 40 compatibility DLSS NR 310.8.0 |
 
 After install, open:
 
@@ -30,68 +37,54 @@ After install, open:
 Home -> Add-ons -> DLSS 5 Feed -> GTA IV DLSS
 ```
 
-That menu controls DLAA/DLSS mode, Neural Rendering, NR passes, diagnostics, and the full DLSS/DLAA processing toggle.
-
-> **Important:** keep GTA IV's own resolution set to your display's native resolution. DLSS modes change the internal render resolution separately.
+> **Keep GTA IV's own resolution set to your display's native resolution.** DLSS changes the internal render resolution separately.
 
 ## Prerequisites
 
-Install these before running Step 2 or Step 3:
-
-| Requirement | Install / recommendation |
+| Requirement | Recommendation |
 |---|---|
-| **Git for Windows** | [Download](https://git-scm.com/download/win) — default options are fine. |
-| **Python 3** | [Download](https://www.python.org/downloads/windows/) — enable **Add python.exe to PATH** during setup. |
-| **Visual Studio 2022 Build Tools** | [Download](https://aka.ms/vs/17/release/vs_BuildTools.exe) — select **Desktop development with C++**, including x86/x64 MSVC tools and a Windows SDK. |
-| **NVIDIA driver** | [Download](https://www.nvidia.com/en-us/drivers/) — use a current driver. Neural Rendering needs the newer DLSS 5-capable driver branch. |
+| **GTA IV: Complete Edition** | Clean game install before FusionFix. |
+| **FusionFix** | [Install from the official repo](https://github.com/ThirteenAG/GTAIV.EFLC.FusionFix). |
+| **NVIDIA driver** | [Install a current driver](https://www.nvidia.com/en-us/drivers/). Neural Rendering requires a DLSS 5-capable driver. |
 
-The installers check these and stop before changing the game if something required is missing.
+**Git, Python, Visual Studio Build Tools and manual ReShade installation are not required.** The release installers use hash-verified prebuilt binaries.
 
-## Neural Rendering runtime
+## In-game controls
 
-The final installer has two verified paths:
+`Home -> Add-ons -> DLSS 5 Feed -> GTA IV DLSS`
 
-| GPU | Runtime |
-|---|---|
-| **RTX 50** | Original **NVIDIA-signed DLSS NR 310.8.0** runtime. |
-| **RTX 40** | **RTX 40 compatibility 310.8.0** runtime used and tested by this project. |
+- DLAA Native
+- Custom Ultra Quality 77%
+- Quality
+- Balanced
+- Performance
+- Ultra Performance
+- Neural Rendering ON/OFF
+- NR passes
+- master DLSS/DLAA/NR processing toggle
+- diagnostics
 
-RTX 40/50 selection is automatic when Windows reports the GPU normally. Other GPU generations are not part of the release-supported NR path yet.
-
-Neural Rendering is installed **OFF by default**. DLSS quality defaults to **Quality** and NR passes default to **1**.
-
-## What the project adds
-
-- DLAA at native resolution.
-- DLSS 4.5 Super Resolution: Custom Ultra Quality 77%, Quality, Balanced, Performance, Ultra Performance.
-- DLSS 5 Neural Rendering with an in-game toggle.
-- Automatic 1485×835 startup stabilization for stable temporal reconstruction.
-- ReShade controls that work through the 32-bit GTA IV / 64-bit renderer bridge.
-- Safe in-game master OFF/ON toggle for DLSS, DLAA, NR and temporal jitter.
+Defaults: **Quality**, Neural Rendering **OFF**, **1** NR pass.
 
 ## Uninstall
 
 To remove **DLSS Full only** and return to DLAA, run `Uninstall-DLSS-Full.bat` from the GTA IV folder.
 
-To remove **everything installed by this project** and return to the GTA IV + FusionFix state from before Step 2, right-click **`install/Uninstall-DLAA.bat` → Run as administrator**, enter the GTA IV folder, and confirm.
+To remove **everything installed by this project** and return to the exact GTA IV + FusionFix state from before Step 2, right-click **`install/Uninstall-DLAA.bat` → Run as administrator**, enter the GTA IV folder, and confirm.
 
-`Uninstall-DLAA.bat` removes `.trex`, DLAA/DLSS/NR, the project ReShade Vulkan/input patch, helpers/logs/receipts and project rollback folders, then restores the exact pre-DLAA FusionFix configuration from the installer's backup. **FusionFix itself is not removed.**
+FusionFix itself is not removed.
 
 ## Troubleshooting
 
-Main log:
+Main runtime log:
 
 ```text
 GTAIV\.trex\dlss5-feed.log
 ```
 
-Useful docs:
+`DLSS-Full-Control.bat` is for launch, repair, status and logs. Normal settings belong in ReShade.
 
-- [DLSS Full details](docs/DLSS-FULL.md)
-- [Verification / logs](docs/VERIFY.md)
-- [ReShade input patch](docs/RESHade-INPUT-PATCH.md)
-
-`DLSS-Full-Control.bat` is only for launch, startup repair, status and logs. Normal settings belong in ReShade.
+Useful docs: [DLSS Full](docs/DLSS-FULL.md) · [Verification](docs/VERIFY.md) · [ReShade input patch](docs/RESHade-INPUT-PATCH.md)
 
 ## Credits
 
