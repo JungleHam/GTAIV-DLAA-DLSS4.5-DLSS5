@@ -10,7 +10,11 @@ $ProgressPreference = 'SilentlyContinue'
 $Self = $env:GTAIV_SETUP_SELF
 $Repo = 'JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5'
 $ReleaseCoreCommit = '7968ba5dc0c9dcbb70c1ff98b37441a9687fc9ff'
-$PatchCommit = 'b437e7646b262dc60863293348fd33369330a429'
+$RuntimeTag = 'runtime-prebuilt-v1'
+$PatchedReShadeUrl = "https://github.com/$Repo/releases/download/$RuntimeTag/ReShade64-bbridge.dll"
+$PatchedReShadeHash = '75976007A0A5DE5BAB364F98E2D01B377D046441C94E89B1DD279CEE856161A9'
+$GlobalReShade = 'C:\ProgramData\ReShade\ReShade64.dll'
+$GlobalReShadeBackup = 'C:\ProgramData\ReShade\ReShade64.dll.pre-bbridge-input'
 $Temp = Join-Path $env:TEMP ("GTAIV_DLAA_RELEASE_" + $PID)
 $CoreTemp = $null
 
@@ -21,9 +25,15 @@ function Is-Admin {
 }
 function Fail([string]$m) { throw $m }
 function Download([string]$u,[string]$p) {
+    Write-Host "Downloading: $u" -ForegroundColor DarkGray
     $curl = Get-Command curl.exe -ErrorAction SilentlyContinue
     if ($curl) { & curl.exe -L --fail --retry 3 --connect-timeout 20 --silent --show-error -o $p $u; if ($LASTEXITCODE -ne 0) { Fail "Download failed: $u" } }
     else { Invoke-WebRequest -UseBasicParsing -Uri $u -OutFile $p }
+    if (-not (Test-Path -LiteralPath $p)) { Fail "Downloaded file is missing: $p" }
+}
+function Assert-SHA256([string]$p,[string]$expected) {
+    $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $p).Hash.ToUpperInvariant()
+    if ($actual -ne $expected.ToUpperInvariant()) { Fail "SHA256 mismatch for $p`nExpected: $expected`nActual:   $actual" }
 }
 function Resolve-GameFolder {
     Write-Host ''
@@ -36,25 +46,36 @@ function Resolve-GameFolder {
     if (Test-Path -LiteralPath (Join-Path $nested 'GTAIV.exe')) { return (Resolve-Path -LiteralPath $nested).Path }
     Fail 'GTAIV.exe was not found in that folder.'
 }
-function Check-BuildTools {
-    $missing = @()
-    if (-not (Get-Command git.exe -ErrorAction SilentlyContinue)) { $missing += 'Git for Windows: https://git-scm.com/download/win' }
-    if (-not (Get-Command python.exe -ErrorAction SilentlyContinue)) { $missing += 'Python 3 (enable Add python.exe to PATH): https://www.python.org/downloads/windows/' }
-    $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
-    $vsOk = $false
-    if (Test-Path -LiteralPath $vswhere) {
-        $root = (& $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath 2>$null | Select-Object -First 1)
-        $vsOk = -not [string]::IsNullOrWhiteSpace($root)
-    }
-    if (-not $vsOk) { $missing += 'Visual Studio 2022 Build Tools -> Desktop development with C++: https://aka.ms/vs/17/release/vs_BuildTools.exe' }
-    if ($missing.Count) { Fail ("Missing prerequisite(s):`n  - " + ($missing -join "`n  - ")) }
-}
 function Has-PatchMarker([string]$path) {
     if (-not (Test-Path -LiteralPath $path)) { return $false }
     try {
         $ascii = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($path))
         return $ascii.Contains('b-bridge input relay')
     } catch { return $false }
+}
+function Set-KeyEquals([string]$Path,[string]$Key,[string]$Value) {
+    $text = if (Test-Path -LiteralPath $Path) { [IO.File]::ReadAllText($Path) } else { '' }
+    $pat = '(?m)^\s*' + [regex]::Escape($Key) + '\s*=\s*.*$'
+    $line = "$Key = $Value"
+    if ($text -match $pat) { $text = [regex]::Replace($text,$pat,$line) }
+    else {
+        if ($text.Length -gt 0 -and -not $text.EndsWith("`n")) { $text += "`r`n" }
+        $text += $line + "`r`n"
+    }
+    [IO.File]::WriteAllText($Path,$text,[Text.UTF8Encoding]::new($false))
+}
+function Ensure-ReShade([string]$Game,[string]$Trex) {
+    if ((Test-Path -LiteralPath $GlobalReShade) -and (Test-Path -LiteralPath (Join-Path $Trex 'ReShade.ini'))) { return }
+    Write-Host '[2/2] ReShade Vulkan layer is missing; reinstalling official ReShade 6.8.0 Add-On Support...' -ForegroundColor Cyan
+    $setup = Join-Path $Temp 'ReShade_Setup_6.8.0_Addon.exe'
+    try { Download 'https://reshade.me/downloads/ReShade_Setup_6.8.0_Addon.exe' $setup }
+    catch { Download 'https://www.reshade.me/releases/ReShade-6.8.0-Addon-setup.exe' $setup }
+    if ((Get-Item -LiteralPath $setup).Length -lt 1MB) { Fail 'ReShade setup download is unexpectedly small.' }
+    $target = Join-Path $Trex 'NvRemixBridge.exe'
+    if (-not (Test-Path -LiteralPath $target)) { Fail 'NvRemixBridge.exe is missing; reinstall the DLAA baseline first.' }
+    $p = Start-Process -FilePath $setup -ArgumentList @("`"$target`"",'--api','vulkan','--headless') -Wait -PassThru
+    if ($p.ExitCode -ne 0) { Fail "Official ReShade setup failed with exit code $($p.ExitCode)." }
+    if (-not (Test-Path -LiteralPath $GlobalReShade)) { Fail 'Official ReShade Vulkan DLL was not installed.' }
 }
 
 if (-not (Is-Admin)) {
@@ -74,17 +95,17 @@ try {
     if (Get-Process GTAIV -ErrorAction SilentlyContinue) { Fail 'Close GTA IV first.' }
     if (Get-Process NvRemixBridge -ErrorAction SilentlyContinue) { Fail 'Close NvRemixBridge.exe first.' }
     if (Test-Path -LiteralPath (Join-Path $Trex 'm3k-nr.ini')) { Fail 'DLSS Full is already installed. Do not run the DLAA baseline installer over it.' }
-    Check-BuildTools
 
     $dlaaReady = (Test-Path -LiteralPath (Join-Path $Trex 'NvRemixBridge.exe')) -and
                  (Test-Path -LiteralPath (Join-Path $Trex 'dlss5-feed.addon64')) -and
                  (Test-Path -LiteralPath (Join-Path $Game 'DLAA_INSTALL_MANIFEST.txt'))
-    $reshadePatchedBefore = Has-PatchMarker 'C:\ProgramData\ReShade\ReShade64.dll'
+    $reshadePatchedBefore = Has-PatchMarker $GlobalReShade
 
     Write-Host ''
     Write-Host "Game: $Game"
     Write-Host ("DLAA baseline: " + $(if ($dlaaReady) { 'already installed - will keep it' } else { 'will install' }))
-    Write-Host ("System-wide ReShade input patch: " + $(if ($reshadePatchedBefore) { 'currently detected - will verify again after DLAA/ReShade install' } else { 'not detected - will verify/build after DLAA/ReShade install' }))
+    Write-Host ("System-wide ReShade input patch: " + $(if ($reshadePatchedBefore) { 'already installed' } else { 'will install from verified prebuilt release' }))
+    Write-Host 'No Git, Python or Visual Studio build tools are required.' -ForegroundColor Green
     $ok = Read-Host 'Continue? [Y/n]'
     if ($ok -and $ok -notmatch '^(y|yes)$') { exit 0 }
 
@@ -92,7 +113,7 @@ try {
 
     if (-not $dlaaReady) {
         Write-Host ''
-        Write-Host '[1/2] Installing DLAA baseline...' -ForegroundColor Cyan
+        Write-Host '[1/2] Installing DLAA baseline + official ReShade...' -ForegroundColor Cyan
         $localCore = Join-Path (Split-Path -Parent $Self) 'core\Install-DLAA-Core.bat'
         $CoreTemp = Join-Path $Game '_GTAIV_DLSS_Install-DLAA-Core.bat'
         if (Test-Path -LiteralPath $localCore) { Copy-Item -LiteralPath $localCore -Destination $CoreTemp -Force }
@@ -109,52 +130,31 @@ try {
         Write-Host '[1/2] Existing DLAA baseline detected; skipping reinstall.' -ForegroundColor Green
     }
 
-    # Re-check after the DLAA core because ReShade setup can refresh the global Vulkan-layer DLL.
-    $reshadePatched = Has-PatchMarker 'C:\ProgramData\ReShade\ReShade64.dll'
-    Write-Host ("[2/2] System-wide ReShade input patch after DLAA/ReShade install: " + $(if ($reshadePatched) { 'detected' } else { 'not detected - installing now' }))
-
+    Ensure-ReShade $Game $Trex
+    $reshadePatched = Has-PatchMarker $GlobalReShade
     if (-not $reshadePatched) {
         Write-Host ''
-        Write-Host '[2/2] Building and installing the ReShade input patch...' -ForegroundColor Cyan
-        Write-Host '      ReShade is compiled from source here; this can take several minutes.' -ForegroundColor DarkGray
-        Write-Host '      Build progress will be shown below.' -ForegroundColor DarkGray
-        $patchDir = Join-Path $Temp 'reshade-input'
-        New-Item -ItemType Directory -Path $patchDir -Force | Out-Null
-        $base = "https://raw.githubusercontent.com/$Repo/$PatchCommit/tools/reshade-bbridge-input"
-        foreach ($name in @('BUILD.bat','INSTALL.bat','apply_patch.ps1')) { Download "$base/$name" (Join-Path $patchDir $name) }
-        foreach ($name in @('BUILD.bat','INSTALL.bat')) {
-            $path = Join-Path $patchDir $name
-            $txt = [IO.File]::ReadAllText($path)
-            $txt = [regex]::Replace($txt,'(?m)^\s*pause\s*$','rem pause')
-            [IO.File]::WriteAllText($path,$txt,[Text.UTF8Encoding]::new($false))
-        }
+        Write-Host '[2/2] Installing verified prebuilt ReShade input patch...' -ForegroundColor Cyan
+        $patched = Join-Path $Temp 'ReShade64-bbridge.dll'
+        Download $PatchedReShadeUrl $patched
+        Assert-SHA256 $patched $PatchedReShadeHash
+        if (-not (Has-PatchMarker $patched)) { Fail 'Downloaded ReShade64-bbridge.dll is missing the expected patch marker.' }
 
-        $buildBat = Join-Path $patchDir 'BUILD.bat'
-        Push-Location $patchDir
-        try {
-            & $buildBat
-            $buildExit = $LASTEXITCODE
-        } finally {
-            Pop-Location
+        if (-not (Test-Path -LiteralPath $GlobalReShadeBackup)) {
+            Copy-Item -LiteralPath $GlobalReShade -Destination $GlobalReShadeBackup -Force
         }
-        if ($buildExit -ne 0) { Fail "ReShade input patch build failed with exit code $buildExit. Re-run this same installer after fixing the shown prerequisite/build error; it will keep the completed DLAA baseline." }
+        Copy-Item -LiteralPath $patched -Destination $GlobalReShade -Force
+        Assert-SHA256 $GlobalReShade $PatchedReShadeHash
 
-        Write-Host ''
-        Write-Host '[2/2] Build complete. Installing the patched ReShade DLL...' -ForegroundColor Cyan
-        $installBat = Join-Path $patchDir 'INSTALL.bat'
-        Push-Location $patchDir
-        try {
-            & $installBat $Game
-            $installExit = $LASTEXITCODE
-        } finally {
-            Pop-Location
-        }
-        if ($installExit -ne 0) { Fail "ReShade input patch install failed with exit code $installExit. Re-run this same installer; it will keep the completed DLAA baseline." }
+        $bridgeConf = Join-Path $Trex 'bridge.conf'
+        if (-not (Test-Path -LiteralPath $bridgeConf)) { Fail 'bridge.conf is missing.' }
+        Set-KeyEquals $bridgeConf 'client.DirectInput.forward.mousePolicy' '3'
+        Set-KeyEquals $bridgeConf 'client.DirectInput.forward.keyboardPolicy' '3'
     } else {
-        Write-Host '[2/2] System-wide ReShade input patch is already active; skipping rebuild.' -ForegroundColor Green
+        Write-Host '[2/2] System-wide ReShade input patch already active; nothing to rebuild.' -ForegroundColor Green
     }
 
-    if (-not (Has-PatchMarker 'C:\ProgramData\ReShade\ReShade64.dll')) { Fail 'Final ReShade input-patch verification failed.' }
+    if (-not (Has-PatchMarker $GlobalReShade)) { Fail 'Final ReShade input-patch verification failed.' }
     Write-Host ''
     Write-Host 'DONE - DLAA + ReShade input patch installed.' -ForegroundColor Green
     Write-Host 'Launch GTA IV once. Press Home and confirm ReShade opens and accepts mouse/keyboard input.' -ForegroundColor White
