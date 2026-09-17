@@ -116,6 +116,8 @@ try {
     if (-not $reshadePatched) {
         Write-Host ''
         Write-Host '[2/2] Building and installing the ReShade input patch...' -ForegroundColor Cyan
+        Write-Host '      ReShade is compiled from source here; this can take several minutes.' -ForegroundColor DarkGray
+        Write-Host '      Build progress will be shown below.' -ForegroundColor DarkGray
         $patchDir = Join-Path $Temp 'reshade-input'
         New-Item -ItemType Directory -Path $patchDir -Force | Out-Null
         $base = "https://raw.githubusercontent.com/$Repo/$PatchCommit/tools/reshade-bbridge-input"
@@ -126,10 +128,28 @@ try {
             $txt = [regex]::Replace($txt,'(?m)^\s*pause\s*$','rem pause')
             [IO.File]::WriteAllText($path,$txt,[Text.UTF8Encoding]::new($false))
         }
-        $p = Start-Process -FilePath (Join-Path $patchDir 'BUILD.bat') -WorkingDirectory $patchDir -Wait -PassThru
-        if ($p.ExitCode -ne 0) { Fail 'ReShade input patch build failed. Re-run this same installer after fixing the shown prerequisite/build error; it will keep the completed DLAA baseline.' }
-        $p = Start-Process -FilePath (Join-Path $patchDir 'INSTALL.bat') -ArgumentList ('"' + $Game + '"') -WorkingDirectory $patchDir -Wait -PassThru
-        if ($p.ExitCode -ne 0) { Fail 'ReShade input patch install failed. Re-run this same installer; it will keep the completed DLAA baseline.' }
+
+        $buildBat = Join-Path $patchDir 'BUILD.bat'
+        Push-Location $patchDir
+        try {
+            & $buildBat
+            $buildExit = $LASTEXITCODE
+        } finally {
+            Pop-Location
+        }
+        if ($buildExit -ne 0) { Fail "ReShade input patch build failed with exit code $buildExit. Re-run this same installer after fixing the shown prerequisite/build error; it will keep the completed DLAA baseline." }
+
+        Write-Host ''
+        Write-Host '[2/2] Build complete. Installing the patched ReShade DLL...' -ForegroundColor Cyan
+        $installBat = Join-Path $patchDir 'INSTALL.bat'
+        Push-Location $patchDir
+        try {
+            & $installBat $Game
+            $installExit = $LASTEXITCODE
+        } finally {
+            Pop-Location
+        }
+        if ($installExit -ne 0) { Fail "ReShade input patch install failed with exit code $installExit. Re-run this same installer; it will keep the completed DLAA baseline." }
     } else {
         Write-Host '[2/2] System-wide ReShade input patch is already active; skipping rebuild.' -ForegroundColor Green
     }
