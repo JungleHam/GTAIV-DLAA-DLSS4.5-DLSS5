@@ -1,5 +1,5 @@
 {
-  "project_status": "release-candidate-prebuilt-install-2026-09-17",
+  "project_status": "v1.0.0-public-release-2026-09-17",
   "components": {
     "fusionfix": {
       "version": "5.0.1",
@@ -8,18 +8,18 @@
       "installed_by_project": false
     },
     "prebuilt_release": {
-      "tag": "runtime-prebuilt-v1",
-      "release_url": "https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/tag/runtime-prebuilt-v1",
+      "tag": "v1.0.0",
+      "release_url": "https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/tag/v1.0.0",
       "reshade_input_patch": {
         "asset": "ReShade64-bbridge.dll",
-        "url": "https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/runtime-prebuilt-v1/ReShade64-bbridge.dll",
+        "url": "https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/v1.0.0/ReShade64-bbridge.dll",
         "sha256": "75976007a0a5de5bab364f98e2d01b377d046441c94e89b1dd279cee856161a9",
         "source": "ReShade 6.8.0 + tools/reshade-bbridge-input/apply_patch.ps1",
         "build": "GitHub Actions"
       },
       "dlss_full_runtime": {
         "asset": "GTAIV-DLSS-Full-Runtime.zip",
-        "url": "https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/runtime-prebuilt-v1/GTAIV-DLSS-Full-Runtime.zip",
+        "url": "https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/v1.0.0/GTAIV-DLSS-Full-Runtime.zip",
         "sha256": "1e14f1508a1ac1fac8eab2dd0e3d8969c99275363b43c47406d0a86d5be36987",
         "files": {
           "d3d9.dll": "eca7c9cf9cd1c4835cea7fd57ad168a35e157f081c0eadba51af35f501026f28",
@@ -74,7 +74,7 @@
         "Performance",
         "Ultra Performance"
       ],
-      "hardware_validation": "RTX 4070 Ti SUPER at 2560x1440. Live DLAA/DLSS mode switching, Neural Rendering, staged master OFF/ON, 1485x835 startup stabilization, and native-resolution Steam overlay startup were hardware-tested.",
+      "hardware_validation": "RTX 4070 Ti SUPER at 2560x1440. Live DLAA/DLSS mode switching, Neural Rendering, staged master OFF/ON, and 1485x835 startup stabilization were hardware-tested. Steam FPS overlay is visible in DLAA Native / processing OFF and is a known display limitation in Super Resolution profiles.",
       "release_installers": {
         "dlaa_and_reshade": "install/Install-DLAA.bat",
         "dlss_full": "install/Install-DLSS-Full.bat",
@@ -139,8 +139,8 @@
       "upstream_version": "3.0.2",
       "upstream_commit": "6b20f622a77b87b2921fe5d2c1774d2f2ba3e9b7",
       "project_patch_checkpoint": "57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f",
-      "release_tag": "m3k-dxvk-v3.0.2-a2s1b",
-      "url": "https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/m3k-dxvk-v3.0.2-a2s1b/d3d9vk_x64.dll",
+      "release_tag": "v1.0.0",
+      "url": "https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/v1.0.0/d3d9vk_x64.dll",
       "dll_sha256": "511e0c2509e1922db2ec38940507ba956908fe6dc5fd9b3db9fec489dc05f297",
       "installed_path": ".trex/d3d9vk_x64.dll",
       "installed_automatically": true
