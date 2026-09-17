@@ -1,115 +1,21 @@
 # Installers
 
-For most users, follow these four steps in order:
+Normal release flow:
 
-| Step | What to install | What it gives you |
+| Step | Run | Result |
 |---|---|---|
-| **1** | **FusionFix 5.0.1** | Clean modern GTA IV renderer baseline. |
-| **2** | **`Install-DLAA.bat`** | DLAA plus the bridge/ReShade/motion-data foundation required by the rest of the project. |
-| **3** | **ReShade controls fix** | Makes the Home overlay, mouse and keyboard work through the separate renderer process. |
-| **4** | **`Install-DLSS-Full.bat`** | DLSS 4.5 Super Resolution, the M3K render/output presenter, automatic startup stabilization, and DLSS 5 Neural Rendering installed OFF by default. |
+| 1 | [FusionFix](https://github.com/ThirteenAG/GTAIV.EFLC.FusionFix) | Required GTA IV baseline. |
+| 2 | **`Install-DLAA.bat` as Administrator** | DLAA + ReShade + cross-process input patch. |
+| 3 | **`Install-DLSS-Full.bat` as Administrator** | DLSS Super Resolution + DLSS 5 Neural Rendering + in-game controls. |
 
-The root [`README.md`](../README.md) is the main step-by-step guide.
+Both BAT installers ask for the folder containing `GTAIV.exe`, show what will be installed, and wait for one confirmation.
 
-## Step 2 — DLAA
+The `install/core/` scripts are implementation files used by the release-facing installers. Normal users should not run them directly.
 
-`Install-DLAA.bat` creates the known-good DLAA baseline from a clean FusionFix installation.
-
-It installs `nvngx_dlss.dll` 310.9.1 and the required bridge/ReShade/Feeder foundation.
-
-**Finished when:** GTA IV launches normally and `.trex\dlss5-feed.log` reports DLAA frames being delivered.
-
-## Step 3 — ReShade controls fix
-
-Open:
+After Step 3, settings are in:
 
 ```text
-../tools/reshade-bbridge-input/
+Home -> Add-ons -> DLSS 5 Feed -> GTA IV DLSS
 ```
 
-Build the patch, then **right-click `INSTALL.bat` → Run as administrator**.
-
-**Finished when:** pressing Home opens ReShade and mouse/keyboard input works inside it.
-
-Do not continue to Step 4 until that works.
-
-## Step 4 — DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering
-
-`Install-DLSS-Full.bat` adds:
-
-- five DLSS Super Resolution quality modes;
-- the pinned M3K DXVK 3.0.2 presenter that separates internal render resolution from physical output and automatically sizes the presenter to the monitor;
-- temporal synchronization needed for stable reconstruction;
-- automatic `1485×835` startup stabilization;
-- automatic return to the saved DLSS quality mode;
-- the tested `nvngx_dlssnr.dll` 310.8.0-RTX40 Neural Rendering runtime;
-- a **GTA IV DLSS** panel inside ReShade for normal settings;
-- `DLSS-Full-Control.bat` for launch/repair/diagnostics only.
-
-Defaults after install:
-
-```text
-DLSS quality:       Quality
-Neural Rendering:  OFF
-NR passes:          1
-```
-
-### Normal settings
-
-Open ReShade with **Home**, then go to:
-
-```text
-Add-ons -> DLSS 5 Feed -> GTA IV DLSS
-```
-
-Use that panel for:
-
-- **DLSS / DLAA mode** — DLAA Native, Custom Ultra Quality (77%), Quality, Balanced, Performance, Ultra Performance;
-- **live resolution diagnostics** — true GTA render target and current DXVK source;
-- **Neural Rendering OFF / ON**;
-- **Neural Rendering passes (advanced)** — 1 is the tested public default.
-
-These settings are saved automatically. There is no need to close the game or use a BAT file to change them.
-
-### Tools helper
-
-`DLSS-Full-Control.bat` is intentionally not a second settings menu. It provides:
-
-```text
-L  Launch with startup stabilization pre-armed
-R  Repair / re-arm startup stabilization
-S  Show current DLSS / Neural Rendering status
-D  Open the DLSS diagnostic log
-```
-
-The repair action preserves your saved quality, Neural Rendering state and pass count.
-
-### About names seen in logs/source
-
-The installer source and logs still contain internal engineering labels such as `A3-S2`, `A3-S5` and `M3K`. They are not extra steps:
-
-- `A3-S2` = temporal synchronization fix;
-- `A3-S5` = automatic startup stabilization;
-- `M3K` = internal project integration namespace.
-
-Normal users do not need to configure those directly.
-
-## Temporary downloads
-
-`Install-DLAA.bat` and `Install-DLSS-Full.bat` show the temporary destination of every network download while they run. Downloaded archives, source checkouts, build environments and other installer-only files are kept under the installer's temporary work folder and are deleted automatically after use, including when installation fails.
-
-Files that are part of the finished installation are copied from the temporary work folder into their final GTA IV locations before cleanup. The DLSS Full installer also disables the pip download cache for its temporary Python build tools.
-
-## Removing DLSS Full
-
-Run `Uninstall-DLSS-Full.bat` beside `GTAIV.exe` with the game and bridge closed. It restores the preserved DLAA-only bridge/DXVK/Feeder baseline while leaving FusionFix, ReShade, the ReShade cross-process input patch, LumeniteFX and `nvngx_dlss.dll` in place.
-
-The uninstaller prefers `_DLSS_FULL_DLAA_BASELINE`. For older installations it safely falls back to the oldest `_DLSS_FULL_PREINSTALL_BACKUP_*` snapshot that validates as DLAA-only. It creates `_DLSS_FULL_UNINSTALL_SAFETY_*` before changing anything.
-
-After removal, launch once and verify DLAA before running `Install-DLSS-Full.bat` again.
-
-## Backup
-
-`Backup-Working-Stack.bat` snapshots the current integration, including the bridge, ReShade configuration, DLSS configuration and Neural Rendering runtime.
-
-The installation scripts also create timestamped rollback backups before replacing runtime files.
+See the root [README](../README.md) for prerequisites and the short install guide.

@@ -1,30 +1,27 @@
 {
-  "project_status": "tested-core-with-hardware-validated-reshade-master-bypass-v2-2026-09-17",
+  "project_status": "release-candidate-streamlined-install-2026-09-17",
   "components": {
     "fusionfix": {
       "version": "5.0.1",
-      "url": "https://github.com/ThirteenAG/GTAIV.EFLC.FusionFix/releases/download/v5.0.1/GTAIV.EFLC.FusionFix.zip",
-      "sha256": "3c202398c133392be985854654f169514e055812cc302ef24e6aa97495975b41",
-      "installed_by_project": false,
-      "notes": "Install first; the DLAA installer expects a clean FusionFix baseline."
+      "url": "https://github.com/ThirteenAG/GTAIV.EFLC.FusionFix",
+      "installed_by_project": false
     },
     "b-bridge": {
       "version": "0.1.0",
-      "url": "https://github.com/gutbash/b-bridge/releases/download/v0.1.0/b-bridge-0.1.0.zip",
-      "sha256": "d5691ad68cca6e731bbe12b34b14b6a8288e2e7e319e8ef0e13e0f3a59c31c55"
+      "source_commit": "1dad5e6d4dcf8647e354aa9a87f611256fb61142",
+      "package_sha256": "d5691ad68cca6e731bbe12b34b14b6a8288e2e7e319e8ef0e13e0f3a59c31c55"
     },
     "dlss-full": {
       "product_name": "DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering",
       "project_checkpoint": "57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f",
       "bbridge_source_commit": "1dad5e6d4dcf8647e354aa9a87f611256fb61142",
-      "temporal_synchronization_internal_name": "A3-S2",
-      "startup_stabilization_internal_name": "A3-S5",
       "a3s2_reference_d3d9_sha256": "6dd40f145a5d503624e3e05ecf0adbaa094cf83b24278c0bb333318e3c52a912",
       "a3s5_reference_feeder_sha256": "c73d8d54271f55f8931f00d62a4cdf605118bea71d7c6bee0b61d0ca7c1cce4b",
-      "a3s5_reference_feeder_scope": "pre-public-ReShade-controls hardware reference",
       "s27_reference_shim_sha256": "a2e4bedace8d99bc60b5d18e958bd7e98f8887ff40ec45a8674b892e2d1fcbbc",
       "public_reshade_controls_commit": "11ac957138d4c6376d1e6ee6413f32cf9826b422",
       "public_reshade_controls_sha256": "0c602d710f62eb6df15c86b7b5473a7f3e9f2e1cf3270aea3976ea512f5907a3",
+      "startup_prime_public_fix_commit": "12ae20c8789495064b32a3e0bf71072796fd46dc",
+      "startup_prime_public_fix_sha256": "639856c7afbd5bbe7bc46a38e839ba8ec95d912efe7190975315045dbb5313bf",
       "public_reshade_ux_commit": "ddc95ef594a960820a70eee37767a2fc9583fb90",
       "public_reshade_ux_master_stage_blob": "6e0ad36221acb4ff9ca35a0501daa0c4eb45b5b2",
       "public_reshade_ux_fixup_blob": "f8b3a05b24ab912d643ec3661aa060b4257da7ee",
@@ -34,18 +31,11 @@
       "default_dlss_quality": "Quality",
       "startup_stabilization_resolution": "1485x835",
       "startup_stabilization_synchronized_frames": 180,
-      "startup_prime": "1485x835",
-      "startup_prime_synchronized_frames": 180,
+      "master_processing_default": true,
+      "master_processing_off_scope": "session-only",
       "nr_default_mode": 0,
       "nr_enabled_mode": 2,
       "nr_passes": 1,
-      "nr_passes_public_default": 1,
-      "master_processing_default": true,
-      "master_processing_off_scope": "session-only",
-      "master_processing_disable_policy": "switch through normal DLAA Native path, hold native for 30 stable frames, request temporal jitter off, wait 400 ms, then enter native raw passthrough",
-      "master_processing_resume_policy": "next launch always resumes processing ON and restores the saved reconstruction/NR state before A3-S5 startup stabilization",
-      "hardware_validation": "RTX 4070 Ti SUPER, 2560x1440 output. Temporal synchronization was stable across Custom Ultra Quality (77%), Quality, Balanced, Performance and Ultra Performance. Automatic 1485x835 startup stabilization was confirmed to remove cold-start vibration. The ReShade UX/master v2 build was hardware-tested with repeated DLAA/DLSS mode changes and repeated processing OFF/ON transitions; the staged native transition avoided the earlier low-resolution -> OFF crash, and relaunch after OFF restored the saved mode so the startup prime remained active.",
-      "notes": "The combined module installs both Super Resolution and the Neural Rendering runtime while leaving Neural Rendering disabled by default. Normal control lives in the ReShade GTA IV DLSS panel: master DLSS/DLAA processing, six reconstruction modes including DLAA Native, Neural Rendering, plus folded Advanced and Diagnostics sections. Master OFF is session-only and safely returns GTA to native before raw passthrough; the next launch restores the saved reconstruction/NR state and starts processing ON so A3-S5 can stabilize startup. DLSS-Full-Control.bat is launch/repair/diagnostics only. The frozen A3-S2/A3-S5 rendering core is preserved; pinned post-checkpoint stages add the public controls, startup-prime release fix and hardware-validated UX/master v2 behavior. The listed A3-S5 Feeder hash is the pre-UI hardware-reference binary; public_reshade_ux_reference_feeder_sha256 is the hardware-tested public v2 Feeder built on windows-2022. Local PE hashes can differ with MSVC revisions.",
       "public_modes": [
         "DLAA Native",
         "Custom Ultra Quality (77%)",
@@ -54,39 +44,23 @@
         "Performance",
         "Ultra Performance"
       ],
-      "uninstaller_commit": "e4c600a96e1b3682d7004dbd04dffc1abace7b90",
-      "uninstaller_sha256": "0af505444e966fb61ab9c83eb7f4d8874a436e4302ab935caa2dba0039656733",
-      "uninstaller_path": "Uninstall-DLSS-Full.bat",
-      "rollback_target": "DLAA-only baseline + ReShade input patch",
-      "uninstaller_legacy_backup_support": "Pre-presenter backups may omit .trex/d3d9vk_x64.dll; restore it from pinned b-bridge 0.1.0 package. Hashing uses .NET SHA-256 and does not depend on Get-FileHash.",
-      "startup_prime_public_fix_commit": "12ae20c8789495064b32a3e0bf71072796fd46dc",
-      "startup_prime_public_fix_sha256": "639856c7afbd5bbe7bc46a38e839ba8ec95d912efe7190975315045dbb5313bf",
-      "startup_stabilization_frame_policy": "180 valid synchronized frames cumulative; explicit live DLSS/DLAA mode change cancels startup prime immediately",
-      "startup_ui_resync_status": "rejected-after-hardware-test-pre-legal-screen-hang; not installed"
+      "hardware_validation": "RTX 4070 Ti SUPER at 2560x1440. Live DLAA/DLSS mode switching, Neural Rendering, staged master OFF/ON, and 1485x835 startup stabilization were hardware-tested.",
+      "release_installers": {
+        "dlaa_and_reshade": "install/Install-DLAA.bat",
+        "dlss_full": "install/Install-DLSS-Full.bat"
+      }
     },
     "reshade": {
       "version": "6.8.0",
       "tag_commit": "18deaa52de0c425a78b329e9cb3c497281cd00ec",
-      "setup_url_primary": "https://reshade.me/downloads/ReShade_Setup_6.8.0_Addon.exe",
-      "setup_url_fallback": "https://www.reshade.me/releases/ReShade-6.8.0-Addon-setup.exe",
-      "notes": "Full Add-On Support, Vulkan global layer. The cross-process input patch is built from the exact v6.8.0 source tag."
+      "input_patch_source_commit": "b437e7646b262dc60863293348fd33369330a429"
     },
     "dlss5-feeder": {
       "version": "0.15.1",
-      "url": "https://github.com/jlrouzies-fr/DLSS5-Feeder/releases/download/v0.15.1/DLSS5-Feeder-0.15.1.zip",
-      "sha256": "2e44e81e691e75e532b9b7babc278a12615cb7f0fd9ef854da50e6ef17b272f4"
+      "package_sha256": "2e44e81e691e75e532b9b7babc278a12615cb7f0fd9ef854da50e6ef17b272f4"
     },
     "lumenitefx": {
-      "commit": "f8cbbb4eccfcb7adf0d74bb358ba349272e3c1e9",
-      "url": "https://codeload.github.com/umar-afzaal/LumeniteFX/zip/f8cbbb4eccfcb7adf0d74bb358ba349272e3c1e9"
-    },
-    "reshade-shaders-headers": {
-      "commit": "6db142b4b1a05c764222e5b0bd9a644b7ccfe1dc",
-      "files": [
-        "ReShade.fxh",
-        "ReShadeUI.fxh",
-        "DrawText.fxh"
-      ]
+      "commit": "f8cbbb4eccfcb7adf0d74bb358ba349272e3c1e9"
     },
     "nvngx_dlss": {
       "product": "DLSS 4.5 Super Resolution / DLAA runtime",
@@ -96,29 +70,30 @@
       "dll_sha256": "3975567b8943c53acce397f2b72380092f84f162d00b0d2c7d08a1025c563983"
     },
     "nvngx_dlssnr": {
-      "product": "DLSS 5 Neural Rendering runtime",
-      "internal_ngx_identifier": "Feature 18 / NR18",
-      "version": "310.8.0-RTX40",
-      "variant": "community RTX 40/50 build, sm_89 compatible",
-      "package_url": "https://github.com/RankFTW/rhi-repo/releases/download/dlssnr-310.8.0-RTX40/nvngx_dlssnr_310.8.0-RTX40.zip",
-      "package_sha256": "46124cfaef532ad5f6da07494772ea8c1b3e719f934e254385697f38d1289e3f",
-      "dll_sha256": "4b8d19bc3eff58a084f5eca7489c921501c203450169fb82ff4f649a4482ba05",
-      "redistributed": false,
-      "installed_automatically": true,
+      "version": "310.8.0",
       "default_enabled": false,
-      "notes": "Downloaded and hash-verified automatically by Install-DLSS-Full.bat. Known-good on RTX 4070 Ti SUPER. Installed to .trex/m3k/nvngx_dlssnr.dll and left OFF until the user enables Neural Rendering from Home -> Add-ons -> DLSS 5 Feed -> GTA IV DLSS."
+      "variants": {
+        "rtx50_original_nvidia_signed": {
+          "gpu": "RTX 50 Series",
+          "package_url": "https://github.com/RankFTW/rhi-repo/releases/download/dlssnr-310.8.0/nvngx_dlssnr_310.8.0.zip",
+          "package_sha256": "388c0a7912e15ec911b9c9e11a692142b11fe387ddf2b637d8c358138fffb3ac",
+          "dll_sha256": "e16bcf15e16e13f527491cdf7845b2fe6521a738d8f7c9c721866a8496e1fc8e",
+          "authenticode": "NVIDIA-signed original runtime"
+        },
+        "rtx40_compatibility": {
+          "gpu": "RTX 40 Series",
+          "package_url": "https://github.com/RankFTW/rhi-repo/releases/download/dlssnr-310.8.0-RTX40/nvngx_dlssnr_310.8.0-RTX40.zip",
+          "package_sha256": "46124cfaef532ad5f6da07494772ea8c1b3e719f934e254385697f38d1289e3f",
+          "dll_sha256": "4b8d19bc3eff58a084f5eca7489c921501c203450169fb82ff4f649a4482ba05",
+          "validation": "Project-tested on RTX 4070 Ti SUPER"
+        }
+      }
     },
     "m3k-dxvk-presenter": {
-      "product": "M3K DXVK render/output presenter for DLSS Super Resolution",
       "upstream_version": "3.0.2",
       "upstream_commit": "6b20f622a77b87b2921fe5d2c1774d2f2ba3e9b7",
-      "project_patch_checkpoint": "57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f",
-      "release_tag": "m3k-dxvk-v3.0.2-a2s1b",
       "url": "https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/m3k-dxvk-v3.0.2-a2s1b/d3d9vk_x64.dll",
-      "dll_sha256": "511e0c2509e1922db2ec38940507ba956908fe6dc5fd9b3db9fec489dc05f297",
-      "installed_path": ".trex/d3d9vk_x64.dll",
-      "installed_automatically": true,
-      "notes": "Frozen M3K source-tap + A2-S1B presenter. Reads m3k-nr.ini, overrides GTA IV D3D9 render extent from RenderWidth/RenderHeight, and resizes the real presenter to OutputWidth/OutputHeight or the monitor when output is 0x0."
+      "dll_sha256": "511e0c2509e1922db2ec38940507ba956908fe6dc5fd9b3db9fec489dc05f297"
     }
   }
 }
