@@ -48,10 +48,10 @@ jobs:
           }
           [void][ScriptBlock]::Create($runner)
 
-          foreach ($marker in @('runtime-prebuilt-v1','ReShade64-bbridge.dll','75976007A0A5DE5BAB364F98E2D01B377D046441C94E89B1DD279CEE856161A9','Install-DLAA-Core.bat','Has-PatchMarker','RunAs')) {
+          foreach ($marker in @('v1.0.0','ReShade64-bbridge.dll','75976007A0A5DE5BAB364F98E2D01B377D046441C94E89B1DD279CEE856161A9','Install-DLAA-Core.bat','Has-PatchMarker','RunAs')) {
             if (-not $dlaa.Contains($marker)) { throw "DLAA installer missing: $marker" }
           }
-          foreach ($marker in @('runtime-prebuilt-v1','GTAIV-DLSS-Full-Runtime.zip','1E14F1508A1AC1FAC8EAB2DD0E3D8969C99275363B43C47406D0A86D5BE36987','ECA7C9CF9CD1C4835CEA7FD57AD168A35E157F081C0EADBA51AF35F501026F28','95259612C7AA82DFC913E6AC4405A27B41C29F0DE4975592E972A9A1435879B2','E16BCF15E16E13F527491CDF7845B2FE6521A738D8F7C9C721866A8496E1FC8E','4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05','Get-AuthenticodeSignature','StartupPrimeWidth=1485','RunAs')) {
+          foreach ($marker in @('v1.0.0','GTAIV-DLSS-Full-Runtime.zip','1E14F1508A1AC1FAC8EAB2DD0E3D8969C99275363B43C47406D0A86D5BE36987','ECA7C9CF9CD1C4835CEA7FD57AD168A35E157F081C0EADBA51AF35F501026F28','95259612C7AA82DFC913E6AC4405A27B41C29F0DE4975592E972A9A1435879B2','E16BCF15E16E13F527491CDF7845B2FE6521A738D8F7C9C721866A8496E1FC8E','4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05','Get-AuthenticodeSignature','StartupPrimeWidth=1485','RunAs')) {
             if (-not $full.Contains($marker)) { throw "DLSS Full installer missing: $marker" }
           }
           if ($dlaa.Contains('Check-BuildTools') -or $full.Contains('Check-BuildTools')) { throw 'Release installers still require local build tools' }
@@ -65,7 +65,7 @@ jobs:
           }
 
           $pre = $manifest.components.prebuilt_release
-          if ($pre.tag -ne 'runtime-prebuilt-v1') { throw 'Prebuilt runtime tag mismatch' }
+          if ($pre.tag -ne 'v1.0.0') { throw 'Prebuilt runtime tag mismatch' }
           if ($pre.reshade_input_patch.sha256.ToUpperInvariant() -ne '75976007A0A5DE5BAB364F98E2D01B377D046441C94E89B1DD279CEE856161A9') { throw 'Prebuilt ReShade hash mismatch in manifest' }
           if ($pre.dlss_full_runtime.sha256.ToUpperInvariant() -ne '1E14F1508A1AC1FAC8EAB2DD0E3D8969C99275363B43C47406D0A86D5BE36987') { throw 'Prebuilt runtime ZIP hash mismatch in manifest' }
           Write-Host 'Release-facing files validated.' -ForegroundColor Green
@@ -73,7 +73,7 @@ jobs:
       - name: Verify prebuilt ReShade input patch
         shell: pwsh
         run: |
-          $url='https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/runtime-prebuilt-v1/ReShade64-bbridge.dll'
+          $url='https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/v1.0.0/ReShade64-bbridge.dll'
           $dll=Join-Path $env:RUNNER_TEMP 'ReShade64-bbridge.dll'
           Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $dll
           $hash=(Get-FileHash -Algorithm SHA256 $dll).Hash.ToUpperInvariant()
@@ -85,7 +85,7 @@ jobs:
       - name: Verify prebuilt DLSS runtime archive
         shell: pwsh
         run: |
-          $url='https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/runtime-prebuilt-v1/GTAIV-DLSS-Full-Runtime.zip'
+          $url='https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/v1.0.0/GTAIV-DLSS-Full-Runtime.zip'
           $zip=Join-Path $env:RUNNER_TEMP 'runtime.zip'
           $dir=Join-Path $env:RUNNER_TEMP 'runtime'
           Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $zip
