@@ -174,7 +174,7 @@ jobs:
 
           $release = gh api "repos/$($env:REPO)/releases/tags/$($env:FINAL_TAG)" | ConvertFrom-Json
           $names = @($release.assets | ForEach-Object name)
-          foreach ($required in @('GTAIV-DLSS-Setup.exe','GTAIV-DLSS-Setup.sha256','GTAIV-DLSS-Full-Runtime.zip','ReShade64-bbridge.dll','d3d9vk_x64.dll','SHA256SUMS.txt')) {
+          foreach ($required in @('GTAIV-DLSS-Setup.exe','GTAIV-DLSS-Full-Runtime.zip','ReShade64-bbridge.dll')) {
             if ($names -notcontains $required) { throw "Published release is missing $required" }
           }
           if ($release.draft -or $release.prerelease) { throw 'v1.0.0 was not published as a normal stable release.' }

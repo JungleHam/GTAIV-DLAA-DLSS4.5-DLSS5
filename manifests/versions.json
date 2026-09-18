@@ -140,7 +140,9 @@
       "upstream_commit": "6b20f622a77b87b2921fe5d2c1774d2f2ba3e9b7",
       "project_patch_checkpoint": "57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f",
       "release_tag": "v1.0.0",
-      "url": "https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/v1.0.0/d3d9vk_x64.dll",
+      "asset": "GTAIV-DLSS-Full-Runtime.zip",
+      "archive_member": "d3d9vk_x64.dll",
+      "url": "https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/v1.0.0/GTAIV-DLSS-Full-Runtime.zip",
       "dll_sha256": "511e0c2509e1922db2ec38940507ba956908fe6dc5fd9b3db9fec489dc05f297",
       "installed_path": ".trex/d3d9vk_x64.dll",
       "installed_automatically": true

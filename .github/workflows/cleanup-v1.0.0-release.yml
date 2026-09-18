@@ -1,0 +1,54 @@
+name: Cleanup v1.0.0 release assets
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/cleanup-v1.0.0-release.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Remove redundant v1.0.0 assets and refresh notes
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5
+          TAG: v1.0.0
+        run: |
+          set -euo pipefail
+
+          for name in d3d9vk_x64.dll GTAIV-DLSS-Setup.sha256 SHA256SUMS.txt; do
+            id="$(gh api "repos/$REPO/releases/tags/$TAG" --jq ".assets[] | select(.name == \"$name\") | .id" | head -n1 || true)"
+            if [ -n "$id" ]; then
+              gh api --method DELETE "repos/$REPO/releases/assets/$id"
+              echo "Removed redundant release asset: $name"
+            fi
+          done
+
+          gh release edit "$TAG" --repo "$REPO" --notes-file docs/RELEASE-1.0.0.md
+
+          mapfile -t names < <(gh api "repos/$REPO/releases/tags/$TAG" --jq '.assets[].name' | sort)
+          printf 'Remaining release assets:\n'
+          printf '  %s\n' "${names[@]}"
+
+          required=(GTAIV-DLSS-Full-Runtime.zip GTAIV-DLSS-Setup.exe ReShade64-bbridge.dll)
+          if [ "${#names[@]}" -ne "${#required[@]}" ]; then
+            echo "Unexpected number of release assets." >&2
+            exit 1
+          fi
+
+          for req in "${required[@]}"; do
+            if ! printf '%s\n' "${names[@]}" | grep -Fxq "$req"; then
+              echo "Missing required release asset: $req" >&2
+              exit 1
+            fi
+          done
+
+          echo 'v1.0.0 release assets are clean.'

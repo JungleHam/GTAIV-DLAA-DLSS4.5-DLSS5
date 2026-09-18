@@ -26,7 +26,8 @@ $ReferenceShimHash = 'A2E4BEDACE8D99BC60B5D18E958BD7E98F8887FF40EC45A8674B892E2D
 $NrPackageUrl = 'https://github.com/RankFTW/rhi-repo/releases/download/dlssnr-310.8.0-RTX40/nvngx_dlssnr_310.8.0-RTX40.zip'
 $NrPackageHash = '46124CFAEF532AD5F6DA07494772EA8C1B3E719F934E254385697F38D1289E3F'
 $NrDllHash = '4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05'
-$DxvkPresenterUrl = 'https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/v1.0.0/d3d9vk_x64.dll'
+$RuntimeZipUrl = 'https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/v1.0.0/GTAIV-DLSS-Full-Runtime.zip'
+$RuntimeZipHash = '1E14F1508A1AC1FAC8EAB2DD0E3D8969C99275363B43C47406D0A86D5BE36987'
 $DxvkPresenterHash = '511E0C2509E1922DB2EC38940507BA956908FE6DC5FD9B3DB9FEC489DC05F297'
 $DxvkPresenterUpstreamCommit = '6b20f622a77b87b2921fe5d2c1774d2f2ba3e9b7'
 $PublicControlsCommit = '11ac957138d4c6376d1e6ee6413f32cf9826b422'
@@ -221,9 +222,14 @@ try {
     Assert-SHA256 $NrDll.FullName $NrDllHash
 
     Write-Host ''
-    Write-Host 'Downloading the tested M3K DXVK 3.0.2 render/output presenter...' -ForegroundColor Cyan
-    $DxvkPresenterTemp = Join-Path $Temp 'd3d9vk_x64.dll'
-    Download-File $DxvkPresenterUrl $DxvkPresenterTemp
+    Write-Host 'Extracting the tested M3K DXVK 3.0.2 presenter from the v1.0.0 runtime payload...' -ForegroundColor Cyan
+    $RuntimeZip = Join-Path $Temp 'GTAIV-DLSS-Full-Runtime.zip'
+    $RuntimeDir = Join-Path $Temp 'release-runtime'
+    Download-File $RuntimeZipUrl $RuntimeZip
+    Assert-SHA256 $RuntimeZip $RuntimeZipHash
+    Expand-Archive -LiteralPath $RuntimeZip -DestinationPath $RuntimeDir -Force
+    $DxvkPresenterTemp = Join-Path $RuntimeDir 'd3d9vk_x64.dll'
+    if (-not (Test-Path -LiteralPath $DxvkPresenterTemp)) { Fail 'Published runtime archive is missing d3d9vk_x64.dll.' }
     Assert-SHA256 $DxvkPresenterTemp $DxvkPresenterHash
 
     Write-Host "Downloading/cloning project source into temporary folder: $Project" -ForegroundColor DarkGray
@@ -471,7 +477,7 @@ try {
         "NvRemixBridge.exe=$serverHash",
         "d3d9vk_x64.dll=$DxvkPresenterHash",
         "DxvkPresenterUpstreamCommit=$DxvkPresenterUpstreamCommit",
-        "DxvkPresenterURL=$DxvkPresenterUrl",
+        "DxvkPresenterSource=$RuntimeZipUrl#d3d9vk_x64.dll",
         "dlss5-feed.addon64=$feederHash",
         "m3k-nvngx.dll=$shimHash",
         "nvngx_dlssnr.dll=$NrDllHash",

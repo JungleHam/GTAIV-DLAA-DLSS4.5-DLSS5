@@ -4,9 +4,14 @@ The first public release. One installer handles installation, repair, upgrades, 
 
 ## Download
 
-**Most users only need `GTAIV-DLSS-Setup.exe` from the Assets section below.**
+**Download `GTAIV-DLSS-Setup.exe`. That is the only file users should download manually.**
 
-The other release assets are verified support payloads used by the installer and are provided for transparency/reproducibility.
+The release intentionally keeps only two additional support payloads because the installer downloads and SHA256-verifies them automatically:
+
+- `GTAIV-DLSS-Full-Runtime.zip` — the frozen bridge / presenter / Feeder / shim runtime.
+- `ReShade64-bbridge.dll` — the verified ReShade input-patch runtime.
+
+You do not need to download either support payload yourself.
 
 ## What you get
 
@@ -42,7 +47,13 @@ Steam's built-in FPS counter disappears while a DLSS Super Resolution profile is
 
 ## Checksums
 
-`GTAIV-DLSS-Setup.sha256` contains the installer hash, and `SHA256SUMS.txt` covers the complete published payload set.
+GitHub records a SHA-256 digest for every uploaded release asset. The frozen v1.0.0 payload hashes are:
+
+- `GTAIV-DLSS-Setup.exe` — `ECC07F04CDE414268B1313459ADECA832C17B1ECC830C0D307688D183F044346`
+- `GTAIV-DLSS-Full-Runtime.zip` — `1E14F1508A1AC1FAC8EAB2DD0E3D8969C99275363B43C47406D0A86D5BE36987`
+- `ReShade64-bbridge.dll` — `75976007A0A5DE5BAB364F98E2D01B377D046441C94E89B1DD279CEE856161A9`
+
+No separate checksum files are needed on the release page.
 
 ---
 
