@@ -78,20 +78,19 @@ Useful docs: [DLSS Full](docs/DLSS-FULL.md) · [Verification](docs/VERIFY.md) ·
 [FusionFix](https://github.com/ThirteenAG/GTAIV.EFLC.FusionFix) · [b-bridge](https://github.com/gutbash/b-bridge) · [DXVK](https://github.com/doitsujin/dxvk) · [ReShade](https://reshade.me/) · [DLSS5-Feeder](https://github.com/jlrouzies-fr/DLSS5-Feeder) · [LumeniteFX](https://github.com/umar-afzaal/LumeniteFX)
 
 ## Screenshots via links
-https://i.vgy.me/753vlP.jpg
-https://i.vgy.me/JREhV8.png
-https://i.vgy.me/j9kHP6.png
-https://i.vgy.me/j0aMuQ.png
-https://i.vgy.me/WjlSqS.png
-https://i.vgy.me/TT7EUv.png
-https://i.vgy.me/UqrH0H.png
-https://i.vgy.me/dvDNhv.png
-https://i.vgy.me/un16lH.png
-https://i.vgy.me/u0GPEF.png
-https://i.vgy.me/ViatXJ.png
-https://i.vgy.me/nPEmCe.png
-https://i.vgy.me/8tDCQU.png
-https://i.vgy.me/803Bsd.png
-https://i.vgy.me/Tm7fCg.png
+- https://i.vgy.me/JREhV8.png DLAA with DLSS5 Neural Rendering 1x Random shot 3
+- https://i.vgy.me/j9kHP6.png DLAA with DLSS5 Neural Rendering 1x Random shot 2
+- https://i.vgy.me/j0aMuQ.png DLAA with DLSS5 Neural Rendering 1x Random shot 1
+- https://i.vgy.me/WjlSqS.png DLAA with DLSS5 Neural Rendering 3x
+- https://i.vgy.me/TT7EUv.png DLAA with DLSS5 Neural Rendering 2x
+- https://i.vgy.me/UqrH0H.png DLAA with DLSS5 Neural Rendering 1x
+- https://i.vgy.me/dvDNhv.png DLSS Ultra Performance
+- https://i.vgy.me/un16lH.png DLSS Performance
+- https://i.vgy.me/u0GPEF.png DLSS Balanced
+- https://i.vgy.me/ViatXJ.png DLSS Quality
+- https://i.vgy.me/nPEmCe.png DLSS Ultra Quality (77% of res)
+- https://i.vgy.me/8tDCQU.png DLAA Only
+- https://i.vgy.me/803Bsd.png Baseline all highest settings 1440p no enhancements
+- https://i.vgy.me/Tm7fCg.png Loading screen with NR
 
 Pinned versions and hashes: [`manifests/versions.json`](manifests/versions.json).
