@@ -77,4 +77,21 @@ Useful docs: [DLSS Full](docs/DLSS-FULL.md) · [Verification](docs/VERIFY.md) ·
 
 [FusionFix](https://github.com/ThirteenAG/GTAIV.EFLC.FusionFix) · [b-bridge](https://github.com/gutbash/b-bridge) · [DXVK](https://github.com/doitsujin/dxvk) · [ReShade](https://reshade.me/) · [DLSS5-Feeder](https://github.com/jlrouzies-fr/DLSS5-Feeder) · [LumeniteFX](https://github.com/umar-afzaal/LumeniteFX)
 
+## Screenshots via links
+https://i.vgy.me/753vlP.jpg
+https://i.vgy.me/JREhV8.png
+https://i.vgy.me/j9kHP6.png
+https://i.vgy.me/j0aMuQ.png
+https://i.vgy.me/WjlSqS.png
+https://i.vgy.me/TT7EUv.png
+https://i.vgy.me/UqrH0H.png
+https://i.vgy.me/dvDNhv.png
+https://i.vgy.me/un16lH.png
+https://i.vgy.me/u0GPEF.png
+https://i.vgy.me/ViatXJ.png
+https://i.vgy.me/nPEmCe.png
+https://i.vgy.me/8tDCQU.png
+https://i.vgy.me/803Bsd.png
+https://i.vgy.me/Tm7fCg.png
+
 Pinned versions and hashes: [`manifests/versions.json`](manifests/versions.json).
