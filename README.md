@@ -61,7 +61,7 @@ The BAT files under `install/` remain available as manual/fallback tools.
 
 ## Known limitation
 
-Steam's built-in FPS counter currently disappears while a **DLSS Super Resolution** profile is active (Ultra Quality 77%, Quality, Balanced, Performance, or Ultra Performance). It remains visible in **DLAA Native** and with project processing **OFF**. This is an overlay-display limitation; DLSS and Neural Rendering continue to operate normally.
+Steam's built-in FPS counter currently sometimes disappears while a **DLSS Super Resolution** profile is active (Ultra Quality 77%, Quality, Balanced, Performance, or Ultra Performance). It remains visible in **DLAA Native** and with project processing **OFF**. This is an overlay-display limitation; DLSS and Neural Rendering continue to operate normally.
 
 ## Troubleshooting
 
