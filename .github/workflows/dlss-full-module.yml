@@ -1,4 +1,4 @@
-name: Release install + runtime validation
+name: Clean release source validation
 
 on:
   workflow_dispatch:
@@ -6,13 +6,13 @@ on:
     branches: [ main ]
     paths:
       - 'README.md'
+      - 'docs/**'
+      - 'input/**'
       - 'installer/**'
-      - 'install/Install-DLAA.bat'
-      - 'install/Install-DLSS-Full.bat'
-      - 'install/Uninstall-DLSS-Full.bat'
-      - 'install/Uninstall-DLAA.bat'
-      - 'install/README.md'
+      - 'install/**'
       - 'manifests/versions.json'
+      - 'tools/Verify-No-External-Binary-Links.ps1'
+      - 'tools/Verify-GitHub-Only-Links.ps1'
       - '.github/workflows/dlss-full-module.yml'
       - '.github/workflows/prebuilt-runtime-release.yml'
 
@@ -20,16 +20,19 @@ permissions:
   contents: read
 
 jobs:
-  validate-release:
+  validate-source:
     runs-on: windows-2022
-    timeout-minutes: 30
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
-      - name: Validate release-facing files
+      - name: Validate cleaned installer source
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          & .\tools\Verify-No-External-Binary-Links.ps1
+          & .\tools\Verify-GitHub-Only-Links.ps1
+
           $readme = Get-Content README.md -Raw
           $setup = Get-Content installer/GTAIV-DLSS-Setup.iss -Raw
           $runner = Get-Content installer/Run-Action.ps1 -Raw
@@ -37,26 +40,25 @@ jobs:
           $full = Get-Content install/Install-DLSS-Full.bat -Raw
           $manifest = Get-Content manifests/versions.json -Raw | ConvertFrom-Json
 
-          foreach ($marker in @('GTAIV-DLSS-Setup.exe','Full DLSS automatically installs','manual ReShade installation are not required','RTX 50 Series','RTX 40 Series','Remove DLSS Full only','Remove everything from this project')) {
-            if (-not $readme.Contains($marker)) { throw "README missing release marker: $marker" }
+          foreach ($marker in @('ReShade 6.8.0 Full Add-On Support','dlssnr-310.8.0-RTX40','nvngx_dlssnr_310.8.0-RTX40.zip','dlssnr-310.8.0','If DLAA is already installed')) {
+            if (-not $readme.Contains($marker)) { throw "README missing guided-install marker: $marker" }
           }
-          foreach ($marker in @('Install / repair DLAA','Install / repair Full DLSS','Remove DLSS Full only','Remove everything from this project','PrivilegesRequired=admin','Run-Action.ps1')) {
+          foreach ($marker in @('Official ReShade prerequisite','LumeniteFX prerequisite','Neural Rendering prerequisite','Open ReShade GitHub','Open NR GitHub Releases','DetectNvidiaGpuSeries','PrivilegesRequired=admin','Run-Action.ps1')) {
             if (-not $setup.Contains($marker)) { throw "Unified setup missing: $marker" }
           }
-          foreach ($marker in @("ValidateSet('DLAA','FULL','REMOVE_FULL','REMOVE_ALL')",'Invoke-DLAA','Invoke-Full','Invoke-RemoveFull','Invoke-RemoveAll','DLAA foundation is not installed. Installing it automatically first')) {
+          foreach ($marker in @("ValidateSet('DLAA','FULL','REMOVE_FULL','REMOVE_ALL')",'GTAIV_SETUP_RESHADE','GTAIV_SETUP_LUMENITE','GTAIV_SETUP_NR_DLL','Resolve-NrPackage','needsFoundationInputs')) {
             if (-not $runner.Contains($marker)) { throw "Setup action runner missing: $marker" }
           }
           [void][ScriptBlock]::Create($runner)
 
-          foreach ($marker in @('v1.0.0','ReShade64-bbridge.dll','75976007A0A5DE5BAB364F98E2D01B377D046441C94E89B1DD279CEE856161A9','Install-DLAA-Core.bat','Has-PatchMarker','RunAs')) {
+          foreach ($marker in @('ReShade64-bbridge.dll','AFE4C8F13048306307983B8B3D41D5BF00A86820440B0E57DEA10950E1176445','43220F99FC0FFA0216E01EBD657180F8C9D043C939F760283B896EA257F1B6A2','Install-DLAA-Core.bat')) {
             if (-not $dlaa.Contains($marker)) { throw "DLAA installer missing: $marker" }
           }
-          foreach ($marker in @('v1.0.0','GTAIV-DLSS-Full-Runtime.zip','1E14F1508A1AC1FAC8EAB2DD0E3D8969C99275363B43C47406D0A86D5BE36987','ECA7C9CF9CD1C4835CEA7FD57AD168A35E157F081C0EADBA51AF35F501026F28','95259612C7AA82DFC913E6AC4405A27B41C29F0DE4975592E972A9A1435879B2','E16BCF15E16E13F527491CDF7845B2FE6521A738D8F7C9C721866A8496E1FC8E','4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05','Get-AuthenticodeSignature','StartupPrimeWidth=1485','RunAs')) {
-            if (-not $full.Contains($marker)) { throw "DLSS Full installer missing: $marker" }
+          foreach ($marker in @('GTAIV_SETUP_NR_DLL','E16BCF15E16E13F527491CDF7845B2FE6521A738D8F7C9C721866A8496E1FC8E','4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05','Get-AuthenticodeSignature','project-tested modded DLL')) {
+            if (-not $full.Contains($marker)) { throw "Full installer missing: $marker" }
           }
-          if ($dlaa.Contains('Check-BuildTools') -or $full.Contains('Check-BuildTools')) { throw 'Release installers still require local build tools' }
 
-          foreach ($path in @('install/Install-DLAA.bat','install/Install-DLSS-Full.bat')) {
+          foreach ($path in @('install/Install-DLAA.bat','install/Install-DLSS-Full.bat','install/core/Install-DLAA-Core.bat','install/core/Install-DLSS-Full-Core.bat')) {
             $text = [IO.File]::ReadAllText($path)
             $marker = '#==POWERSHELL==#'
             $i = $text.IndexOf($marker)
@@ -64,65 +66,10 @@ jobs:
             [void][ScriptBlock]::Create($text.Substring($i + $marker.Length))
           }
 
-          $pre = $manifest.components.prebuilt_release
-          if ($pre.tag -ne 'v1.0.0') { throw 'Prebuilt runtime tag mismatch' }
-          if ($pre.reshade_input_patch.sha256.ToUpperInvariant() -ne '75976007A0A5DE5BAB364F98E2D01B377D046441C94E89B1DD279CEE856161A9') { throw 'Prebuilt ReShade hash mismatch in manifest' }
-          if ($pre.dlss_full_runtime.sha256.ToUpperInvariant() -ne '1E14F1508A1AC1FAC8EAB2DD0E3D8969C99275363B43C47406D0A86D5BE36987') { throw 'Prebuilt runtime ZIP hash mismatch in manifest' }
-          Write-Host 'Release-facing files validated.' -ForegroundColor Green
+          if (-not $manifest.components.reshade.user_supplied_official_setup) { throw 'Manifest must mark ReShade setup as user supplied.' }
+          if (-not $manifest.components.lumenitefx.user_supplied_official_archive) { throw 'Manifest must mark LumeniteFX archive as user supplied.' }
+          if (-not $manifest.components.nvngx_dlssnr.user_supplied) { throw 'Manifest must mark NR runtime as user supplied.' }
+          if ($manifest.components.nvngx_dlssnr.direct_download_links_provided) { throw 'Manifest unexpectedly claims NR download links are provided.' }
+          if ($manifest.components.nvngx_dlss.official_source_repository -ne 'https://github.com/NVIDIA/DLSS') { throw 'DLSS 310.9.1 must use the official NVIDIA source.' }
 
-      - name: Verify prebuilt ReShade input patch
-        shell: pwsh
-        run: |
-          $url='https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/v1.0.0/ReShade64-bbridge.dll'
-          $dll=Join-Path $env:RUNNER_TEMP 'ReShade64-bbridge.dll'
-          Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $dll
-          $hash=(Get-FileHash -Algorithm SHA256 $dll).Hash.ToUpperInvariant()
-          if ($hash -ne '75976007A0A5DE5BAB364F98E2D01B377D046441C94E89B1DD279CEE856161A9') { throw "ReShade asset hash mismatch: $hash" }
-          $ascii=[Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($dll))
-          if (-not $ascii.Contains('b-bridge input relay')) { throw 'Prebuilt ReShade patch marker missing' }
-          Write-Host "Prebuilt ReShade verified: $hash" -ForegroundColor Green
-
-      - name: Verify prebuilt DLSS runtime archive
-        shell: pwsh
-        run: |
-          $url='https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/v1.0.0/GTAIV-DLSS-Full-Runtime.zip'
-          $zip=Join-Path $env:RUNNER_TEMP 'runtime.zip'
-          $dir=Join-Path $env:RUNNER_TEMP 'runtime'
-          Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $zip
-          $zipHash=(Get-FileHash -Algorithm SHA256 $zip).Hash.ToUpperInvariant()
-          if ($zipHash -ne '1E14F1508A1AC1FAC8EAB2DD0E3D8969C99275363B43C47406D0A86D5BE36987') { throw "Runtime ZIP mismatch: $zipHash" }
-          Expand-Archive -LiteralPath $zip -DestinationPath $dir -Force
-          $expected=@{
-            'd3d9.dll'='ECA7C9CF9CD1C4835CEA7FD57AD168A35E157F081C0EADBA51AF35F501026F28';
-            'NvRemixBridge.exe'='8A89A3DBBC02D56BA98254941B14E52D88EFEF3F95E491C9C6AF5ADC65FECFFA';
-            'd3d9vk_x64.dll'='511E0C2509E1922DB2EC38940507BA956908FE6DC5FD9B3DB9FEC489DC05F297';
-            'dlss5-feed.addon64'='95259612C7AA82DFC913E6AC4405A27B41C29F0DE4975592E972A9A1435879B2';
-            'm3k\m3k-nvngx.dll'='69D63D238780F93F8ABC3D59C97C9E577A7845C557C1DC7A8F28FF3A84AAE51A'
-          }
-          foreach($rel in $expected.Keys){
-            $p=Join-Path $dir $rel
-            if(-not(Test-Path $p)){throw "Missing runtime file: $rel"}
-            $h=(Get-FileHash -Algorithm SHA256 $p).Hash.ToUpperInvariant()
-            if($h -ne $expected[$rel]){throw "$rel hash mismatch: $h"}
-          }
-          Write-Host 'Prebuilt DLSS runtime verified.' -ForegroundColor Green
-
-      - name: Verify both Neural Rendering choices
-        shell: pwsh
-        run: |
-          $variants = @(
-            @{Name='RTX50 original NVIDIA-signed';Url='https://github.com/RankFTW/rhi-repo/releases/download/dlssnr-310.8.0/nvngx_dlssnr_310.8.0.zip';Zip='388C0A7912E15EC911B9C9E11A692142B11FE387DDF2B637D8C358138FFFB3AC';Dll='E16BCF15E16E13F527491CDF7845B2FE6521A738D8F7C9C721866A8496E1FC8E';Signed=$true},
-            @{Name='RTX40 compatibility';Url='https://github.com/RankFTW/rhi-repo/releases/download/dlssnr-310.8.0-RTX40/nvngx_dlssnr_310.8.0-RTX40.zip';Zip='46124CFAEF532AD5F6DA07494772EA8C1B3E719F934E254385697F38D1289E3F';Dll='4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05';Signed=$false}
-          )
-          foreach($v in $variants){
-            $zip=Join-Path $env:RUNNER_TEMP (($v.Name -replace '[^A-Za-z0-9]','_')+'.zip')
-            $dir=$zip+'.dir'
-            Invoke-WebRequest -UseBasicParsing -Uri $v.Url -OutFile $zip
-            if((Get-FileHash -Algorithm SHA256 $zip).Hash.ToUpperInvariant() -ne $v.Zip){throw "$($v.Name) package hash mismatch"}
-            Expand-Archive -LiteralPath $zip -DestinationPath $dir -Force
-            $dll=Get-ChildItem $dir -Recurse -File -Filter nvngx_dlssnr.dll | Select-Object -First 1
-            if(-not $dll){throw "$($v.Name) DLL missing"}
-            if((Get-FileHash -Algorithm SHA256 $dll.FullName).Hash.ToUpperInvariant() -ne $v.Dll){throw "$($v.Name) DLL hash mismatch"}
-            if($v.Signed){$sig=Get-AuthenticodeSignature $dll.FullName;if($sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notmatch 'NVIDIA'){throw 'RTX50 runtime signature check failed'}}
-          }
-          Write-Host 'Both Neural Rendering choices verified.' -ForegroundColor Green
+          Write-Host 'Clean release source validated.' -ForegroundColor Green

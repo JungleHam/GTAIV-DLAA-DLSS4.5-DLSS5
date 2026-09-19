@@ -18,8 +18,8 @@ if exist "%PATCHED%" del /q "%PATCHED%"
 where git >nul 2>nul || (
   echo ERROR: Git for Windows is not installed, or Windows cannot find it.
   echo.
-  echo Download it here:
-  echo   https://git-scm.com/install/windows
+  echo Install Git for Windows, then double-click BUILD.bat again.
+  echo Project source: https://github.com/git-for-windows/git
   echo.
   echo Install Git, then double-click BUILD.bat again.
   pause
@@ -29,8 +29,8 @@ where python >nul 2>nul || (
   where py >nul 2>nul || (
     echo ERROR: Python 3 is not installed, or Windows cannot find it.
     echo.
-    echo Download it here:
-    echo   https://www.python.org/downloads/windows/
+    echo Install Python 3 and add it to PATH, then double-click BUILD.bat again.
+    echo Python source project: https://github.com/python/cpython
     echo.
     echo During setup, enable the option to add Python to PATH, then double-click BUILD.bat again.
     pause
@@ -66,8 +66,8 @@ set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
 if not exist "%VSWHERE%" (
   echo ERROR: Visual Studio 2022 Build Tools are required.
   echo.
-  echo Download them here:
-  echo   https://aka.ms/vs/17/release/vs_BuildTools.exe
+  echo Install Visual Studio 2022 Build Tools from Microsoft.
+  echo This repository intentionally stores no non-GitHub download link.
   echo.
   echo In the installer, select:
   echo   Desktop development with C++

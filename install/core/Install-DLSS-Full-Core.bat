@@ -23,32 +23,31 @@ $ReferenceBridgeHash = '6DD40F145A5D503624E3E05ECF0ADBAA094CF83B24278C0BB333318E
 $ReferenceCoreFeederHash = 'C73D8D54271F55F8931F00D62A4CDF605118BEA71D7C6BEE0B61D0CA7C1CCE4B'
 $ReferencePublicUxFeederHash = 'E22DD7EAF6D1C6A876AF486C939E3DCB980D6AE03A247B2C5772D0502224FCCD'
 $ReferenceShimHash = 'A2E4BEDACE8D99BC60B5D18E958BD7E98F8887FF40EC45A8674B892E2D1FCBBC'
-$NrPackageUrl = 'https://github.com/RankFTW/rhi-repo/releases/download/dlssnr-310.8.0-RTX40/nvngx_dlssnr_310.8.0-RTX40.zip'
-$NrPackageHash = '46124CFAEF532AD5F6DA07494772EA8C1B3E719F934E254385697F38D1289E3F'
-$NrDllHash = '4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05'
-$RuntimeZipUrl = 'https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/v1.0.0/GTAIV-DLSS-Full-Runtime.zip'
-$RuntimeZipHash = '1E14F1508A1AC1FAC8EAB2DD0E3D8969C99275363B43C47406D0A86D5BE36987'
+$NrDllInput = $env:GTAIV_SETUP_NR_DLL
+$Nr40DllHash = '4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05'
+$Nr50DllHash = 'E16BCF15E16E13F527491CDF7845B2FE6521A738D8F7C9C721866A8496E1FC8E'
+$ReleaseApi = 'https://api.github.com/repos/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/tags/v1.0.0'
+$RuntimeAsset = 'GTAIV-DLSS-Full-Runtime.zip'
 $DxvkPresenterHash = '511E0C2509E1922DB2EC38940507BA956908FE6DC5FD9B3DB9FEC489DC05F297'
 $DxvkPresenterUpstreamCommit = '6b20f622a77b87b2921fe5d2c1774d2f2ba3e9b7'
-$PublicControlsCommit = '11ac957138d4c6376d1e6ee6413f32cf9826b422'
-$PublicControlsUrl = "https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/$PublicControlsCommit/install/Public-ReShade-Controls-Stage.ps1"
 $PublicControlsHash = '0C602D710F62EB6DF15C86B7B5473A7F3E9F2E1CF3270AEA3976EA512F5907A3'
-$StartupPrimeFixCommit = '12ae20c8789495064b32a3e0bf71072796fd46dc'
-$StartupPrimeFixUrl = "https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/$StartupPrimeFixCommit/install/Public-Startup-Prime-Fix-Stage.ps1"
 $StartupPrimeFixHash = '639856C7AFBD5BBE7BC46A38E839BA8EC95D912EFE7190975315045DBB5313BF'
 $PublicUxCommit = 'ddc95ef594a960820a70eee37767a2fc9583fb90'
 $PublicUxMasterStageBlob = '6e0ad36221acb4ff9ca35a0501daa0c4eb45b5b2'
 $PublicUxFixupBlob = 'f8b3a05b24ab912d643ec3661aa060b4257da7ee'
 $PublicUxV2FixupBlob = '9a079d97391ca70b1ab0a115e3c04288720e9d48'
-$ControlCommit = 'a6bd0080982398046b20cf39e858f3e016c03492'
-$ControlUrl = "https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/$ControlCommit/install/DLSS-Full-Control.bat"
 $ControlHash = 'F209610F26970939D5B12EFCC13BEE84BB08348B045B2C4442D3177ED142661D'
-$UninstallerCommit = 'e4c600a96e1b3682d7004dbd04dffc1abace7b90'
-$UninstallerUrl = "https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/$UninstallerCommit/install/Uninstall-DLSS-Full.bat"
-$UninstallerHash = '0AF505444E966FB61AB9C83EB7F4D8874A436E4302AB935CAA2DBA0039656733'
+$UninstallerHash = 'B4FA1284047F32DCBFA966F8FA70DEEB2CBEA5630182754998B13D68C042CFBF'
 $TranscriptStarted = $false
 
 function Fail([string]$Message) { throw $Message }
+function Resolve-ProjectAssetUrl([string]$AssetName) {
+    $headers = @{'User-Agent'='GTAIV-DLSS-Setup'}
+    $release = Invoke-RestMethod -UseBasicParsing -Headers $headers -Uri $ReleaseApi
+    $asset = @($release.assets | Where-Object { $_.name -eq $AssetName }) | Select-Object -First 1
+    if (-not $asset -or -not $asset.browser_download_url) { Fail "Project release asset was not found: $AssetName" }
+    return [string]$asset.browser_download_url
+}
 
 function Hash([string]$Path) {
     if (-not (Test-Path -LiteralPath $Path)) { return '<missing>' }
@@ -211,30 +210,56 @@ try {
     Write-Host 'Everything downloaded, cloned, or built in this folder will be deleted automatically after use, including if installation fails.' -ForegroundColor DarkGray
 
     Write-Host ''
-    Write-Host 'Downloading the tested DLSS 5 Neural Rendering runtime for RTX 40/50...' -ForegroundColor Cyan
-    $nrZip = Join-Path $Temp 'nvngx_dlssnr_310.8.0-RTX40.zip'
-    $nrDir = Join-Path $Temp 'dlssnr'
-    Download-File $NrPackageUrl $nrZip
-    Assert-SHA256 $nrZip $NrPackageHash
-    Expand-Archive -LiteralPath $nrZip -DestinationPath $nrDir -Force
-    $NrDll = Get-ChildItem -LiteralPath $nrDir -Filter 'nvngx_dlssnr.dll' -File -Recurse | Select-Object -First 1
-    if (-not $NrDll) { Fail 'nvngx_dlssnr.dll was not found in the pinned NR package.' }
-    Assert-SHA256 $NrDll.FullName $NrDllHash
+    Write-Host 'Validating the user-supplied DLSS 5 Neural Rendering runtime...' -ForegroundColor Cyan
+    if (-not $NrDllInput -or -not (Test-Path -LiteralPath $NrDllInput -PathType Leaf)) {
+        Fail 'Set GTAIV_SETUP_NR_DLL to the appropriate user-supplied nvngx_dlssnr.dll before using this developer build script.'
+    }
+    $gpu = Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue | Where-Object { $_.Name -match 'NVIDIA' } | Select-Object -First 1
+    $gpuName = if ($gpu) { [string]$gpu.Name } else { 'NVIDIA GPU not detected by Windows' }
+    if ($gpuName -match 'RTX\s*50') {
+        $NrDllHash = $Nr50DllHash
+        $sig = Get-AuthenticodeSignature -LiteralPath $NrDllInput
+        if ($sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notmatch 'NVIDIA') { Fail 'RTX 50 NR DLL is not the expected NVIDIA-signed runtime.' }
+    } elseif ($gpuName -match 'RTX\s*40') {
+        $NrDllHash = $Nr40DllHash
+    } else {
+        Fail "This developer path currently supports RTX 40/50. Detected: $gpuName"
+    }
+    Assert-SHA256 $NrDllInput $NrDllHash
+    $NrDll = Get-Item -LiteralPath $NrDllInput
 
     Write-Host ''
     Write-Host 'Extracting the tested M3K DXVK 3.0.2 presenter from the v1.0.0 runtime payload...' -ForegroundColor Cyan
     $RuntimeZip = Join-Path $Temp 'GTAIV-DLSS-Full-Runtime.zip'
     $RuntimeDir = Join-Path $Temp 'release-runtime'
+    $RuntimeZipUrl = Resolve-ProjectAssetUrl $RuntimeAsset
     Download-File $RuntimeZipUrl $RuntimeZip
-    Assert-SHA256 $RuntimeZip $RuntimeZipHash
     Expand-Archive -LiteralPath $RuntimeZip -DestinationPath $RuntimeDir -Force
     $DxvkPresenterTemp = Join-Path $RuntimeDir 'd3d9vk_x64.dll'
     if (-not (Test-Path -LiteralPath $DxvkPresenterTemp)) { Fail 'Published runtime archive is missing d3d9vk_x64.dll.' }
     Assert-SHA256 $DxvkPresenterTemp $DxvkPresenterHash
 
-    Write-Host "Downloading/cloning project source into temporary folder: $Project" -ForegroundColor DarkGray
+    Write-Host "Cloning project source into temporary folder: $Project" -ForegroundColor DarkGray
     Write-Host 'This source checkout will be deleted automatically after use, including if installation fails.' -ForegroundColor DarkGray
     Run $Git @('clone','--filter=blob:none',$RepoUrl,$Project) 'Cloning project source'
+
+    # Preserve current maintenance/release-stage scripts before switching the checkout
+    # to the frozen rendering checkpoint. This avoids remote raw-script downloads.
+    $Support = Join-Path $Temp 'support-scripts'
+    New-Item -ItemType Directory -Path $Support -Force | Out-Null
+    $supportFiles = @{
+        'Public-ReShade-Controls-Stage.ps1' = $PublicControlsHash
+        'Public-Startup-Prime-Fix-Stage.ps1' = $StartupPrimeFixHash
+        'DLSS-Full-Control.bat' = $ControlHash
+        'Uninstall-DLSS-Full.bat' = $UninstallerHash
+    }
+    foreach ($name in $supportFiles.Keys) {
+        $src = Join-Path $Project ('install\' + $name)
+        if (-not (Test-Path -LiteralPath $src -PathType Leaf)) { Fail "Current project checkout is missing support file: $name" }
+        Assert-SHA256 $src $supportFiles[$name]
+        Copy-Item -LiteralPath $src -Destination (Join-Path $Support $name) -Force
+    }
+
     Run $Git @('-C',$Project,'checkout',$Checkpoint) 'Checking out the frozen tested project checkpoint'
     $head = (& $Git -C $Project rev-parse HEAD).Trim()
     if ($head -ne $Checkpoint) { Fail "Wrong project revision: $head" }
@@ -242,12 +267,12 @@ try {
     Write-Host ''
     Write-Host 'Adding the public ReShade DLSS controls to the frozen rendering core...' -ForegroundColor Cyan
     $publicStage = Join-Path $Project 'tools\m3k-nr\public-reshade-controls-stage.ps1'
-    Download-File $PublicControlsUrl $publicStage
+    Copy-Item -LiteralPath (Join-Path $Support 'Public-ReShade-Controls-Stage.ps1') -Destination $publicStage -Force
     Assert-SHA256 $publicStage $PublicControlsHash
 
     Write-Host 'Adding the public startup-prime release fix...' -ForegroundColor Cyan
     $primeFixStage = Join-Path $Project 'tools\m3k-nr\public-startup-prime-fix-stage.ps1'
-    Download-File $StartupPrimeFixUrl $primeFixStage
+    Copy-Item -LiteralPath (Join-Path $Support 'Public-Startup-Prime-Fix-Stage.ps1') -Destination $primeFixStage -Force
     Assert-SHA256 $primeFixStage $StartupPrimeFixHash
 
     Write-Host 'Adding the hardware-validated ReShade UX + safe master bypass v2...' -ForegroundColor Cyan
@@ -436,18 +461,16 @@ try {
     Set-KeyEquals $feedCfg 'work_resolution' '100'
 
     $controlPath = Join-Path $Game 'DLSS-Full-Control.bat'
-    $controlTemp = Join-Path $Temp 'DLSS-Full-Control.bat'
+    $controlSource = Join-Path $Support 'DLSS-Full-Control.bat'
     Write-Host 'Installing DLSS-Full-Control.bat (launch / repair / diagnostics)...' -ForegroundColor Cyan
-    Download-File $ControlUrl $controlTemp
-    Assert-SHA256 $controlTemp $ControlHash
-    Copy-Item -LiteralPath $controlTemp -Destination $controlPath -Force
+    Assert-SHA256 $controlSource $ControlHash
+    Copy-Item -LiteralPath $controlSource -Destination $controlPath -Force
 
     $uninstallerPath = Join-Path $Game 'Uninstall-DLSS-Full.bat'
-    $uninstallerTemp = Join-Path $Temp 'Uninstall-DLSS-Full.bat'
+    $uninstallerSource = Join-Path $Support 'Uninstall-DLSS-Full.bat'
     Write-Host 'Installing Uninstall-DLSS-Full.bat (restore DLAA-only baseline)...' -ForegroundColor Cyan
-    Download-File $UninstallerUrl $uninstallerTemp
-    Assert-SHA256 $uninstallerTemp $UninstallerHash
-    Copy-Item -LiteralPath $uninstallerTemp -Destination $uninstallerPath -Force
+    Assert-SHA256 $uninstallerSource $UninstallerHash
+    Copy-Item -LiteralPath $uninstallerSource -Destination $uninstallerPath -Force
 
     $receipt = @(
         'GTA IV DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering installation receipt',
@@ -461,31 +484,27 @@ try {
         'SettingsSurface=ReShade Home > Add-ons > DLSS 5 Feed > GTA IV DLSS',
         'StartupStabilization=1485x835',
         'StartupStabilizationFrames=180',
-        "PublicControlsCommit=$PublicControlsCommit",
         "PublicControlsSHA256=$PublicControlsHash",
-        "StartupPrimeFixCommit=$StartupPrimeFixCommit",
         "StartupPrimeFixSHA256=$StartupPrimeFixHash",
         "PublicUxCommit=$PublicUxCommit",
         "PublicUxMasterStageBlob=$PublicUxMasterStageBlob",
         "PublicUxFixupBlob=$PublicUxFixupBlob",
         "PublicUxV2FixupBlob=$PublicUxV2FixupBlob",
         "ReferencePublicUxFeeder=$ReferencePublicUxFeederHash",
-        "UninstallerCommit=$UninstallerCommit",
         "UninstallerSHA256=$UninstallerHash",
         "DlaaBaseline=$DlaaBaseline",
         "d3d9.dll=$bridgeHash",
         "NvRemixBridge.exe=$serverHash",
         "d3d9vk_x64.dll=$DxvkPresenterHash",
         "DxvkPresenterUpstreamCommit=$DxvkPresenterUpstreamCommit",
-        "DxvkPresenterSource=$RuntimeZipUrl#d3d9vk_x64.dll",
+        "DxvkPresenterSource=Project release v1.0.0 / GTAIV-DLSS-Full-Runtime.zip / d3d9vk_x64.dll",
         "dlss5-feed.addon64=$feederHash",
         "m3k-nvngx.dll=$shimHash",
         "nvngx_dlssnr.dll=$NrDllHash",
         "ReferenceA3S2Bridge=$ReferenceBridgeHash",
         "ReferencePreUiA3S5Feeder=$ReferenceCoreFeederHash",
         "ReferenceS27Shim=$ReferenceShimHash",
-        "NRPackage=$NrPackageUrl",
-        "NRPackageSHA256=$NrPackageHash",
+        "NRRuntimeSource=UserSupplied",
         "Backup=$Backup"
     )
     Write-NoBom (Join-Path $Game 'DLSS_FULL_INSTALLED.txt') $receipt

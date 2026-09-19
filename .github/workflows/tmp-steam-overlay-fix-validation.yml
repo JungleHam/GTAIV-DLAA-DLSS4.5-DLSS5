@@ -14,14 +14,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download immutable Steam stage and print raw SHA256
+      - name: Read immutable Steam stage from a pinned Git commit
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $commit = '0d201b70d05dc24ad5867770ba7901f92b546fc4'
-          $url = "https://raw.githubusercontent.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/$commit/install/Public-BBridge-Steam-Overlay-Fix.py"
+          git clone --filter=blob:none https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5.git _stage_source
+          git -C _stage_source checkout $commit
           $out = Join-Path $env:RUNNER_TEMP 'Public-BBridge-Steam-Overlay-Fix.py'
-          Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $out
+          Copy-Item -LiteralPath .\_stage_source\install\Public-BBridge-Steam-Overlay-Fix.py -Destination $out -Force
           $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $out).Hash.ToUpperInvariant()
           Write-Host "STEAM_FIX_RAW_SHA256=$hash"
           "STEAM_STAGE=$out" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append

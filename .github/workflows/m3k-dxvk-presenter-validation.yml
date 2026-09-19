@@ -22,7 +22,6 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $hash='511E0C2509E1922DB2EC38940507BA956908FE6DC5FD9B3DB9FEC489DC05F297'
-          $runtimeZip='1E14F1508A1AC1FAC8EAB2DD0E3D8969C99275363B43C47406D0A86D5BE36987'
           $upstream='6b20f622a77b87b2921fe5d2c1774d2f2ba3e9b7'
           $checkpoint='57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f'
 
@@ -30,7 +29,6 @@ jobs:
           foreach($marker in @(
             'v1.0.0',
             'GTAIV-DLSS-Full-Runtime.zip',
-            $runtimeZip,
             "'d3d9vk_x64.dll'='$hash'",
             "Copy-Item -LiteralPath (Join-Path `$runtimeDir 'd3d9vk_x64.dll') -Destination (Join-Path `$Trex 'd3d9vk_x64.dll') -Force",
             "Assert-SHA256 (Join-Path `$Trex 'd3d9vk_x64.dll') `$RuntimeHashes['d3d9vk_x64.dll']")) {
@@ -49,14 +47,16 @@ jobs:
 
       - name: Download and verify presenter inside public runtime
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $url='https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/v1.0.0/GTAIV-DLSS-Full-Runtime.zip'
-          $zip=Join-Path $env:RUNNER_TEMP 'runtime.zip'
+          $downloadDir=Join-Path $env:RUNNER_TEMP 'published-runtime'
           $dir=Join-Path $env:RUNNER_TEMP 'runtime'
-          Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $zip
-          $zipHash=(Get-FileHash -Algorithm SHA256 $zip).Hash.ToUpperInvariant()
-          if($zipHash -ne '1E14F1508A1AC1FAC8EAB2DD0E3D8969C99275363B43C47406D0A86D5BE36987'){throw "Runtime ZIP hash mismatch: $zipHash"}
+          New-Item -ItemType Directory -Path $downloadDir -Force | Out-Null
+          gh release download v1.0.0 --repo $env:GITHUB_REPOSITORY --pattern 'GTAIV-DLSS-Full-Runtime.zip' --dir $downloadDir --clobber
+          if ($LASTEXITCODE -ne 0) { throw "gh release download failed: $LASTEXITCODE" }
+          $zip=Join-Path $downloadDir 'GTAIV-DLSS-Full-Runtime.zip'
           Expand-Archive -LiteralPath $zip -DestinationPath $dir -Force
           $presenter=Join-Path $dir 'd3d9vk_x64.dll'
           $actual=(Get-FileHash -Algorithm SHA256 $presenter).Hash.ToUpperInvariant()

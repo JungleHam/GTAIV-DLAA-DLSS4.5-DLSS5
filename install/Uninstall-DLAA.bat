@@ -11,10 +11,8 @@ $Self = $env:GTAIV_UNINSTALL_SELF
 $Temp = Join-Path $env:TEMP ("GTAIV_DLAA_UNINSTALL_" + $PID)
 $Safety = Join-Path $Temp 'safety'
 $Log = Join-Path $Temp 'Uninstall-DLAA.log'
-$ReshadeSetup = Join-Path $Temp 'ReShade_Setup_6.8.0_Addon.exe'
 $TranscriptStarted = $false
 $Succeeded = $false
-$ReShadeUninstalled = $false
 $GlobalReShade = 'C:\ProgramData\ReShade\ReShade64.dll'
 $GlobalReShadeBackup = 'C:\ProgramData\ReShade\ReShade64.dll.pre-bbridge-input'
 
@@ -23,16 +21,6 @@ function Is-Admin {
     $id = [Security.Principal.WindowsIdentity]::GetCurrent()
     $p = New-Object Security.Principal.WindowsPrincipal($id)
     return $p.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-}
-function Download([string]$Url,[string]$Dest) {
-    $curl = Get-Command curl.exe -ErrorAction SilentlyContinue
-    if ($curl) {
-        & curl.exe -L --fail --retry 3 --connect-timeout 20 --silent --show-error -o $Dest $Url
-        if ($LASTEXITCODE -ne 0) { Fail "Download failed: $Url" }
-    } else {
-        Invoke-WebRequest -UseBasicParsing -Uri $Url -OutFile $Dest
-    }
-    if (-not (Test-Path -LiteralPath $Dest)) { Fail "Downloaded file is missing: $Url" }
 }
 function Resolve-GameFolder {
     Write-Host ''
@@ -111,12 +99,6 @@ function Restore-Safety([string]$Game) {
     if ($cfg) { Copy-Path $cfg.FullName (Join-Path $plugins $cfg.Name) }
     Copy-Path (Join-Path $Safety 'plugins\GTAIV.EFLC.FusionFix.ini') (Join-Path $plugins 'GTAIV.EFLC.FusionFix.ini')
 
-    if ($ReShadeUninstalled -and (Test-Path -LiteralPath $ReshadeSetup) -and (Test-Path -LiteralPath (Join-Path $trex 'NvRemixBridge.exe'))) {
-        try {
-            $target = Join-Path $trex 'NvRemixBridge.exe'
-            Start-Process -FilePath $ReshadeSetup -ArgumentList @("`"$target`"",'--api','vulkan','--headless') -Wait | Out-Null
-        } catch {}
-    }
     Copy-Path (Join-Path $Safety 'global-reshade\ReShade64.dll') $GlobalReShade
     Copy-Path (Join-Path $Safety 'global-reshade\ReShade64.dll.pre-bbridge-input') $GlobalReShadeBackup
 }
@@ -212,25 +194,18 @@ try {
     $TranscriptStarted = $true
     Snapshot-Current $Game
 
-    $needReShadeCleanup = (Test-Path -LiteralPath (Join-Path $Trex 'ReShade.ini')) -or (Test-Path -LiteralPath $GlobalReShadeBackup) -or (Has-PatchMarker $GlobalReShade)
+    $needReShadeCleanup = (Test-Path -LiteralPath $GlobalReShadeBackup) -or (Has-PatchMarker $GlobalReShade)
     if ($needReShadeCleanup) {
         Write-Host ''
-        Write-Host '[1/3] Removing the ReShade Vulkan layer/input patch installed by this project...' -ForegroundColor Cyan
-        try { Download 'https://reshade.me/downloads/ReShade_Setup_6.8.0_Addon.exe' $ReshadeSetup }
-        catch { Download 'https://www.reshade.me/releases/ReShade-6.8.0-Addon-setup.exe' $ReshadeSetup }
-        if ((Get-Item -LiteralPath $ReshadeSetup).Length -lt 1MB) { Fail 'ReShade setup download is unexpectedly small.' }
-
-        if ((Test-Path -LiteralPath $GlobalReShadeBackup) -and (Has-PatchMarker $GlobalReShade)) {
+        Write-Host '[1/3] Removing this project''s ReShade input patch...' -ForegroundColor Cyan
+        if (Test-Path -LiteralPath $GlobalReShadeBackup) {
             Copy-Item -LiteralPath $GlobalReShadeBackup -Destination $GlobalReShade -Force
+            Remove-Item -LiteralPath $GlobalReShadeBackup -Force
+        } elseif (Has-PatchMarker $GlobalReShade) {
+            Fail 'The project ReShade input patch is active, but its official ReShade backup is missing. Reinstall official ReShade using the ReShade GitHub project page and its official-site link, then run removal again.'
         }
-        $rsTarget = if (Test-Path -LiteralPath (Join-Path $Trex 'NvRemixBridge.exe')) { Join-Path $Trex 'NvRemixBridge.exe' } else { Join-Path $Game 'GTAIV.exe' }
-        $p = Start-Process -FilePath $ReshadeSetup -ArgumentList @("`"$rsTarget`"",'--api','vulkan','--headless','--state','uninstall') -Wait -PassThru
-        if ($p.ExitCode -ne 0) { Fail "ReShade Vulkan uninstall failed with exit code $($p.ExitCode)." }
-        $ReShadeUninstalled = $true
-        if (Test-Path -LiteralPath $GlobalReShadeBackup) { Remove-Item -LiteralPath $GlobalReShadeBackup -Force }
-        if (Has-PatchMarker $GlobalReShade) { Remove-Item -LiteralPath $GlobalReShade -Force }
     } else {
-        Write-Host '[1/3] No project ReShade Vulkan/input-patch state detected.' -ForegroundColor DarkGray
+        Write-Host '[1/3] No project ReShade input-patch state detected.' -ForegroundColor DarkGray
     }
 
     Write-Host '[2/3] Restoring the exact pre-DLAA FusionFix files...' -ForegroundColor Cyan
@@ -246,7 +221,7 @@ try {
     Write-Host ' DONE - GTA IV + FUSIONFIX BASELINE RESTORED' -ForegroundColor Green
     Write-Host '============================================================' -ForegroundColor Green
     Write-Host 'Everything installed by this project has been removed from the GTA IV runtime.' -ForegroundColor Green
-    Write-Host 'FusionFix and GTA IV were left in place.' -ForegroundColor Green
+    Write-Host 'FusionFix, GTA IV, and the official ReShade installation were left in place.' -ForegroundColor Green
     Write-Host 'Launch GTA IV normally to verify the clean FusionFix baseline.' -ForegroundColor White
 }
 catch {

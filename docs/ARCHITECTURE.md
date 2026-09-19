@@ -111,7 +111,7 @@ The name `startup prime` may still appear in logs/config because that is the ori
 
 ## DLSS 5 Neural Rendering
 
-Step 4 also installs the tested Neural Rendering runtime but leaves it OFF by default.
+Step 4 validates and installs the user-supplied Neural Rendering runtime but leaves it OFF by default. The project intentionally provides no direct NR runtime download link.
 
 When enabled, the current rendering order is:
 

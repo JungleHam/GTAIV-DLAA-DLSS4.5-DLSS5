@@ -6,19 +6,13 @@ You do not install a separate Neural Rendering mod after that step.
 
 ## What gets installed
 
-The combined Step 4 installer downloads and verifies:
-
-```text
-nvngx_dlssnr.dll 310.8.0-RTX40
-```
-
-and places it at:
+The combined Step 4 installer asks you to select the downloaded Neural Rendering ZIP, verifies the GPU-specific runtime, extracts it itself, and places the validated DLL at:
 
 ```text
 GTAIV\.trex\m3k\nvngx_dlssnr.dll
 ```
 
-The runtime is installed automatically, but Neural Rendering starts **OFF by default**.
+The selected runtime is copied automatically after validation, but Neural Rendering starts **OFF by default**. The installer opens only the GitHub repository and provides click-by-click instructions for reaching Releases and older release pages; this project stores no direct NR asset URL.
 
 ## Turn Neural Rendering ON or OFF
 
@@ -62,17 +56,14 @@ Neural Rendering adds a substantial GPU workload, especially on RTX 40 hardware.
 
 ## GPU/runtime notes
 
-The current tested runtime is:
+The installer supports two pinned user-supplied NR variants. Start at <https://github.com/RankFTW/rhi-repo>. Verify the repository is **RankFTW/rhi-repo**, click **Releases** in the right sidebar, and move through older release pages with **Next** until the exact pinned tag appears. GitHub's **Find a release** box can also be used when available:
 
-```text
-nvngx_dlssnr.dll 310.8.0-RTX40
-```
+- **RTX 40:** search `dlssnr-310.8.0-RTX40`, open the matching release, expand **Assets**, and download `nvngx_dlssnr_310.8.0-RTX40.zip`. Expected DLL SHA256: `4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05`.
+- **RTX 50:** search `dlssnr-310.8.0`, open the plain 310.8.0 release (not RTX40), expand **Assets**, and download `nvngx_dlssnr_310.8.0.zip`. Expected DLL SHA256: `E16BCF15E16E13F527491CDF7845B2FE6521A738D8F7C9C721866A8496E1FC8E`.
 
-It is the RTX 40/50-compatible build used by this project. Direct project validation is on RTX 4070 Ti SUPER.
+Normal users provide the ZIP directly and do **not** extract it. See [`PREREQUISITES.md`](PREREQUISITES.md) for the full walkthrough.
 
-The runtime reports a minimum NVIDIA driver of **615.00**. Use 615.00 or newer before enabling Neural Rendering.
-
-Other GPU-generation Neural Rendering variants are outside the current validated install path.
+Direct project validation is on RTX 4070 Ti SUPER. The tested NR runtime reports a minimum NVIDIA driver of **615.00**.
 
 ## Underlying config
 

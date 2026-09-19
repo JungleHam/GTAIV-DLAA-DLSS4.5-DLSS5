@@ -2,65 +2,37 @@
 
 ## Purpose
 
-Step 2 creates a clean, known-good DLAA baseline before the ReShade controls fix and the combined DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering module are added.
+DLAA establishes the native-resolution temporal baseline used by the project before Super Resolution and Neural Rendering are added.
 
-## Prerequisites
+## Beginner preparation
 
-Use GTA IV Complete Edition with a clean, working **FusionFix 5.0.1** installation.
+Create one temporary folder such as:
 
-Before running the project installer:
+```text
+Desktop\GTA IV DLSS Setup Files\
+```
 
-1. launch GTA IV once;
-2. verify FusionFix loads normally;
-3. close GTA IV completely;
-4. make sure no old `.trex` folder or previous bridge experiment remains.
+Keep `GTAIV-DLSS-Setup.exe` and every prerequisite download in that folder. **Do not manually install or extract any prerequisite.** See [`PREREQUISITES.md`](PREREQUISITES.md) for the exact GitHub clicks.
 
-The installer is deliberately strict because its rollback logic assumes a clean FusionFix baseline.
+For a fresh DLAA setup you may need:
+
+- `GTAIV.EFLC.FusionFix.zip` if FusionFix is not already installed;
+- official ReShade 6.8.0 **Full Add-On Support** setup EXE;
+- official LumeniteFX ZIP from commit `f8cbbb4eccfcb7adf0d74bb358ba349272e3c1e9`.
+
+Setup installs/extracts these itself. If it installs FusionFix, it will ask you to launch GTA IV normally once to the main menu, close it, then rerun setup from the same folder. That first game launch is required by FusionFix; there is no other manual install step.
 
 ## Install
 
-Copy:
+Run `GTAIV-DLSS-Setup.exe` as Administrator, select the GTA IV folder, and choose **Install / repair DLAA**.
 
-```text
-install/Install-DLAA.bat
-```
+Setup validates the local prerequisite files. It runs the official ReShade installer against the bridge renderer itself, extracts LumeniteFX, and installs the project runtime. Do **not** run ReShade or unpack LumeniteFX yourself.
 
-beside `GTAIV.exe` and run it.
+The project runtime supplies the pinned b-bridge/DXVK integration, DLSS5-Feeder pieces, ReShade headers, and NVIDIA `nvngx_dlss.dll` 310.9.1.
 
-The BAT contains an embedded PowerShell installer and elevates itself because ReShade's global Vulkan-layer registration requires Administrator permission.
+After official ReShade installs its Vulkan layer, the project applies its b-bridge input-patched ReShade DLL so the Home key, keyboard and mouse work with the 64-bit bridge renderer. The official DLL is backed up for restoration during project removal.
 
-It downloads pinned upstream packages and verifies hashes recorded in `manifests/versions.json` where available.
-
-## Resulting important files
-
-```text
-GTAIV\
-  dinput8.dll                     FusionFix ASI loader
-  d3d9.dll                        bridge client
-  d3d9Hooked.dll                  FusionFix renderer wrapper chained by the bridge
-  dxvk.conf
-  commandline.txt
-  .trex\
-    NvRemixBridge.exe             64-bit renderer process
-    d3d9vk_x64.dll
-    bridge.conf
-    ReShade.ini
-    ReShadePreset.ini
-    dlss5-feed.addon64
-    dlss5-feed.cfg
-    nvngx_dlss.dll                310.9.1
-    reshade-shaders\
-      Shaders\
-        lumenite_Kernel.fx
-        DLSS5_Feed.fx
-        ReShade.fxh
-        ReShadeUI.fxh
-        DrawText.fxh
-      Textures\
-        lumenite_bluenoise256.png
-```
-
-## Known-good base configuration
+## Known-good baseline
 
 FusionFix:
 
@@ -77,12 +49,6 @@ Antialiasing=5
 FpsLimitPreset=0
 ```
 
-`commandline.txt`:
-
-```text
--windowed
-```
-
 DLSS feeder:
 
 ```ini
@@ -91,72 +57,14 @@ mode=2
 work_resolution=100
 ```
 
-ReShade preset:
+At this stage GTA IV still renders at native/output resolution. Super Resolution and Neural Rendering are not enabled by the DLAA-only mode.
 
-```ini
-Techniques=Lumenite_Kernel@lumenite_Kernel.fx,DLSS5_Feed@DLSS5_Feed.fx
-TechniqueSorting=Lumenite_Kernel@lumenite_Kernel.fx,DLSS5_Feed@DLSS5_Feed.fx,DLSS5_Feed_Debug@DLSS5_Feed.fx
-
-[DLSS5_Feed.fx]
-PreprocessorDefinitions=DLSS5_MV_PROVIDER=3
-```
-
-Do not append `\**` to the ReShade shader search paths in this stack.
-
-## What Step 2 intentionally does not install
-
-Step 2 is only the **DLAA baseline**. It does not yet add:
-
-- DLSS Super Resolution quality modes;
-- the temporal synchronization used by Super Resolution;
-- automatic startup stabilization;
-- the DLSS 5 Neural Rendering runtime.
-
-Those arrive together in Step 4.
-
-After Step 2 you should therefore not yet have:
-
-```text
-.trex\m3k-nr.ini
-.trex\m3k\m3k-nvngx.dll
-.trex\m3k\nvngx_dlssnr.dll
-```
-
-The `m3k` name in those paths is only the project's internal integration namespace.
-
-## DLAA model / preset selector
-
-After completing the **ReShade controls fix** in Step 3, press Home and open:
-
-```text
-Add-ons -> DLSS 5 Feed -> DLSS render preset -> Preset
-```
-
-Recommended starting point: **K**.
-
-- **K** — modern transformer; normal recommendation.
-- **J** — modern alternative; may trade a little less ghosting for more flicker.
-- **Default** — runtime-selected policy.
-- **E/F** — legacy CNN troubleshooting choices.
-
-Changing the preset rebuilds the DLSS feature and may briefly hitch.
-
-At this stage GTA IV still renders at native/output resolution; this selector does not by itself enable Super Resolution.
-
-## Verify before continuing
+## Verify
 
 Launch GTA IV and inspect:
 
 ```text
-.trex\dlss5-feed.log
+GTAIV\.trex\dlss5-feed.log
 ```
 
-Expected evidence includes:
-
-```text
-DLSS5_MV_PROVIDER=3
-feature ready: <native resolution> DLAA ...
-frame ... delivered
-```
-
-Only after the DLAA baseline works should you continue to Step 3 and Step 4.
+Expected evidence includes the Lumenite motion-vector provider, successful DLAA feature creation and delivered frames. Press **Home** to confirm the ReShade overlay accepts keyboard and mouse input.

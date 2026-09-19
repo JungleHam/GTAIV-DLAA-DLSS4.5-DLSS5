@@ -161,13 +161,17 @@ Check:
 .trex\dlss5-feed.log
 ```
 
-The tested NR DLL hash is:
+Check the installed NR DLL against the GPU-specific value:
 
 ```text
+RTX 40 compatibility:
 4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05
+
+RTX 50 NVIDIA-signed:
+E16BCF15E16E13F527491CDF7845B2FE6521A738D8F7C9C721866A8496E1FC8E
 ```
 
-The current validated NR package targets RTX 40/50. Direct project validation is on RTX 4070 Ti SUPER, and the tested runtime requires NVIDIA driver 615.00 or newer when NR is enabled.
+For RTX 50, the DLL must also have a valid NVIDIA Authenticode signature. Direct project validation is on RTX 4070 Ti SUPER, and the tested runtime requires NVIDIA driver 615.00 or newer when NR is enabled.
 
 Successful logs may include:
 

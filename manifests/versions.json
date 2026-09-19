@@ -1,41 +1,50 @@
 {
-  "project_status": "v1.0.0-public-release-2026-09-17",
+  "project_status": "github-clean-layman-prerequisite-flow-source-rebuild-required",
   "components": {
     "fusionfix": {
       "version": "5.0.1",
       "url": "https://github.com/ThirteenAG/GTAIV.EFLC.FusionFix",
       "sha256": "3c202398c133392be985854654f169514e055812cc302ef24e6aa97495975b41",
-      "installed_by_project": false
+      "installed_by_project": true,
+      "user_supplied_official_archive": true,
+      "expected_archive_name": "GTAIV.EFLC.FusionFix.zip",
+      "installer_instruction": "Open official GitHub repository; right sidebar > Releases > GTAIV.EFLC.FusionFix v5.0.1 > Assets > GTAIV.EFLC.FusionFix.zip. Save beside setup EXE; do not extract."
     },
     "prebuilt_release": {
       "tag": "v1.0.0",
       "release_url": "https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/tag/v1.0.0",
       "reshade_input_patch": {
         "asset": "ReShade64-bbridge.dll",
-        "url": "https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/v1.0.0/ReShade64-bbridge.dll",
         "sha256": "75976007a0a5de5bab364f98e2d01b377d046441c94e89b1dd279cee856161a9",
         "source": "ReShade 6.8.0 + tools/reshade-bbridge-input/apply_patch.ps1",
         "build": "GitHub Actions"
       },
       "dlss_full_runtime": {
         "asset": "GTAIV-DLSS-Full-Runtime.zip",
-        "url": "https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/v1.0.0/GTAIV-DLSS-Full-Runtime.zip",
-        "sha256": "1e14f1508a1ac1fac8eab2dd0e3d8969c99275363b43c47406d0a86d5be36987",
+        "sha256": "REBUILD_REQUIRED_AFTER_CLEANUP",
         "files": {
           "d3d9.dll": "eca7c9cf9cd1c4835cea7fd57ad168a35e157f081c0eadba51af35f501026f28",
           "NvRemixBridge.exe": "8a89a3dbbc02d56ba98254941b14e52d88efef3f95e491c9c6af5adc65fecffa",
           "d3d9vk_x64.dll": "511e0c2509e1922db2ec38940507ba956908fe6dc5fd9b3db9fec489dc05f297",
           "dlss5-feed.addon64": "95259612c7aa82dfc913e6ac4405a27b41c29f0de4975592e972a9a1435879b2",
-          "m3k/m3k-nvngx.dll": "69d63d238780f93f8abc3d59c97c9e577a7845c557c1dc7a8f28ff3a84aae51a"
+          "m3k/m3k-nvngx.dll": "69d63d238780f93f8abc3d59c97c9e577a7845c557c1dc7a8f28ff3a84aae51a",
+          "DLSS5_Feed.fx": "cdac08a721b14b97187dd86c5b5bead157c9063d7ee859a0f131a8ee791695f1",
+          "nvngx_dlss.dll": "3975567b8943c53acce397f2b72380092f84f162d00b0d2c7d08a1025c563983",
+          "ReShade.fxh": "6dabfbbaf968c3871905d2ea17f96572ff7b1cec01310b5d0e5252b66b30174f",
+          "ReShadeUI.fxh": "78adf672df47460297eb9fe6dd238d2aafa24510b52b84feb1a745dff70eb901",
+          "DrawText.fxh": "b79cc4dfb3e98bcf4c06193d00ea7631d74f467f73a4deeeee13e71336d3e680",
+          "bridge.conf": "161557ed3b3dee86d9b9bea3d3323924ee1f9f7ff47a139e3075b787b752ec8c",
+          "dxvk.conf": "509713876c2c9efbc70d242c4474e76554c59d2a0b162695085a31b8fe772247"
         },
         "build": "GitHub Actions from pinned sources"
       }
     },
     "b-bridge": {
       "version": "0.1.0",
+      "source_repository": "https://github.com/gutbash/b-bridge",
       "source_commit": "1dad5e6d4dcf8647e354aa9a87f611256fb61142",
-      "package_url": "https://github.com/gutbash/b-bridge/releases/download/v0.1.0/b-bridge-0.1.0.zip",
-      "package_sha256": "d5691ad68cca6e731bbe12b34b14b6a8288e2e7e319e8ef0e13e0f3a59c31c55"
+      "license": "MIT",
+      "bundled_in_project_runtime": true
     },
     "dlss-full": {
       "product_name": "DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering",
@@ -90,26 +99,35 @@
     "reshade": {
       "version": "6.8.0",
       "tag_commit": "18deaa52de0c425a78b329e9cb3c497281cd00ec",
-      "setup_url_primary": "https://reshade.me/downloads/ReShade_Setup_6.8.0_Addon.exe",
-      "setup_url_fallback": "https://www.reshade.me/releases/ReShade-6.8.0-Addon-setup.exe",
+      "user_supplied_official_setup": true,
+      "expected_setup_sha256": "afe4c8f13048306307983b8b3d41d5bf00a86820440b0e57dea10950e1176445",
       "input_patch_source": "tools/reshade-bbridge-input/apply_patch.ps1",
-      "input_patch_build": "prebuilt by GitHub Actions for release installs"
+      "input_patch_build": "prebuilt by GitHub Actions for release installs",
+      "source_repository": "https://github.com/crosire/reshade",
+      "installer_discovery": "Open the GitHub repository; in the About box click the project website; download ReShade 6.8.0 with full add-on support; select the EXE locally."
     },
     "dlss5-feeder": {
       "version": "0.15.1",
-      "url": "https://github.com/jlrouzies-fr/DLSS5-Feeder/releases/download/v0.15.1/DLSS5-Feeder-0.15.1.zip",
-      "sha256": "2e44e81e691e75e532b9b7babc278a12615cb7f0fd9ef854da50e6ef17b272f4"
+      "source_repository": "https://github.com/jlrouzies-fr/DLSS5-Feeder",
+      "license": "MIT",
+      "bundled_in_project_runtime": true,
+      "release_archive_sha256_reference": "2e44e81e691e75e532b9b7babc278a12615cb7f0fd9ef854da50e6ef17b272f4"
     },
     "lumenitefx": {
+      "source_repository": "https://github.com/umar-afzaal/LumeniteFX",
       "commit": "f8cbbb4eccfcb7adf0d74bb358ba349272e3c1e9",
-      "url": "https://codeload.github.com/umar-afzaal/LumeniteFX/zip/f8cbbb4eccfcb7adf0d74bb358ba349272e3c1e9"
+      "user_supplied_official_archive": true,
+      "expected_archive_sha256": "43220f99fc0ffa0216e01ebd657180f8c9d043c939f760283b896ea257f1b6a2",
+      "installer_instruction": "Open official repo at pinned commit and use Code > Download ZIP"
     },
     "nvngx_dlss": {
       "product": "DLSS 4.5 Super Resolution / DLAA runtime",
       "version": "310.9.1",
-      "package_url": "https://github.com/RankFTW/rhi-repo/releases/download/dlss-310.9.1/nvngx_dlss_310.9.1.zip",
-      "package_sha256": "aaba83b288bd145c3808e8d7a0ba03cc8c8676d18ad984b1bfa6563046a3ba37",
-      "dll_sha256": "3975567b8943c53acce397f2b72380092f84f162d00b0d2c7d08a1025c563983"
+      "official_source_repository": "https://github.com/NVIDIA/DLSS",
+      "official_tag": "v310.9.1",
+      "official_member": "lib/Windows_x86_64/rel/nvngx_dlss.dll",
+      "dll_sha256": "3975567b8943c53acce397f2b72380092f84f162d00b0d2c7d08a1025c563983",
+      "bundled_in_project_runtime": true
     },
     "nvngx_dlssnr": {
       "product": "DLSS 5 Neural Rendering runtime",
@@ -117,22 +135,31 @@
       "version": "310.8.0",
       "default_enabled": false,
       "installed_path": ".trex/m3k/nvngx_dlssnr.dll",
+      "user_supplied": true,
+      "direct_download_links_provided": false,
       "variants": {
         "rtx50_original_nvidia_signed": {
           "gpu": "RTX 50 Series",
-          "package_url": "https://github.com/RankFTW/rhi-repo/releases/download/dlssnr-310.8.0/nvngx_dlssnr_310.8.0.zip",
-          "package_sha256": "388c0a7912e15ec911b9c9e11a692142b11fe387ddf2b637d8c358138fffb3ac",
+          "search_instruction": "RankFTW/rhi-repo > Releases > older pages via Next > exact tag dlssnr-310.8.0 > Assets > nvngx_dlssnr_310.8.0.zip",
           "dll_sha256": "e16bcf15e16e13f527491cdf7845b2fe6521a738d8f7c9c721866a8496e1fc8e",
-          "authenticode": "NVIDIA-signed original runtime"
+          "authenticode": "Require valid NVIDIA signature",
+          "release_search": "dlssnr-310.8.0",
+          "archive_name": "nvngx_dlssnr_310.8.0.zip",
+          "archive_sha256": "388c0a7912e15ec911b9c9e11a692142b11fe387ddf2b637d8c358138fffb3ac"
         },
         "rtx40_compatibility": {
           "gpu": "RTX 40 Series",
-          "package_url": "https://github.com/RankFTW/rhi-repo/releases/download/dlssnr-310.8.0-RTX40/nvngx_dlssnr_310.8.0-RTX40.zip",
-          "package_sha256": "46124cfaef532ad5f6da07494772ea8c1b3e719f934e254385697f38d1289e3f",
+          "search_instruction": "RankFTW/rhi-repo > Releases > older pages via Next > exact tag dlssnr-310.8.0-RTX40 > Assets > nvngx_dlssnr_310.8.0-RTX40.zip",
           "dll_sha256": "4b8d19bc3eff58a084f5eca7489c921501c203450169fb82ff4f649a4482ba05",
-          "validation": "Project-tested on RTX 4070 Ti SUPER"
+          "validation": "Project-tested modded compatibility DLL on RTX 4070 Ti SUPER",
+          "release_search": "dlssnr-310.8.0-RTX40",
+          "archive_name": "nvngx_dlssnr_310.8.0-RTX40.zip",
+          "archive_sha256": "46124cfaef532ad5f6da07494772ea8c1b3e719f934e254385697f38d1289e3f"
         }
-      }
+      },
+      "catalog_release_page": "https://github.com/RankFTW/rhi-repo",
+      "installer_accepts": "ZIP archive (normal user flow); extracted DLL remains supported internally",
+      "navigation_instruction": "Open RankFTW/rhi-repo; right sidebar > Releases; use Next through older release pages until exact pinned tag appears; download exact ZIP from Assets; do not extract."
     },
     "m3k-dxvk-presenter": {
       "product": "M3K DXVK render/output presenter for DLSS Super Resolution",
@@ -142,10 +169,10 @@
       "release_tag": "v1.0.0",
       "asset": "GTAIV-DLSS-Full-Runtime.zip",
       "archive_member": "d3d9vk_x64.dll",
-      "url": "https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/v1.0.0/GTAIV-DLSS-Full-Runtime.zip",
       "dll_sha256": "511e0c2509e1922db2ec38940507ba956908fe6dc5fd9b3db9fec489dc05f297",
       "installed_path": ".trex/d3d9vk_x64.dll",
-      "installed_automatically": true
+      "installed_automatically": true,
+      "release_page": "https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/tag/v1.0.0"
     }
   }
 }

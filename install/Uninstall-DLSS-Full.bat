@@ -15,8 +15,6 @@ $Log = Join-Path $Game 'DLSS_FULL_uninstall.log'
 $Temp = Join-Path $env:TEMP ("GTAIV_DLSS_FULL_UNINSTALL_" + $PID)
 $TranscriptStarted = $false
 $Safety = $null
-$BBridgePackageUrl = 'https://github.com/gutbash/b-bridge/releases/download/v0.1.0/b-bridge-0.1.0.zip'
-$BBridgePackageHash = 'D5691AD68CCA6E731BBE12B34B14B6A8288E2E7E319E8EF0E13E0F3A59C31C55'
 
 function Fail([string]$Message) { throw $Message }
 
@@ -31,9 +29,9 @@ $RuntimeFiles = @(
     '.trex\m3k\nvngx_dlssnr.dll'
 )
 # Old Full installers (before the public presenter packaging fix) did not copy
-# d3d9vk_x64.dll into their preinstall backup. These four files are enough to
-# identify the original DLAA-only runtime; the missing stock presenter can be
-# reconstructed from the exact pinned b-bridge 0.1.0 package.
+# d3d9vk_x64.dll into their preinstall backup. The cleaned uninstaller never
+# downloads a third-party archive; if needed it reuses the verified presenter
+# preserved in the pre-uninstall Full-runtime safety snapshot.
 $DlaaBaselineCore = @(
     'd3d9.dll',
     '.trex\NvRemixBridge.exe',
@@ -73,19 +71,6 @@ function Assert-SHA256([string]$Path,[string]$Expected) {
     }
 }
 
-function Download-File([string]$Url,[string]$Dest) {
-    Write-Host "Downloading: $Url" -ForegroundColor Cyan
-    Write-Host "  Temporary file: $Dest" -ForegroundColor DarkGray
-    Write-Host '  This download will be deleted automatically after use, including if uninstall fails.' -ForegroundColor DarkGray
-    $curl = Get-Command curl.exe -ErrorAction SilentlyContinue
-    if ($curl) {
-        & curl.exe -L --fail --retry 3 --connect-timeout 20 --silent --show-error -o $Dest $Url
-        if ($LASTEXITCODE -ne 0) { Fail "Download failed: $Url" }
-    } else {
-        Invoke-WebRequest -UseBasicParsing -Uri $Url -OutFile $Dest
-    }
-    if (-not (Test-Path -LiteralPath $Dest)) { Fail "Downloaded file is missing: $Dest" }
-}
 
 function Remove-TemporaryFiles {
     if (-not (Test-Path -LiteralPath $Temp)) { return }
@@ -140,42 +125,21 @@ function Restore-RuntimeSnapshot([string]$Path) {
     }
 }
 
-function Restore-StockDlaaPresenterIfMissing([string]$Baseline) {
+function Restore-DlaaPresenterIfMissing([string]$Baseline,[string]$SafetySnapshot) {
     $dst = Join-Path $Trex 'd3d9vk_x64.dll'
     $baselinePresenter = Join-Path $Baseline '.trex\d3d9vk_x64.dll'
     if (Test-Path -LiteralPath $baselinePresenter) {
-        if (-not (Test-Path -LiteralPath $dst)) {
-            Copy-Item -LiteralPath $baselinePresenter -Destination $dst -Force
-        }
+        if (-not (Test-Path -LiteralPath $dst)) { Copy-Item -LiteralPath $baselinePresenter -Destination $dst -Force }
         return
     }
-
-    Write-Host ''
-    Write-Host 'Legacy DLAA backup detected: it predates d3d9vk_x64.dll backup support.' -ForegroundColor Yellow
-    Write-Host 'Restoring the original stock DLAA presenter from pinned b-bridge 0.1.0...' -ForegroundColor Cyan
-
-    Remove-TemporaryFiles
-    New-Item -ItemType Directory -Path $Temp -Force | Out-Null
-    Write-Host "Temporary download/work folder: $Temp" -ForegroundColor DarkGray
-    Write-Host 'Everything downloaded or extracted here will be deleted automatically after use, including if uninstall fails.' -ForegroundColor DarkGray
-
-    $zip = Join-Path $Temp 'b-bridge-0.1.0.zip'
-    $extract = Join-Path $Temp 'b-bridge'
-    Download-File $BBridgePackageUrl $zip
-    Assert-SHA256 $zip $BBridgePackageHash
-    Expand-Archive -LiteralPath $zip -DestinationPath $extract -Force
-
-    $bridgeClient = Get-ChildItem -LiteralPath $extract -Filter 'd3d9.dll' -File -Recurse |
-        Where-Object { Test-Path -LiteralPath (Join-Path $_.Directory.FullName '.trex\NvRemixBridge.exe') } |
-        Select-Object -First 1
-    if (-not $bridgeClient) { Fail 'Could not locate the pinned b-bridge 0.1.0 GTA IV payload.' }
-
-    $stockPresenter = Join-Path $bridgeClient.Directory.FullName '.trex\d3d9vk_x64.dll'
-    if (-not (Test-Path -LiteralPath $stockPresenter)) {
-        Fail 'Pinned b-bridge 0.1.0 package is missing .trex\d3d9vk_x64.dll.'
+    $safetyPresenter = Join-Path $SafetySnapshot '.trex\d3d9vk_x64.dll'
+    $expected = '511E0C2509E1922DB2EC38940507BA956908FE6DC5FD9B3DB9FEC489DC05F297'
+    if ((Test-Path -LiteralPath $safetyPresenter) -and ((Hash $safetyPresenter) -eq $expected)) {
+        Copy-Item -LiteralPath $safetyPresenter -Destination $dst -Force
+        Write-Host 'Legacy baseline: reused the verified project presenter from the safety snapshot.' -ForegroundColor Green
+        return
     }
-    Copy-Item -LiteralPath $stockPresenter -Destination $dst -Force
-    Write-Host 'Original DLAA DXVK presenter restored from pinned b-bridge 0.1.0.' -ForegroundColor Green
+    Fail 'Legacy DLAA baseline is missing d3d9vk_x64.dll and no verified project presenter was available in the safety snapshot. Nothing will be downloaded from a third-party archive.'
 }
 
 try {
@@ -207,7 +171,7 @@ try {
     $legacyBaseline = -not (Test-Path -LiteralPath (Join-Path $Baseline '.trex\d3d9vk_x64.dll'))
     Write-Host "DLAA baseline selected: $Baseline" -ForegroundColor Cyan
     if ($legacyBaseline) {
-        Write-Host 'Baseline format: legacy (stock DXVK presenter will be reconstructed from pinned b-bridge 0.1.0).' -ForegroundColor Yellow
+        Write-Host 'Baseline format: legacy (presenter will be recovered from the verified Full-runtime safety snapshot).' -ForegroundColor Yellow
     } else {
         Write-Host 'Baseline format: complete.' -ForegroundColor DarkGray
     }
@@ -218,7 +182,7 @@ try {
     Write-Host "Current DLSS Full runtime backed up to: $Safety" -ForegroundColor DarkGray
 
     Restore-RuntimeSnapshot $Baseline
-    Restore-StockDlaaPresenterIfMissing $Baseline
+    Restore-DlaaPresenterIfMissing $Baseline $Safety
 
     foreach ($rel in $FullOnly) {
         $p = Join-Path $Game $rel

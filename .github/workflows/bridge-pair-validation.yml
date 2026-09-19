@@ -35,13 +35,16 @@ jobs:
 
       - name: Download and verify published matched pair
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $url='https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/download/v1.0.0/GTAIV-DLSS-Full-Runtime.zip'
-          $zip=Join-Path $env:RUNNER_TEMP 'runtime.zip'
+          $downloadDir=Join-Path $env:RUNNER_TEMP 'published-runtime'
           $dir=Join-Path $env:RUNNER_TEMP 'runtime'
-          Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $zip
-          if ((Get-FileHash -Algorithm SHA256 $zip).Hash.ToUpperInvariant() -ne '1E14F1508A1AC1FAC8EAB2DD0E3D8969C99275363B43C47406D0A86D5BE36987') { throw 'Runtime ZIP hash mismatch' }
+          New-Item -ItemType Directory -Path $downloadDir -Force | Out-Null
+          gh release download v1.0.0 --repo $env:GITHUB_REPOSITORY --pattern 'GTAIV-DLSS-Full-Runtime.zip' --dir $downloadDir --clobber
+          if ($LASTEXITCODE -ne 0) { throw "gh release download failed: $LASTEXITCODE" }
+          $zip=Join-Path $downloadDir 'GTAIV-DLSS-Full-Runtime.zip'
           Expand-Archive -LiteralPath $zip -DestinationPath $dir -Force
           $client=Join-Path $dir 'd3d9.dll'
           $server=Join-Path $dir 'NvRemixBridge.exe'

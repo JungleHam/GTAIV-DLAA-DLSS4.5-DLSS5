@@ -1,74 +1,95 @@
 # Third-party components and redistribution policy
 
-This repository is an integration project. It does not claim ownership of the upstream projects or proprietary runtimes it orchestrates.
+This repository is an integration project. It does not claim ownership of GTA IV, upstream projects, or proprietary NVIDIA runtimes.
 
 ## Credits and upstream projects
 
-- **GTA IV / Rockstar Games** — target game: https://www.rockstargames.com/games/IV
-- **FusionFix** — ThirteenAG and contributors: https://github.com/ThirteenAG/GTAIV.EFLC.FusionFix
-- **b-bridge** — gutbash and contributors: https://github.com/gutbash/b-bridge
-- **DXVK** — doitsujin and contributors: https://github.com/doitsujin/dxvk
-- **ReShade** — Patrick Mours / crosire and contributors: https://github.com/crosire/reshade
-- **DLSS5-Feeder** — jlrouzies-fr and contributors: https://github.com/jlrouzies-fr/DLSS5-Feeder
-- **LumeniteFX** — umar-afzaal and contributors: https://github.com/umar-afzaal/LumeniteFX
-- **NVIDIA NGX / DLSS** — NVIDIA: https://developer.nvidia.com/rtx/dlss
-- **RankFTW/rhi-repo** — source used by the installers for the pinned `nvngx_dlss.dll` 310.9.1 package and `nvngx_dlssnr.dll` 310.8.0-RTX40 package: https://github.com/RankFTW/rhi-repo
-- **DLSS5 Autopilot** — Kizzuwatnaa and contributors: https://github.com/Kizzuwatnaa/DLSS5-Autopilot. Its GPU/runtime compatibility research is useful for distinguishing the RTX50, RTX40 and SF NR variants.
+All hyperlinks in this file point to GitHub project pages.
 
-See `manifests/versions.json` for exact versions, commits, hashes and package URLs.
+- **FusionFix** — https://github.com/ThirteenAG/GTAIV.EFLC.FusionFix
+- **b-bridge** — https://github.com/gutbash/b-bridge
+- **DXVK** — https://github.com/doitsujin/dxvk
+- **ReShade** — https://github.com/crosire/reshade
+- **DLSS5-Feeder** — https://github.com/jlrouzies-fr/DLSS5-Feeder
+- **LumeniteFX** — https://github.com/umar-afzaal/LumeniteFX
+- **NVIDIA DLSS / NGX** — https://github.com/NVIDIA/DLSS
+- **NR package catalog used by the tested integration** — https://github.com/RankFTW/rhi-repo
 
-## What this repository contains
+See `manifests/versions.json` for pinned versions, commits and hashes.
 
-The repository contains:
+## Repository link policy
 
-- original installation/orchestration scripts;
-- original documentation;
-- small configuration templates;
-- source transforms and validation scripts for the project's temporal synchronization and startup-stabilization integration;
-- a patching script that applies this project's ReShade 6.8.0 cross-process-input changes to upstream ReShade source;
-- the original debug proof-of-concept ReShade input add-on source.
+The public repository intentionally stores:
 
-In historical source/checkpoint names, the temporal-synchronization work is called `A3-S2`, the startup-stabilization work is called `A3-S5`, and the project integration namespace is called `M3K`. Those are engineering identifiers, not separate user-facing modules.
+- no hyperlink to a non-GitHub site;
+- no third-party direct ZIP/EXE/DLL download URL;
+- no direct third-party GitHub release-asset URL.
 
-## What this repository does not bundle
+For third-party prerequisites, documentation links to a GitHub project/release-listing page and explains what the user should click. The user obtains the file themselves, keeps it beside the project setup EXE, and the installer validates/installs/extracts it locally. Users are not expected to manually install or extract prerequisites.
 
-The Git repository itself does not commit:
+## Packaging policy
 
-- GTA IV game files;
-- FusionFix binaries;
-- b-bridge release binaries;
-- ReShade binaries/source snapshots;
-- DLSS5-Feeder binaries;
-- LumeniteFX source snapshots;
-- NVIDIA NGX runtime DLLs.
+The project runtime payload may contain project-authored binaries and third-party components whose licences permit redistribution, with required notices/licences included.
 
-Instead, the installers fetch pinned upstream packages at install time and verify hashes where available.
+The following remain **user supplied** and are installed/extracted by our setup rather than manually by the user:
 
-## NVIDIA runtime packages
+- FusionFix 5.0.1 ZIP when FusionFix is not already installed;
+- official ReShade 6.8.0 full add-on-support setup;
+- official pinned LumeniteFX ZIP;
+- the GPU-appropriate Neural Rendering ZIP.
 
-The current normal install flow automatically fetches both required NGX runtime packages:
+### ReShade
+
+ReShade's GitHub repository does not publish the official setup EXE as a GitHub Release. The installer therefore opens only <https://github.com/crosire/reshade> and tells the user to use the project website shown by GitHub's **About** box, then choose the official **ReShade 6.8.0 with full add-on support** download.
+
+Our setup validates the selected EXE, invokes the official installer for the Vulkan bridge renderer, then applies the project's own b-bridge input-patched ReShade build while preserving the official DLL for restoration on uninstall.
+
+### LumeniteFX
+
+The project does not mirror LumeniteFX. Users open the exact pinned source tree on GitHub:
+
+https://github.com/umar-afzaal/LumeniteFX/tree/f8cbbb4eccfcb7adf0d74bb358ba349272e3c1e9
+
+They use **Code → Download ZIP**, then select that local ZIP. The installer verifies SHA256 before extracting the files required by this integration.
+
+### NVIDIA DLSS Super Resolution / DLAA runtime
+
+The normal `nvngx_dlss.dll` 310.9.1 is sourced from:
+
+https://github.com/NVIDIA/DLSS
+
+The cleaned project runtime build takes the pinned DLL from NVIDIA's repository and records the expected SHA256 in `manifests/versions.json`.
+
+### Neural Rendering runtime
+
+The project does not host, mirror, or store a direct asset link for the NR runtime. Users start at:
+
+https://github.com/RankFTW/rhi-repo
+
+The installer explicitly tells layman users to verify that the repository is **RankFTW/rhi-repo**, click **Releases** in the right sidebar, and move through older release pages with **Next** until the pinned 310.8.0 release appears. The exact number of pages can change as newer releases are added. Setup auto-detects the supported GPU series and gives the corresponding exact release/tag and ZIP filename.
+
+RTX 40 Series:
 
 ```text
-nvngx_dlss.dll 310.9.1
-nvngx_dlssnr.dll 310.8.0-RTX40
+Find a release: dlssnr-310.8.0-RTX40
+Asset name:    nvngx_dlssnr_310.8.0-RTX40.zip
+ZIP SHA256:    46124CFAEF532AD5F6DA07494772EA8C1B3E719F934E254385697F38D1289E3F
+DLL SHA256:    4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05
 ```
 
-The NR package is not stored in this repository. `Install-DLSS-Full.bat` downloads it from the pinned RankFTW/rhi-repo release and verifies both the archive SHA256 and the extracted DLL SHA256.
-
-Current tested NR runtime:
+RTX 50 Series:
 
 ```text
-package: nvngx_dlssnr_310.8.0-RTX40.zip
-package SHA256: 46124CFAEF532AD5F6DA07494772EA8C1B3E719F934E254385697F38D1289E3F
-DLL SHA256:     4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05
+Find a release: dlssnr-310.8.0
+Asset name:    nvngx_dlssnr_310.8.0.zip
+ZIP SHA256:    388C0A7912E15EC911B9C9E11A692142B11FE387DDF2B637D8C358138FFFB3AC
+DLL SHA256:    E16BCF15E16E13F527491CDF7845B2FE6521A738D8F7C9C721866A8496E1FC8E
 ```
 
-This is the RTX 40/50-compatible community build used by the project on RTX 4070 Ti SUPER. It is not the stock RTX50-only FP8 build.
+The RTX 40 variant is the project-tested modded compatibility DLL. The RTX 50 variant must also have a valid NVIDIA Authenticode signature.
 
-The current project no longer uses or requires Deep Fried Chicken.
+## Repository contents
 
-Nothing in this repository grants redistribution rights for third-party binaries. Check and follow the upstream licences/terms before redistributing files outside the install-time fetching model used here.
-
-## Trademark / affiliation note
+The Git repository contains project-authored orchestration, patches, configuration, documentation, validation scripts and source transforms. It does not commit GTA IV files, FusionFix binaries, downloaded ReShade installers, LumeniteFX snapshots, or Neural Rendering runtime DLLs.
 
 Grand Theft Auto, Rockstar Games, NVIDIA, GeForce, RTX, DLSS and other product names are trademarks of their respective owners. This is an independent community project and is not affiliated with, endorsed by, or sponsored by Rockstar Games, NVIDIA, or the upstream projects listed above.

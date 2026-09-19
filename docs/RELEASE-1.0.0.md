@@ -1,60 +1,37 @@
-# GTA IV DLAA + DLSS 4.5 + DLSS 5 Neural Rendering — v1.0.0
+# v1.0.0
 
-The first public release. One installer handles installation, repair, upgrades, and removal. 🎀
+This is the first public release of the GTA IV DLAA / DLSS integration.
 
 ## Download
 
-**Download `GTAIV-DLSS-Setup.exe`. That is the only file users should download manually.**
+Open the repository's **Releases** page and download `GTAIV-DLSS-Setup.exe` from the v1.0.0 release.
 
-The release intentionally keeps only two additional support payloads because the installer downloads and SHA256-verifies them automatically:
+https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases
 
-- `GTAIV-DLSS-Full-Runtime.zip` — the frozen bridge / presenter / Feeder / shim runtime.
-- `ReShade64-bbridge.dll` — the verified ReShade input-patch runtime.
+The release page may also contain backend payloads used automatically by setup. Users should not manually place those payloads into GTA IV.
 
-You do not need to download either support payload yourself.
+## Guided prerequisites
 
-## What you get
+The cleaned installer source contains no direct third-party ZIP/EXE/DLL URLs. For each user-supplied prerequisite, setup explains the exact GitHub page and the exact buttons/filename to use.
 
-- **DLAA Native** plus five DLSS Super Resolution profiles: Ultra Quality 77%, Quality, Balanced, Performance, and Ultra Performance.
-- **DLSS 5 Neural Rendering** with live on/off control and adjustable pass count.
-- **ReShade 6.8 Add-On Support** with the project's b-bridge input fix.
-- A single **Setup & Maintenance** wizard: install/repair DLAA, install/repair Full DLSS, remove Full while keeping DLAA, or remove the whole project while keeping FusionFix.
-- **FusionFix first-run detection** so the setup will not proceed until a clean FusionFix launch has initialized correctly.
-- **Prebuilt, SHA256-verified runtime assets**. No Git, Python, Visual Studio, or local compilation is required.
+See [`PREREQUISITES.md`](PREREQUISITES.md) for the same click-by-click guide:
 
-## Before installing
+- FusionFix 5.0.1 — FusionFix GitHub → right sidebar **Releases** → v5.0.1 → **Assets** → `GTAIV.EFLC.FusionFix.zip`; setup installs the ZIP for the user;
+- ReShade 6.8.0 Full Add-On Support — ReShade GitHub → About → project website → official Full Add-On Support download;
+- LumeniteFX — pinned GitHub commit → Code → Download ZIP;
+- Full DLSS only — open `RankFTW/rhi-repo` (not `RankFTW/RHI`) → right sidebar **Releases** → use **Next** through older release pages until the exact GPU-specific 310.8.0 tag appears → **Assets** → exact ZIP. Users keep the ZIP beside setup and do not extract it.
 
-1. Start from GTA IV: Complete Edition with **FusionFix** installed.
-2. Launch GTA IV normally once, reach the menu, then quit normally.
-3. Run `GTAIV-DLSS-Setup.exe` as Administrator and select the folder containing `GTAIV.exe`.
-4. Keep GTA IV's own resolution set to your display's **native resolution**. The mod changes internal render resolution separately.
+Users are instructed to keep the setup EXE and every prerequisite download in one temporary folder. They do not manually install or extract prerequisites; setup validates and handles them.
 
-## In-game controls
+## Modes
 
-Press **Home** and open:
+- **DLAA** — native-resolution DLAA baseline, ReShade/Lumenite temporal data and the b-bridge input patch.
+- **Full DLSS** — DLAA plus DLSS 4.5 Super Resolution and optional DLSS 5 Neural Rendering.
 
-`Add-ons → DLSS 5 Feed → GTA IV DLSS`
+Full DLSS automatically establishes the DLAA foundation first when necessary.
 
-Neural Rendering defaults to **OFF** and DLSS defaults to **Quality**.
+## Removal
 
-## Hardware validation
+The unified setup can remove Full DLSS only or remove the whole project integration. Full project removal restores the official ReShade DLL that existed before the project's input patch; FusionFix and the official ReShade installation remain installed.
 
-The complete public stack was hardware-tested on an **RTX 4070 Ti SUPER at 2560×1440**, including live DLAA/DLSS switching, Neural Rendering, startup stabilization, and the master processing toggle. The installer includes the RTX 40 compatibility NR path and the original NVIDIA-signed RTX 50 NR runtime path.
-
-## Known limitation
-
-Steam's built-in FPS counter disappears while a DLSS Super Resolution profile is active. It remains visible in **DLAA Native** and with project processing **OFF**. This affects the Steam overlay display, not DLSS or Neural Rendering itself.
-
-## Checksums
-
-GitHub records a SHA-256 digest for every uploaded release asset. The frozen v1.0.0 payload hashes are:
-
-- `GTAIV-DLSS-Setup.exe` — `ECC07F04CDE414268B1313459ADECA832C17B1ECC830C0D307688D183F044346`
-- `GTAIV-DLSS-Full-Runtime.zip` — `1E14F1508A1AC1FAC8EAB2DD0E3D8969C99275363B43C47406D0A86D5BE36987`
-- `ReShade64-bbridge.dll` — `75976007A0A5DE5BAB364F98E2D01B377D046441C94E89B1DD279CEE856161A9`
-
-No separate checksum files are needed on the release page.
-
----
-
-Thanks to **FusionFix, b-bridge, DXVK, ReShade, DLSS5-Feeder, and LumeniteFX** for the projects this integration builds on.
+Thanks to **FusionFix, b-bridge, DXVK, ReShade, DLSS5-Feeder, LumeniteFX and NVIDIA DLSS** for the projects and technology this integration builds on.
