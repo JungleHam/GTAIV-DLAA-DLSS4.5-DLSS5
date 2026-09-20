@@ -16,6 +16,8 @@
    - Already have the correct `nvngx_dlssnr.dll`? Check **I brought my own** and select it instead.
 8. Finish setup and launch GTA IV.
 
+To modify or remove the project later, run the same installer again and choose the maintenance action you want.
+
 Full DLSS starts with:
 
 ```text
