@@ -25,7 +25,7 @@
         "files": {
           "d3d9.dll": "eca7c9cf9cd1c4835cea7fd57ad168a35e157f081c0eadba51af35f501026f28",
           "NvRemixBridge.exe": "8a89a3dbbc02d56ba98254941b14e52d88efef3f95e491c9c6af5adc65fecffa",
-          "d3d9vk_x64.dll": "511e0c2509e1922db2ec38940507ba956908fe6dc5fd9b3db9fec489dc05f297",
+          "d3d9vk_x64.dll": "208607b43b0832c32f5ec92c9e20fe5988e435101af83a81ed6ba5538353e366",
           "dlss5-feed.addon64": "95259612c7aa82dfc913e6ac4405a27b41c29f0de4975592e972a9a1435879b2",
           "m3k/m3k-nvngx.dll": "69d63d238780f93f8abc3d59c97c9e577a7845c557c1dc7a8f28ff3a84aae51a",
           "DLSS5_Feed.fx": "cdac08a721b14b97187dd86c5b5bead157c9063d7ee859a0f131a8ee791695f1",
@@ -169,7 +169,7 @@
       "release_tag": "v1.0.0",
       "asset": "GTAIV-DLSS-Full-Runtime.zip",
       "archive_member": "d3d9vk_x64.dll",
-      "dll_sha256": "511e0c2509e1922db2ec38940507ba956908fe6dc5fd9b3db9fec489dc05f297",
+      "dll_sha256": "208607b43b0832c32f5ec92c9e20fe5988e435101af83a81ed6ba5538353e366",
       "installed_path": ".trex/d3d9vk_x64.dll",
       "installed_automatically": true,
       "release_page": "https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/tag/v1.0.0"
