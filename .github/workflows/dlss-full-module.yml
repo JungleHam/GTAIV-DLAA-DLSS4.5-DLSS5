@@ -26,15 +26,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Probe pinned Lumenite GitHub archive
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $p = Join-Path $env:RUNNER_TEMP 'LumeniteFX-pinned.zip'
-          Invoke-WebRequest -UseBasicParsing -Headers @{'User-Agent'='GTAIV-DLSS-Setup'} -Uri 'https://api.github.com/repos/umar-afzaal/LumeniteFX/zipball/f8cbbb4eccfcb7adf0d74bb358ba349272e3c1e9' -OutFile $p
-          $h = (Get-FileHash -Algorithm SHA256 -LiteralPath $p).Hash.ToUpperInvariant()
-          Write-Host "LUMENITE_API_ZIP_SHA256=$h" -ForegroundColor Cyan
-
       - name: Validate cleaned installer source
         shell: pwsh
         run: |
@@ -49,18 +40,18 @@ jobs:
           $full = Get-Content install/Install-DLSS-Full.bat -Raw
           $manifest = Get-Content manifests/versions.json -Raw | ConvertFrom-Json
 
-          foreach ($marker in @('Installation — all steps in order','ReShade 6.8.0 Full Add-On Support','dlssnr-310.8.0-RTX40','nvngx_dlssnr_310.8.0-RTX40.zip','dlssnr-310.8.0','Neural Rendering: OFF')) {
+          foreach ($marker in @('Installation — all steps in order','ReShade 6.8.0 Full Add-On Support','Setup will download and verify it automatically.','dlssnr-310.8.0-RTX40','nvngx_dlssnr_310.8.0-RTX40.zip','Neural Rendering: OFF')) {
             if (-not $readme.Contains($marker)) { throw "README missing guided-install marker: $marker" }
           }
-          foreach ($marker in @('Official ReShade prerequisite','LumeniteFX prerequisite','Neural Rendering prerequisite','Open ReShade repository on GitHub','Open RankFTW/rhi-repo on GitHub','DetectNvidiaGpuSeries','PrivilegesRequired=admin','Run-Action.ps1')) {
+          foreach ($marker in @('Official ReShade prerequisite','Full DLSS GPU','Open ReShade repository on GitHub','Open NR source on GitHub','DetectNvidiaGpuSeries','ResultFile','PrivilegesRequired=admin','Run-Action.ps1')) {
             if (-not $setup.Contains($marker)) { throw "Unified setup missing: $marker" }
           }
-          foreach ($marker in @("ValidateSet('DLAA','FULL','REMOVE_FULL','REMOVE_ALL')",'GTAIV_SETUP_RESHADE','GTAIV_SETUP_LUMENITE','GTAIV_SETUP_NR_DLL','Resolve-NrPackage','needsFoundationInputs')) {
+          foreach ($marker in @("ValidateSet('DLAA','FULL','REMOVE_FULL','REMOVE_ALL')",'Download-GitHubReleaseAsset','Resolve-FusionFixPackage','Resolve-LumenitePackage','Resolve-AutoNrPackage','GTAIV_SETUP_RESHADE','GTAIV_SETUP_LUMENITE','GTAIV_SETUP_NR_DLL','Write-Result')) {
             if (-not $runner.Contains($marker)) { throw "Setup action runner missing: $marker" }
           }
           [void][ScriptBlock]::Create($runner)
 
-          foreach ($marker in @('ReShade64-bbridge.dll','C:\ProgramData\ReShade\ReShade64\ReShade64.dll','AFE4C8F13048306307983B8B3D41D5BF00A86820440B0E57DEA10950E1176445','43220F99FC0FFA0216E01EBD657180F8C9D043C939F760283B896EA257F1B6A2','Install-DLAA-Core.bat')) {
+          foreach ($marker in @('ReShade64-bbridge.dll','C:\ProgramData\ReShade\ReShade64\ReShade64.dll','AFE4C8F13048306307983B8B3D41D5BF00A86820440B0E57DEA10950E1176445','572FEFB20D466AFE50998E16996B4833BEC675264485C99FE768A2337636E756','Install-DLAA-Core.bat')) {
             if (-not $dlaa.Contains($marker)) { throw "DLAA installer missing: $marker" }
           }
           foreach ($marker in @('GTAIV_SETUP_NR_DLL','E16BCF15E16E13F527491CDF7845B2FE6521A738D8F7C9C721866A8496E1FC8E','4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05','Get-AuthenticodeSignature','project-tested modded DLL','LastNRMode=0','Mode=0','NeuralRendering=installed-off-by-default')) {
@@ -76,9 +67,10 @@ jobs:
           }
 
           if (-not $manifest.components.reshade.user_supplied_official_setup) { throw 'Manifest must mark ReShade setup as user supplied.' }
-          if (-not $manifest.components.lumenitefx.user_supplied_official_archive) { throw 'Manifest must mark LumeniteFX archive as user supplied.' }
-          if (-not $manifest.components.nvngx_dlssnr.user_supplied) { throw 'Manifest must mark NR runtime as user supplied.' }
-          if ($manifest.components.nvngx_dlssnr.direct_download_links_provided) { throw 'Manifest unexpectedly claims NR download links are provided.' }
+          if ($manifest.components.lumenitefx.user_supplied_official_archive) { throw 'LumeniteFX should be automatic in the current installer flow.' }
+          if (-not $manifest.components.nvngx_dlssnr.automatic_download) { throw 'NR runtime must be auto-downloaded from GitHub.' }
+          if ($manifest.components.nvngx_dlssnr.user_supplied) { throw 'NR runtime should not require a user-supplied package in the normal flow.' }
+          if ($manifest.components.nvngx_dlssnr.direct_download_links_provided) { throw 'Manifest should not store direct NR download links.' }
           if ($manifest.components.nvngx_dlss.official_source_repository -ne 'https://github.com/NVIDIA/DLSS') { throw 'DLSS 310.9.1 must use the official NVIDIA source.' }
 
           Write-Host 'Clean release source validated.' -ForegroundColor Green
