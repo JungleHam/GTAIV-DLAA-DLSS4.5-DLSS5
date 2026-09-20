@@ -168,12 +168,6 @@ begin
   if FileExists(P) then Page.Values[0] := P;
 end;
 
-procedure PrefillNrForSeries(Series: Integer);
-begin
-  if Series = 40 then PrefillIfPresent(NrPage, 'nvngx_dlssnr_310.8.0-RTX40.zip')
-  else if Series = 50 then PrefillIfPresent(NrPage, 'nvngx_dlssnr_310.8.0.zip');
-end;
-
 procedure InitializeWizard;
 var PrepText: AnsiString;
 begin
@@ -181,35 +175,33 @@ begin
   FusionFixInstalledThisRun := False;
 
   PrepText :=
-    'Before you start, make ONE temporary folder somewhere easy to find, for example:' + #13#10 +
-    'Desktop\GTA IV DLSS Setup Files' + #13#10 + #13#10 +
-    'Put GTAIV-DLSS-Setup.exe and every prerequisite file you download into that SAME folder.' + #13#10 + #13#10 +
-    'IMPORTANT: Do NOT extract ZIP files. Do NOT run ReShade yourself. Do NOT copy prerequisite files into GTA IV yourself. This installer validates and installs/extracts them for you.' + #13#10 + #13#10 +
-    'If FusionFix is not already installed, setup can install it from GTAIV.EFLC.FusionFix.zip. FusionFix requires one normal GTA IV launch before the DLAA/DLSS part can continue; setup will tell you exactly when to do that.' + #13#10 + #13#10 +
-    'Keeping all downloads beside this setup EXE lets setup find the normal filenames automatically.';
-  PrepPage := CreateOutputMsgMemoPage(wpWelcome, 'Put all setup files in one folder', 'No manual installation is required', 'Download the requested files, keep them together, and let this installer do the installation.', PrepText);
+    'Setup now downloads all GitHub-hosted prerequisites automatically.' + #13#10 + #13#10 +
+    'You only need to provide the official ReShade 6.8.0 Full Add-On installer when a fresh DLAA foundation is required.' + #13#10 + #13#10 +
+    'FusionFix, LumeniteFX, the correct RTX 40/50 Neural Rendering package, this project''s runtime, and the ReShade input patch are downloaded/verified automatically.' + #13#10 + #13#10 +
+    'If FusionFix is installed for you, setup will stop once and ask you to launch GTA IV to the main menu before continuing.';
+  PrepPage := CreateOutputMsgMemoPage(wpWelcome, 'Simplified setup', 'Only ReShade may need a manual download', 'GitHub-hosted dependencies are automatic.', PrepText);
 
-  GamePage := CreateInputDirPage(PrepPage.ID, 'Select GTA IV', 'Choose the folder that contains GTAIV.exe', 'You only select the game folder. Do not copy prerequisites into it yourself.', False, '');
+  GamePage := CreateInputDirPage(PrepPage.ID, 'Select GTA IV', 'Choose the folder that contains GTAIV.exe', 'Select the game folder only.', False, '');
   GamePage.Add('');
 
   ActionPage := CreateInputOptionPage(GamePage.ID, 'Install, modify, or remove', 'Choose one action', 'Full DLSS automatically installs the DLAA foundation first.', True, False);
-  ActionPage.Add('Install / repair DLAA  —  DLAA + ReShade + input patch');
-  ActionPage.Add('Install / repair Full DLSS  —  everything above + DLSS 4.5 + DLSS 5 Neural Rendering');
-  ActionPage.Add('Remove DLSS Full only  —  return to the preserved DLAA setup');
-  ActionPage.Add('Remove everything from this project  —  keep FusionFix and official ReShade installed');
+  ActionPage.Add('Install / repair DLAA');
+  ActionPage.Add('Install / repair Full DLSS');
+  ActionPage.Add('Remove DLSS Full only');
+  ActionPage.Add('Remove everything from this project');
   ActionPage.Values[1] := True;
 
-  FusionFixPage := CreateInputFilePage(ActionPage.ID, 'FusionFix prerequisite', 'Select GTAIV.EFLC.FusionFix.zip', 'Only shown when FusionFix is missing. Click the GitHub button below. Confirm the page says ThirteenAG/GTAIV.EFLC.FusionFix. On the RIGHT side click Releases, open GTAIV.EFLC.FusionFix v5.0.1, expand Assets, and download GTAIV.EFLC.FusionFix.zip. Save it beside this setup EXE. Do NOT extract it; setup installs it.');
-  FusionFixPage.Add('FusionFix ZIP:', 'ZIP archives|*.zip|All files|*.*', '.zip');
-  FusionFixGitHubButton := TNewButton.Create(WizardForm);
-  FusionFixGitHubButton.Parent := FusionFixPage.Surface;
-  FusionFixGitHubButton.Caption := 'Open FusionFix repository on GitHub';
-  FusionFixGitHubButton.Left := FusionFixPage.Edits[0].Left;
-  FusionFixGitHubButton.Top := FusionFixPage.Edits[0].Top + FusionFixPage.Edits[0].Height + ScaleY(12);
-  FusionFixGitHubButton.Width := ScaleX(245);
-  FusionFixGitHubButton.OnClick := @OpenFusionFixGitHub;
+  GpuPage := CreateOutputMsgPage(ActionPage.ID, 'Full DLSS GPU', 'GPU detection and Neural Rendering package', 'GPU detection will run after you choose Full DLSS.');
 
-  ReShadePage := CreateInputFilePage(FusionFixPage.ID, 'Official ReShade prerequisite', 'Select ReShade 6.8.0 Full Add-On Support', 'Click the GitHub button below. Confirm the page says crosire/reshade. ReShade does NOT provide the installer EXE as a GitHub Release. In the GitHub About box on the RIGHT, click the official project website shown there. On that site look for ReShade 6.8.0 with full add-on support (NOT the normal build). Save the EXE beside this setup EXE. Do NOT run it yourself; setup runs it correctly for GTA IV.');
+  NrGitHubButton := TNewButton.Create(WizardForm);
+  NrGitHubButton.Parent := GpuPage.Surface;
+  NrGitHubButton.Caption := 'Open NR source on GitHub';
+  NrGitHubButton.Left := ScaleX(0);
+  NrGitHubButton.Top := GpuPage.MsgLabel.Top + GpuPage.MsgLabel.Height + ScaleY(16);
+  NrGitHubButton.Width := ScaleX(180);
+  NrGitHubButton.OnClick := @OpenNrGitHub;
+
+  ReShadePage := CreateInputFilePage(GpuPage.ID, 'Official ReShade prerequisite', 'Select ReShade 6.8.0 Full Add-On Support', 'Open the ReShade GitHub repository below. In its About box, open the official project website and download ReShade 6.8.0 with full add-on support. Select that EXE here. Setup runs it for you.');
   ReShadePage.Add('ReShade setup EXE:', 'Executable files|*.exe|All files|*.*', '.exe');
   ReShadeGitHubButton := TNewButton.Create(WizardForm);
   ReShadeGitHubButton.Parent := ReShadePage.Surface;
@@ -219,29 +211,7 @@ begin
   ReShadeGitHubButton.Width := ScaleX(245);
   ReShadeGitHubButton.OnClick := @OpenReShadeGitHub;
 
-  LumenitePage := CreateInputFilePage(ReShadePage.ID, 'LumeniteFX prerequisite', 'Select the pinned LumeniteFX ZIP', 'Click the GitHub button below. It opens the exact pinned LumeniteFX commit. On GitHub click the green Code button, then Download ZIP. Save that ZIP beside this setup EXE. Do NOT extract it; setup extracts exactly what GTA IV needs.');
-  LumenitePage.Add('LumeniteFX ZIP:', 'ZIP archives|*.zip|All files|*.*', '.zip');
-  LumeniteGitHubButton := TNewButton.Create(WizardForm);
-  LumeniteGitHubButton.Parent := LumenitePage.Surface;
-  LumeniteGitHubButton.Caption := 'Open pinned LumeniteFX on GitHub';
-  LumeniteGitHubButton.Left := LumenitePage.Edits[0].Left;
-  LumeniteGitHubButton.Top := LumenitePage.Edits[0].Top + LumenitePage.Edits[0].Height + ScaleY(12);
-  LumeniteGitHubButton.Width := ScaleX(245);
-  LumeniteGitHubButton.OnClick := @OpenLumeniteGitHub;
-
-  NrPage := CreateInputFilePage(LumenitePage.ID, 'Neural Rendering prerequisite', 'Select the GPU-matched NR ZIP', 'Setup detects RTX 40/50 and shows the exact old release/tag and ZIP filename. Click the GitHub button below and confirm the page says RankFTW/rhi-repo (NOT RankFTW/RHI). On the RIGHT side click Releases. Do NOT use the newest release. Scroll to the bottom and click Next through older pages until the exact 310.8.0 tag setup tells you to find appears. Open Assets, download the exact ZIP setup names, save it beside this EXE, and do NOT extract it.');
-  NrPage.Add('NR ZIP:', 'ZIP archives|*.zip|All files|*.*', '.zip');
-  NrGitHubButton := TNewButton.Create(WizardForm);
-  NrGitHubButton.Parent := NrPage.Surface;
-  NrGitHubButton.Caption := 'Open RankFTW/rhi-repo on GitHub';
-  NrGitHubButton.Left := NrPage.Edits[0].Left;
-  NrGitHubButton.Top := NrPage.Edits[0].Top + NrPage.Edits[0].Height + ScaleY(12);
-  NrGitHubButton.Width := ScaleX(245);
-  NrGitHubButton.OnClick := @OpenNrGitHub;
-
-  PrefillIfPresent(FusionFixPage, 'GTAIV.EFLC.FusionFix.zip');
   PrefillIfPresent(ReShadePage, 'ReShade_Setup_6.8.0_Addon.exe');
-  PrefillIfPresent(LumenitePage, 'LumeniteFX-f8cbbb4eccfcb7adf0d74bb358ba349272e3c1e9.zip');
 end;
 
 function ShouldSkipPage(PageID: Integer): Boolean;
