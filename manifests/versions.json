@@ -1,14 +1,15 @@
 {
-  "project_status": "github-clean-installer-flow-ready-runtime-rebuild-ready-installer-not-built",
+  "project_status": "github-clean-auto-download-flow-test-build",
   "components": {
     "fusionfix": {
       "version": "5.0.1",
       "url": "https://github.com/ThirteenAG/GTAIV.EFLC.FusionFix",
       "sha256": "3c202398c133392be985854654f169514e055812cc302ef24e6aa97495975b41",
       "installed_by_project": true,
-      "user_supplied_official_archive": true,
+      "user_supplied_official_archive": false,
       "expected_archive_name": "GTAIV.EFLC.FusionFix.zip",
-      "installer_instruction": "Open official GitHub repository; right sidebar > Releases > GTAIV.EFLC.FusionFix v5.0.1 > Assets > GTAIV.EFLC.FusionFix.zip. Save beside setup EXE; do not extract."
+      "installer_instruction": "Downloaded automatically from the official GitHub v5.0.1 release and SHA256-verified when FusionFix is missing.",
+      "download_mode": "automatic via GitHub release API"
     },
     "prebuilt_release": {
       "tag": "v1.0.0",
@@ -116,9 +117,10 @@
     "lumenitefx": {
       "source_repository": "https://github.com/umar-afzaal/LumeniteFX",
       "commit": "f8cbbb4eccfcb7adf0d74bb358ba349272e3c1e9",
-      "user_supplied_official_archive": true,
+      "user_supplied_official_archive": false,
       "expected_archive_sha256": "43220f99fc0ffa0216e01ebd657180f8c9d043c939f760283b896ea257f1b6a2",
-      "installer_instruction": "Open official repo at pinned commit and use Code > Download ZIP"
+      "installer_instruction": "Downloaded automatically from the pinned GitHub commit and verified before installation.",
+      "download_mode": "automatic via GitHub API pinned commit"
     },
     "nvngx_dlss": {
       "product": "DLSS 4.5 Super Resolution / DLAA runtime",
@@ -135,7 +137,7 @@
       "version": "310.8.0",
       "default_enabled": false,
       "installed_path": ".trex/m3k/nvngx_dlssnr.dll",
-      "user_supplied": true,
+      "user_supplied": false,
       "direct_download_links_provided": false,
       "variants": {
         "rtx50_original_nvidia_signed": {
@@ -158,8 +160,9 @@
         }
       },
       "catalog_release_page": "https://github.com/RankFTW/rhi-repo",
-      "installer_accepts": "ZIP archive (normal user flow); extracted DLL remains supported internally",
-      "navigation_instruction": "Open RankFTW/rhi-repo; right sidebar > Releases; use Next through older release pages until exact pinned tag appears; download exact ZIP from Assets; do not extract."
+      "installer_accepts": "Automatically resolved GPU-matched GitHub ZIP; local ZIP/DLL remains supported internally.",
+      "navigation_instruction": "No manual release browsing in the normal flow. Setup detects RTX 40/50 and resolves the exact pinned GitHub release asset automatically.",
+      "automatic_download": true
     },
     "m3k-dxvk-presenter": {
       "product": "M3K DXVK render/output presenter for DLSS Super Resolution",
