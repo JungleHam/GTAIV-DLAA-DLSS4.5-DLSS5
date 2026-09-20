@@ -92,33 +92,21 @@ end;
 function NrInstructions(Series: Integer): string;
 begin
   if Series = 40 then
-    Result := 'Detected: RTX 40 Series.' + #13#10 + #13#10 +
-      'You need the RTX 40 compatibility Neural Rendering ZIP.' + #13#10 + #13#10 +
-      '1. Click the RankFTW/rhi-repo GitHub button below.' + #13#10 +
-      '2. Make sure the repository name at the top is RankFTW/rhi-repo (NOT RankFTW/RHI).' + #13#10 +
-      '3. On the RIGHT side of the repository page, click Releases.' + #13#10 +
-      '4. The release you need is older and may not be on the first page. Scroll to the bottom of the Releases list and click Next to show older releases. You may need to click Next a couple of times; the exact number changes as new releases are added.' + #13#10 +
-      '5. Stop when you find the exact release/tag: dlssnr-310.8.0-RTX40.' + #13#10 +
-      '   Tip: if GitHub shows a Find a release box, you can also search that exact text.' + #13#10 +
-      '6. Open that release, find Assets, and download: nvngx_dlssnr_310.8.0-RTX40.zip' + #13#10 +
-      '7. Save the ZIP in the SAME folder as GTAIV-DLSS-Setup.exe.' + #13#10 +
-      '8. Do NOT extract or install it. This setup handles it.'
+    Result := 'Detected: RTX 40 Series' + #13#10 + #13#10 +
+      'DLSS NR: 310.8.0 RTX 40 compatibility build' + #13#10 +
+      'Source: RankFTW/rhi-repo on GitHub' + #13#10 +
+      'Setup will download and verify it automatically.' + #13#10 + #13#10 +
+      'Neural Rendering starts OFF.'
   else if Series = 50 then
-    Result := 'Detected: RTX 50 Series.' + #13#10 + #13#10 +
-      'You need the ORIGINAL 310.8.0 Neural Rendering ZIP, not the RTX40 compatibility package.' + #13#10 + #13#10 +
-      '1. Click Open RankFTW/rhi-repo GitHub below.' + #13#10 +
-      '2. Make sure the repository name at the top is RankFTW/rhi-repo (NOT RankFTW/RHI).' + #13#10 +
-      '3. On the RIGHT side of the repository page, click Releases.' + #13#10 +
-      '4. The release you need is older and may not be on the first page. Scroll to the bottom of the Releases list and click Next to show older releases. You may need to click Next a couple of times; the exact number changes as new releases are added.' + #13#10 +
-      '5. Stop when you find the exact release/tag: dlssnr-310.8.0.' + #13#10 +
-      '   Tip: if GitHub shows a Find a release box, you can also search that exact text.' + #13#10 +
-      '6. Be careful: choose the PLAIN 310.8.0 release, NOT dlssnr-310.8.0-RTX40.' + #13#10 +
-      '7. Open Assets and download: nvngx_dlssnr_310.8.0.zip' + #13#10 +
-      '8. Save the ZIP in the SAME folder as GTAIV-DLSS-Setup.exe.' + #13#10 +
-      '9. Do NOT extract or install it. This setup handles it.'
+    Result := 'Detected: RTX 50 Series' + #13#10 + #13#10 +
+      'DLSS NR: original NVIDIA 310.8.0 build' + #13#10 +
+      'Source: RankFTW/rhi-repo on GitHub' + #13#10 +
+      'Setup will download and verify it automatically.' + #13#10 + #13#10 +
+      'Neural Rendering starts OFF.'
   else
-    Result := 'Full DLSS / Neural Rendering currently supports the project-tested RTX 40 and RTX 50 runtime paths.' + #13#10 + #13#10 +
-      'Setup could not identify a supported RTX 40/50 GPU, so Full DLSS will not continue. You can still choose the DLAA install mode.';
+    Result := 'No supported RTX 40/50 GPU was detected.' + #13#10 + #13#10 +
+      'Full DLSS cannot continue.' + #13#10 +
+      'Click Back and choose DLAA.';
 end;
 
 function NormalizeGameDir(const Input: string): string;
