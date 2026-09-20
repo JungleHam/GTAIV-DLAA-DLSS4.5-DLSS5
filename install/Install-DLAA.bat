@@ -24,6 +24,15 @@ $LumenitePackageHash = '572FEFB20D466AFE50998E16996B4833BEC675264485C99FE768A233
 
 function Is-Admin { $id=[Security.Principal.WindowsIdentity]::GetCurrent(); $p=New-Object Security.Principal.WindowsPrincipal($id); return $p.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator) }
 function Fail([string]$m) { throw $m }
+function Write-SetupResultIfEmpty([string]$Message) {
+    if (-not $env:GTAIV_SETUP_RESULT_FILE) { return }
+    try {
+        if ((-not (Test-Path -LiteralPath $env:GTAIV_SETUP_RESULT_FILE -PathType Leaf)) -or
+            ((Get-Item -LiteralPath $env:GTAIV_SETUP_RESULT_FILE).Length -eq 0)) {
+            [IO.File]::WriteAllText($env:GTAIV_SETUP_RESULT_FILE,$Message,[Text.UTF8Encoding]::new($false))
+        }
+    } catch {}
+}
 function Resolve-ProjectAssetUrl([string]$AssetName) {
     $headers=@{'User-Agent'='GTAIV-DLSS-Setup'}
     $release=Invoke-RestMethod -UseBasicParsing -Headers $headers -Uri $ReleaseApi
@@ -116,5 +125,5 @@ try {
     if (-not (Has-PatchMarker $GlobalReShade)) { Fail 'Final ReShade input-patch verification failed.' }
     Write-Host ''; Write-Host 'DONE - DLAA + ReShade input patch installed.' -ForegroundColor Green; Write-Host 'Launch GTA IV once. Press Home and confirm ReShade accepts mouse/keyboard input.' -ForegroundColor White
     Start-Sleep -Seconds 3; exit 0
-} catch { Write-Host ''; Write-Host ('INSTALL FAILED: '+$_.Exception.Message) -ForegroundColor Red; Read-Host 'Press Enter to close'; exit 1 }
+} catch { $err=$_.Exception.Message; Write-Host ''; Write-Host ('INSTALL FAILED: '+$err) -ForegroundColor Red; Write-SetupResultIfEmpty $err; Read-Host 'Press Enter to close'; exit 1 }
 finally { if($CoreTemp -and (Test-Path -LiteralPath $CoreTemp)){Remove-Item -LiteralPath $CoreTemp -Force -ErrorAction SilentlyContinue}; if(Test-Path -LiteralPath $Temp){Remove-Item -LiteralPath $Temp -Recurse -Force -ErrorAction SilentlyContinue} }
