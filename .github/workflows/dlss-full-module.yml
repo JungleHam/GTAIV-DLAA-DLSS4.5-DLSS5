@@ -40,10 +40,10 @@ jobs:
           $full = Get-Content install/Install-DLSS-Full.bat -Raw
           $manifest = Get-Content manifests/versions.json -Raw | ConvertFrom-Json
 
-          foreach ($marker in @('ReShade 6.8.0 Full Add-On Support','dlssnr-310.8.0-RTX40','nvngx_dlssnr_310.8.0-RTX40.zip','dlssnr-310.8.0','If DLAA is already installed')) {
+          foreach ($marker in @('Installation — all steps in order','ReShade 6.8.0 Full Add-On Support','dlssnr-310.8.0-RTX40','nvngx_dlssnr_310.8.0-RTX40.zip','dlssnr-310.8.0','Neural Rendering: OFF')) {
             if (-not $readme.Contains($marker)) { throw "README missing guided-install marker: $marker" }
           }
-          foreach ($marker in @('Official ReShade prerequisite','LumeniteFX prerequisite','Neural Rendering prerequisite','Open ReShade GitHub','Open NR GitHub Releases','DetectNvidiaGpuSeries','PrivilegesRequired=admin','Run-Action.ps1')) {
+          foreach ($marker in @('Official ReShade prerequisite','LumeniteFX prerequisite','Neural Rendering prerequisite','Open ReShade repository on GitHub','Open RankFTW/rhi-repo on GitHub','DetectNvidiaGpuSeries','PrivilegesRequired=admin','Run-Action.ps1')) {
             if (-not $setup.Contains($marker)) { throw "Unified setup missing: $marker" }
           }
           foreach ($marker in @("ValidateSet('DLAA','FULL','REMOVE_FULL','REMOVE_ALL')",'GTAIV_SETUP_RESHADE','GTAIV_SETUP_LUMENITE','GTAIV_SETUP_NR_DLL','Resolve-NrPackage','needsFoundationInputs')) {
@@ -51,10 +51,10 @@ jobs:
           }
           [void][ScriptBlock]::Create($runner)
 
-          foreach ($marker in @('ReShade64-bbridge.dll','AFE4C8F13048306307983B8B3D41D5BF00A86820440B0E57DEA10950E1176445','43220F99FC0FFA0216E01EBD657180F8C9D043C939F760283B896EA257F1B6A2','Install-DLAA-Core.bat')) {
+          foreach ($marker in @('ReShade64-bbridge.dll','C:\\ProgramData\\ReShade\\ReShade64\\ReShade64.dll','AFE4C8F13048306307983B8B3D41D5BF00A86820440B0E57DEA10950E1176445','43220F99FC0FFA0216E01EBD657180F8C9D043C939F760283B896EA257F1B6A2','Install-DLAA-Core.bat')) {
             if (-not $dlaa.Contains($marker)) { throw "DLAA installer missing: $marker" }
           }
-          foreach ($marker in @('GTAIV_SETUP_NR_DLL','E16BCF15E16E13F527491CDF7845B2FE6521A738D8F7C9C721866A8496E1FC8E','4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05','Get-AuthenticodeSignature','project-tested modded DLL')) {
+          foreach ($marker in @('GTAIV_SETUP_NR_DLL','E16BCF15E16E13F527491CDF7845B2FE6521A738D8F7C9C721866A8496E1FC8E','4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05','Get-AuthenticodeSignature','project-tested modded DLL','LastNRMode=0','Mode=0','NeuralRendering=installed-off-by-default')) {
             if (-not $full.Contains($marker)) { throw "Full installer missing: $marker" }
           }
 
