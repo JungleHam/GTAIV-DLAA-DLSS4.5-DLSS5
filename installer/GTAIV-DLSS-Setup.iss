@@ -324,20 +324,43 @@ begin
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
-var PowerShell, Args: string; ResultCode: Integer;
+var
+  PowerShell, Args, ResultPath, Detail: string;
+  RawDetail: AnsiString;
+  ResultCode: Integer;
 begin
   if CurStep = ssInstall then begin
-    ExtractSetupFiles; WizardForm.StatusLabel.Caption := ActionTitle(SelectedAction) + '...';
+    ExtractSetupFiles;
+    WizardForm.StatusLabel.Caption := 'Downloading verified dependencies and installing...';
+
     PowerShell := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
-    Args := '-NoLogo -NoProfile -ExecutionPolicy Bypass -File ' + QuoteArg(ExpandConstant('{tmp}\Run-Action.ps1')) + ' -Action ' + ActionCode(SelectedAction) + ' -Game ' + QuoteArg(GameDir) + ' -SetupSource ' + QuoteArg(ExpandConstant('{src}'));
-    if NeedFusionFixPackage and ((SelectedAction = 0) or (SelectedAction = 1)) then
-      Args := Args + ' -FusionFixPackage ' + QuoteArg(FusionFixPage.Values[0]);
+    ResultPath := ExpandConstant('{tmp}\GTAIV-DLSS-action-result.txt');
+    DeleteFile(ResultPath);
+
+    Args := '-NoLogo -NoProfile -ExecutionPolicy Bypass -File ' +
+      QuoteArg(ExpandConstant('{tmp}\Run-Action.ps1')) +
+      ' -Action ' + ActionCode(SelectedAction) +
+      ' -Game ' + QuoteArg(GameDir) +
+      ' -SetupSource ' + QuoteArg(ExpandConstant('{src}')) +
+      ' -ResultFile ' + QuoteArg(ResultPath);
+
     if (SelectedAction = 0) or ((SelectedAction = 1) and (not DetectedDLAA)) then
-      Args := Args + ' -ReShadeSetup ' + QuoteArg(ReShadePage.Values[0]) + ' -LumenitePackage ' + QuoteArg(LumenitePage.Values[0]);
-    if SelectedAction = 1 then Args := Args + ' -NrPackage ' + QuoteArg(NrPage.Values[0]);
-    if not Exec(PowerShell, Args, GameDir, SW_SHOW, ewWaitUntilTerminated, ResultCode) then RaiseException('Could not start the setup action.');
-    if ResultCode = 20 then begin FusionFixInstalledThisRun := True; exit; end;
-    if ResultCode <> 0 then RaiseException('The selected action failed. Review the console output and installer log for details.');
+      Args := Args + ' -ReShadeSetup ' + QuoteArg(ReShadePage.Values[0]);
+
+    if not Exec(PowerShell, Args, GameDir, SW_SHOW, ewWaitUntilTerminated, ResultCode) then
+      RaiseException('Could not start the setup action.');
+
+    if ResultCode = 20 then begin
+      FusionFixInstalledThisRun := True;
+      exit;
+    end;
+
+    if ResultCode <> 0 then begin
+      Detail := '';
+      if LoadStringFromFile(ResultPath, RawDetail) then Detail := String(RawDetail);
+      if Detail = '' then Detail := 'Unknown setup error. Check the console window for the last failing step.';
+      RaiseException('Install failed:' + #13#10 + #13#10 + Detail);
+    end;
   end;
 end;
 
