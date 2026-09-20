@@ -87,8 +87,8 @@ jobs:
           Copy-Item .\Directory.Build.Props .\_compPair64 -Force
           meson compile -C _compPair64 NvRemixBridge
           if ($LASTEXITCODE -ne 0) { throw "x64 NvRemixBridge build failed: $LASTEXITCODE" }
-          $client='.\_compPair32\src\client\d3d9.dll'
-          $server='.\_compPair64\src\server\NvRemixBridge.exe'
+          $client=(Resolve-Path '.\_compPair32\src\client\d3d9.dll').Path
+          $server=(Resolve-Path '.\_compPair64\src\server\NvRemixBridge.exe').Path
           $expectedVersion='remix-main+1dad5e6d'
           foreach ($p in @($client,$server)) {
             if (-not (Test-Path $p)) { throw "Missing rebuilt bridge file: $p" }
