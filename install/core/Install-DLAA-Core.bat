@@ -1,4 +1,4 @@
-@rem GTAIV-DLAA-DLSS5 clean baseline installer. Third-party installer/archive inputs are user-supplied.
+@rem GTAIV-DLAA-DLSS5 clean baseline installer. Normal users should launch it through GTAIV-DLSS-Setup.exe.
 @echo off
 setlocal
 set "DLAA_SELF=%~f0"
@@ -102,7 +102,7 @@ try{
  $manifest=@"
 GTA IV DLAA clean installation
 Created: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
-ReShade: official 6.8.0 Full Add-On Support supplied by user
+ReShade: official 6.8.0 Full Add-On Support selected through setup
 LumeniteFX: pinned GitHub archive downloaded/verified by setup
 DLSS5-Feeder: project runtime
 nvngx_dlss.dll: official NVIDIA 310.9.1 packaged in project runtime
