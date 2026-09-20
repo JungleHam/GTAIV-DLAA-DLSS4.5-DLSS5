@@ -89,7 +89,7 @@ if (-not (Is-Admin)) { Write-Host 'Administrator permission is required. Approve
 try {
     Write-Host ''; Write-Host '============================================================' -ForegroundColor Green; Write-Host ' GTA IV - DLAA + ReShade input patch' -ForegroundColor Green; Write-Host '============================================================' -ForegroundColor Green
     $Game=Resolve-GameFolder; $Trex=Join-Path $Game '.trex'
-    if (-not (Test-Path -LiteralPath (Join-Path $Game 'dinput8.dll'))) { Fail 'FusionFix is not detected. Normal users should use GTAIV-DLSS-Setup.exe, which can install the user-supplied FusionFix ZIP automatically. This fallback BAT expects FusionFix to be present already.' }
+    if (-not (Test-Path -LiteralPath (Join-Path $Game 'dinput8.dll'))) { Fail 'FusionFix is not detected. Normal users should use GTAIV-DLSS-Setup.exe, which downloads and installs FusionFix automatically. This fallback BAT expects FusionFix to be present already.' }
     if (Get-Process GTAIV -ErrorAction SilentlyContinue) { Fail 'Close GTA IV first.' }; if (Get-Process NvRemixBridge -ErrorAction SilentlyContinue) { Fail 'Close NvRemixBridge.exe first.' }
     if (Test-Path -LiteralPath (Join-Path $Trex 'm3k-nr.ini')) { Fail 'DLSS Full is already installed. Do not run the DLAA baseline installer over it.' }
     Validate-UserPrereqs
@@ -97,7 +97,7 @@ try {
     $dlaaReady=(Test-Path -LiteralPath (Join-Path $Trex 'NvRemixBridge.exe')) -and (Test-Path -LiteralPath (Join-Path $Trex 'dlss5-feed.addon64')) -and (Test-Path -LiteralPath (Join-Path $Game 'DLAA_INSTALL_MANIFEST.txt'))
     $reshadePatchedBefore=Has-PatchMarker $GlobalReShade
     Write-Host ''; Write-Host "Game: $Game"; Write-Host ("DLAA baseline: "+$(if($dlaaReady){'already installed - will keep it'}else{'will install'})); Write-Host ("ReShade input patch: "+$(if($reshadePatchedBefore){'already installed'}else{'will install from this project release'}))
-    Write-Host 'Official ReShade and LumeniteFX were supplied by the user; no third-party archive/executable URL is embedded.' -ForegroundColor Green
+    Write-Host 'Official ReShade was selected by the user; LumeniteFX and other GitHub-hosted dependencies are handled by setup.' -ForegroundColor Green
     $ok=if($env:GTAIV_SETUP_GAME){'y'}else{Read-Host 'Continue? [Y/n]'}; if($ok -and $ok -notmatch '^(y|yes)$'){exit 0}
     New-Item -ItemType Directory -Path $Temp -Force | Out-Null
 
