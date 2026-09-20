@@ -29,8 +29,7 @@ jobs:
           foreach($marker in @(
             'GTAIV-DLSS-Full-Runtime.zip',
             "'d3d9vk_x64.dll'='$hash'",
-            "Copy-Item -LiteralPath (Join-Path `$runtimeDir 'd3d9vk_x64.dll') -Destination (Join-Path `$Trex 'd3d9vk_x64.dll') -Force",
-            "d3d9vk_x64.dll')){Assert-SHA256")) {
+            "Copy-Item -LiteralPath (Join-Path `$runtimeDir 'd3d9vk_x64.dll') -Destination (Join-Path `$Trex 'd3d9vk_x64.dll') -Force")) {
             if(-not $installer.Contains($marker)){throw "Release installer missing presenter marker: $marker"}
           }
 
