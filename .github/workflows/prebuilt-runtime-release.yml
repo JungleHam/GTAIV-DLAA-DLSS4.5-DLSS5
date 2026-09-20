@@ -104,7 +104,6 @@ jobs:
           path: out-reshade/*
 
   build-runtime:
-    needs: build-presenter
     runs-on: windows-2022
     timeout-minutes: 75
     env:
@@ -112,11 +111,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download freshly built presenter
+      - name: Download frozen verified presenter for test runtime
         uses: actions/download-artifact@v4
         with:
-          name: cleaned-runtime-presenter
+          github-token: ${{ github.token }}
+          run-id: 35528028649
+          name: m3k-dxvk-v3.0.2-presenter
           path: _presenter-artifact
+
+      - name: Verify frozen presenter artifact
+        shell: pwsh
+        run: |
+          $p = '.\_presenter-artifact\d3d9vk_x64.dll'
+          if (-not (Test-Path -LiteralPath $p)) { throw 'Frozen presenter artifact is missing.' }
+          $h = (Get-FileHash -Algorithm SHA256 -LiteralPath $p).Hash.ToUpperInvariant()
+          if ($h -ne '370BE394DE7BFC612D227CBE4B2A57A4AB5C23A420BE00AA839876DEF653DF97') { throw "Frozen presenter hash mismatch: $h" }
+          $ascii = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($p))
+          if (-not $ascii.Contains('M3K_QueryPresentSourceV1')) { throw 'Frozen presenter query marker missing.' }
+          if (-not $ascii.Contains('[M3K-S1B] config')) { throw 'Frozen presenter config marker missing.' }
 
       - name: Checkout frozen project rendering core
         shell: pwsh
