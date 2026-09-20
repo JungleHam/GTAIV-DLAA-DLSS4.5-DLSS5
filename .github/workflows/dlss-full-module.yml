@@ -7,7 +7,6 @@ on:
     paths:
       - 'README.md'
       - 'docs/**'
-      - 'input/**'
       - 'installer/**'
       - 'install/**'
       - 'manifests/versions.json'
