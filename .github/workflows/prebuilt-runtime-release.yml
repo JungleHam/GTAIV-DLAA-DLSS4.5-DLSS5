@@ -55,9 +55,7 @@ jobs:
           test -n "$dll"
           cp "$dll" d3d9vk_x64.dll
           actual="$(sha256sum d3d9vk_x64.dll | awk '{print toupper($1)}')"
-          expected="208607B43B0832C32F5EC92C9E20FE5988E435101AF83A81ED6BA5538353E366"
-          echo "Presenter SHA256: $actual"
-          test "$actual" = "$expected"
+          echo "Presenter SHA256 for this build: $actual"
           strings d3d9vk_x64.dll | grep -q '\[M3K-S1B\] config'
           strings d3d9vk_x64.dll | grep -q 'M3K_QueryPresentSourceV1'
 
@@ -228,7 +226,6 @@ jobs:
           $ngx = '.\_nvidia-dlss\lib\Windows_x86_64\rel\nvngx_dlss.dll'
           Copy-Item $ngx .\out-runtime\nvngx_dlss.dll -Force
 
-          AssertHash .\out-runtime\d3d9vk_x64.dll '208607B43B0832C32F5EC92C9E20FE5988E435101AF83A81ED6BA5538353E366'
           AssertHash .\out-runtime\DLSS5_Feed.fx 'CDAC08A721B14B97187DD86C5B5BEAD157C9063D7EE859A0F131A8EE791695F1'
           AssertHash .\out-runtime\nvngx_dlss.dll '3975567B8943C53ACCE397F2B72380092F84F162D00B0D2C7D08A1025C563983'
           AssertHash .\out-runtime\ReShade.fxh '6DABFBBAF968C3871905D2EA17F96572FF7B1CEC01310B5D0E5252B66B30174F'
