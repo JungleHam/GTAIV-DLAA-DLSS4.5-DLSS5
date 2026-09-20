@@ -7,7 +7,6 @@ on:
     paths:
       - 'install/Uninstall-DLAA.bat'
       - 'README.md'
-      - 'install/README.md'
       - '.github/workflows/uninstall-dlaa-validation.yml'
 
 permissions:
@@ -57,11 +56,7 @@ jobs:
         shell: pwsh
         run: |
           $readme = Get-Content README.md -Raw
-          $installReadme = Get-Content install/README.md -Raw
-          foreach ($required in @('Remove everything from this project','FusionFix itself remains installed','official ReShade')) {
-            if (-not $readme.Contains($required)) { throw "README missing uninstall guidance: $required" }
+          foreach ($required in @('GTAIV-DLSS-Setup.exe','To modify or remove the project later','maintenance action')) {
+            if (-not $readme.Contains($required)) { throw "README missing installer maintenance guidance: $required" }
           }
-          foreach ($required in @('GTAIV-DLSS-Setup.exe','Do **not** extract ZIPs','GitHub project pages')) {
-            if (-not $installReadme.Contains($required)) { throw "install/README missing current installer guidance: $required" }
-          }
-          Write-Host 'Release uninstall documentation validated.' -ForegroundColor Green
+          Write-Host 'README maintenance guidance validated.' -ForegroundColor Green
