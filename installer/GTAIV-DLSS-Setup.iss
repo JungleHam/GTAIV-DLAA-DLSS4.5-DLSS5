@@ -355,7 +355,7 @@ begin
     end;
     case SelectedAction of
       0: WizardForm.FinishedLabel.Caption := 'DLAA + ReShade input patch is installed. Setup handled the prerequisite installation. Launch GTA IV and press Home to verify the ReShade menu.';
-      1: WizardForm.FinishedLabel.Caption := 'Full DLSS is installed. Setup handled the prerequisite installation. Keep GTA IV set to your display native resolution, then use Home → Add-ons → DLSS 5 Feed → GTA IV DLSS.';
+      1: WizardForm.FinishedLabel.Caption := 'Full DLSS is installed. Initial profile: Quality. Neural Rendering is installed but intentionally OFF on the first launch. Verify DLSS 4.5 first; then enable NR later from Home → Add-ons → DLSS 5 Feed → GTA IV DLSS if wanted.';
       2: WizardForm.FinishedLabel.Caption := 'DLSS Full was removed. The preserved DLAA setup remains installed.';
       3: WizardForm.FinishedLabel.Caption := 'This project was removed. FusionFix and the official ReShade installation were left installed.';
     end;
