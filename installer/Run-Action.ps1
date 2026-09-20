@@ -236,7 +236,7 @@ function Invoke-BundledBat {
             $detail = [IO.File]::ReadAllText($ResultFile).Trim()
             if ($detail) { Fail $detail }
         }
-        Fail "Installer component failed with exit code $code: $([IO.Path]::GetFileName($Path))"
+        Fail "Installer component failed with exit code ${code}: $([IO.Path]::GetFileName($Path))"
     }
 }
 
