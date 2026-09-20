@@ -1,0 +1,112 @@
+name: Publish v1.0.0 confirmed release
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/publish-v1.0.0.yml'
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download confirmed working artifacts
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Path .\download -Force | Out-Null
+          New-Item -ItemType Directory -Path .\release -Force | Out-Null
+
+          gh api -H "Accept: application/vnd.github+json" "/repos/$env:GITHUB_REPOSITORY/actions/artifacts/10612083031/zip" > .\download\setup.zip
+          if ($LASTEXITCODE -ne 0) { throw 'Could not download confirmed setup artifact.' }
+          gh api -H "Accept: application/vnd.github+json" "/repos/$env:GITHUB_REPOSITORY/actions/artifacts/10610767459/zip" > .\download\runtime.zip
+          if ($LASTEXITCODE -ne 0) { throw 'Could not download confirmed runtime artifact.' }
+          gh api -H "Accept: application/vnd.github+json" "/repos/$env:GITHUB_REPOSITORY/actions/artifacts/10610506986/zip" > .\download\reshade.zip
+          if ($LASTEXITCODE -ne 0) { throw 'Could not download confirmed ReShade patch artifact.' }
+
+          Expand-Archive .\download\setup.zip .\download\setup -Force
+          Expand-Archive .\download\runtime.zip .\download\runtime -Force
+          Expand-Archive .\download\reshade.zip .\download\reshade -Force
+
+          $setup = Get-ChildItem .\download\setup -Recurse -File -Filter 'GTAIV-DLSS-Setup.exe' | Select-Object -First 1
+          $runtime = Get-ChildItem .\download\runtime -Recurse -File -Filter 'GTAIV-DLSS-Full-Runtime.zip' | Select-Object -First 1
+          $reshade = Get-ChildItem .\download\reshade -Recurse -File -Filter 'ReShade64-bbridge.dll' | Select-Object -First 1
+
+          if (-not $setup) { throw 'GTAIV-DLSS-Setup.exe missing from confirmed artifact.' }
+          if (-not $runtime) { throw 'GTAIV-DLSS-Full-Runtime.zip missing from confirmed artifact.' }
+          if (-not $reshade) { throw 'ReShade64-bbridge.dll missing from confirmed artifact.' }
+
+          Copy-Item $setup.FullName .\release\GTAIV-DLSS-Setup.exe -Force
+          Copy-Item $runtime.FullName .\release\GTAIV-DLSS-Full-Runtime.zip -Force
+          Copy-Item $reshade.FullName .\release\ReShade64-bbridge.dll -Force
+
+      - name: Verify exact user-confirmed binaries
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $expected = @{
+            '.\release\GTAIV-DLSS-Setup.exe' = 'E11B32837D9725015465A16C33E9FB1F5375C4AA1172CF788B9193AE33F2443A'
+            '.\release\GTAIV-DLSS-Full-Runtime.zip' = '7560102921FFD2FFFEBB7A76763F87B4F0A7DD994B27B49C6BCBC3FBD9F06BA4'
+            '.\release\ReShade64-bbridge.dll' = 'D5BD8CB2B6E935506888EA71711361B9AFCD72ED7C70926C0F52E8F8E47C7510'
+          }
+          foreach ($path in $expected.Keys) {
+            $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash.ToUpperInvariant()
+            Write-Host "$path  $actual"
+            if ($actual -ne $expected[$path]) { throw "Confirmed release hash mismatch: $path" }
+          }
+
+      - name: Write release notes
+        shell: pwsh
+        run: |
+          @'
+# GTA IV DLAA + DLSS 4.5 + DLSS 5 Neural Rendering v1.0.0
+
+**Normal users: download only GTAIV-DLSS-Setup.exe.**
+
+The installer guides the whole process and automatically obtains the GitHub-hosted dependencies it needs.
+
+## Installation
+
+1. Download and run GTAIV-DLSS-Setup.exe as Administrator.
+2. Select the GTA IV folder containing GTAIV.exe.
+3. Choose DLAA or Full DLSS.
+4. If FusionFix is installed automatically, launch GTA IV once to the main menu, close it, then rerun setup.
+5. When asked, select the official ReShade 6.8.0 Full Add-On Support setup EXE.
+6. Full DLSS detects RTX 40/50 and downloads the matching NR package automatically. Advanced users may use **I brought my own** to select an existing validated nvngx_dlssnr.dll.
+
+Full DLSS starts at **Quality** with **Neural Rendering OFF**.
+
+## Release assets
+
+- GTAIV-DLSS-Setup.exe — user-facing installer
+- GTAIV-DLSS-Full-Runtime.zip — downloaded by the installer
+- ReShade64-bbridge.dll — downloaded by the installer
+
+## SHA256
+
+E11B32837D9725015465A16C33E9FB1F5375C4AA1172CF788B9193AE33F2443A  GTAIV-DLSS-Setup.exe
+7560102921FFD2FFFEBB7A76763F87B4F0A7DD994B27B49C6BCBC3FBD9F06BA4  GTAIV-DLSS-Full-Runtime.zip
+D5BD8CB2B6E935506888EA71711361B9AFCD72ED7C70926C0F52E8F8E47C7510  ReShade64-bbridge.dll
+
+See the repository README for screenshots, prerequisites, architecture, troubleshooting, and credits.
+          '@ | Set-Content -LiteralPath .\release-notes.md -Encoding utf8
+
+      - name: Publish GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          gh release view v1.0.0 --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) { throw 'v1.0.0 already exists; refusing to replace the confirmed release automatically.' }
+
+          gh release create v1.0.0 --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'GTA IV DLAA + DLSS 4.5 + DLSS 5 v1.0.0' --notes-file .\release-notes.md .\release\GTAIV-DLSS-Setup.exe .\release\GTAIV-DLSS-Full-Runtime.zip .\release\ReShade64-bbridge.dll
+          if ($LASTEXITCODE -ne 0) { throw 'GitHub release creation failed.' }
