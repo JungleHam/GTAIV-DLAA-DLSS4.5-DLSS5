@@ -368,7 +368,7 @@ procedure CurPageChanged(CurPageID: Integer);
 begin
   if CurPageID = wpFinished then begin
     if FusionFixInstalledThisRun then begin
-      WizardForm.FinishedLabel.Caption := 'FusionFix 5.0.1 was installed for you. One first-run step is required: launch GTA IV normally, wait until the main menu appears, then close the game. After that, run GTAIV-DLSS-Setup.exe again from the SAME setup-files folder. Leave ReShade, LumeniteFX and the NR ZIP untouched; setup will install/extract them on the next run.';
+      WizardForm.FinishedLabel.Caption := 'FusionFix 5.0.1 was downloaded from GitHub and installed automatically. Launch GTA IV once to the main menu, close it, then run GTAIV-DLSS-Setup.exe again. Other GitHub prerequisites will download automatically on the next run.';
       exit;
     end;
     case SelectedAction of
