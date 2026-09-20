@@ -3,8 +3,8 @@ setlocal EnableExtensions DisableDelayedExpansion
 cd /d "%~dp0"
 
 set "BB_SELF=%~f0"
-set "RESHADESYS=C:\ProgramData\ReShade\ReShade64.dll"
-set "BACKUP=C:\ProgramData\ReShade\ReShade64.dll.pre-bbridge-input"
+set "RESHADESYS=C:\ProgramData\ReShade\ReShade64\ReShade64.dll"
+set "BACKUP=C:\ProgramData\ReShade\ReShade64\ReShade64.dll.pre-bbridge-input"
 
 rem Ask for the game first so paste/drag works in a normal non-elevated window.
 set "GAME=%~1"
