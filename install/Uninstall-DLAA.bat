@@ -13,8 +13,8 @@ $Safety = Join-Path $Temp 'safety'
 $Log = Join-Path $Temp 'Uninstall-DLAA.log'
 $TranscriptStarted = $false
 $Succeeded = $false
-$GlobalReShade = 'C:\ProgramData\ReShade\ReShade64.dll'
-$GlobalReShadeBackup = 'C:\ProgramData\ReShade\ReShade64.dll.pre-bbridge-input'
+$GlobalReShade = 'C:\ProgramData\ReShade\ReShade64\ReShade64.dll'
+$GlobalReShadeBackup = 'C:\ProgramData\ReShade\ReShade64\ReShade64.dll.pre-bbridge-input'
 
 function Fail([string]$Message) { throw $Message }
 function Is-Admin {
