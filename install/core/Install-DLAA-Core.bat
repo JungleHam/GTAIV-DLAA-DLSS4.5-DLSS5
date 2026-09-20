@@ -29,7 +29,7 @@ $RuntimeHashes=@{
  'bridge.conf'='161557ED3B3DEE86D9B9BEA3D3323924EE1F9F7FF47A139E3075B787B752EC8C';
  'dxvk.conf'='509713876C2C9EFBC70D242C4474E76554C59D2A0B162695085A31B8FE772247'
 }
-$ReShadeInstalled=$false; $TranscriptStarted=$false
+$ReShadeInstalled=$false; $TranscriptStarted=$false; $Backup=$null
 function Fail([string]$m){throw $m}
 function Resolve-ProjectAssetUrl([string]$AssetName){$headers=@{'User-Agent'='GTAIV-DLSS-Setup'};$release=Invoke-RestMethod -UseBasicParsing -Headers $headers -Uri $ReleaseApi;$asset=@($release.assets|Where-Object{$_.name -eq $AssetName})|Select-Object -First 1;if(-not $asset -or -not $asset.browser_download_url){Fail "Project release asset was not found: $AssetName"};return[string]$asset.browser_download_url}
 function Is-Admin{$id=[Security.Principal.WindowsIdentity]::GetCurrent();$p=New-Object Security.Principal.WindowsPrincipal($id);return $p.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)}
@@ -41,12 +41,43 @@ function Set-KeyEquals([string]$Path,[string]$Key,[string]$Value){$text=if(Test-
 function Copy-IfExists([string]$s,[string]$d){if(Test-Path -LiteralPath $s){$p=Split-Path -Parent $d;if($p -and -not(Test-Path -LiteralPath $p)){New-Item -ItemType Directory -Path $p -Force|Out-Null};Copy-Item -LiteralPath $s -Destination $d -Force}}
 function Cleanup{if(Test-Path -LiteralPath $Temp){Remove-Item -LiteralPath $Temp -Recurse -Force -ErrorAction SilentlyContinue}}
 
+function Write-SetupResult([string]$Message){
+ if(-not $env:GTAIV_SETUP_RESULT_FILE){return}
+ try{[IO.File]::WriteAllText($env:GTAIV_SETUP_RESULT_FILE,$Message,[Text.UTF8Encoding]::new($false))}catch{}
+}
+function Restore-GameBaseline([string]$BackupPath){
+ if(-not $BackupPath -or -not(Test-Path -LiteralPath $BackupPath -PathType Container)){return}
+ Write-Host "Restoring clean FusionFix baseline from $BackupPath" -ForegroundColor Yellow
+ if(Test-Path -LiteralPath $Trex){Remove-Item -LiteralPath $Trex -Recurse -Force -ErrorAction SilentlyContinue}
+ $hook=Join-Path $Game 'd3d9Hooked.dll';if(Test-Path -LiteralPath $hook){Remove-Item -LiteralPath $hook -Force -ErrorAction SilentlyContinue}
+ foreach($n in @('d3d9.dll','vulkan.dll','dxvk.conf','commandline.txt')){
+   $src=Join-Path $BackupPath $n;$dst=Join-Path $Game $n
+   if(Test-Path -LiteralPath $src){Copy-Item -LiteralPath $src -Destination $dst -Force}
+   elseif(Test-Path -LiteralPath $dst){Remove-Item -LiteralPath $dst -Force -ErrorAction SilentlyContinue}
+ }
+ $bp=Join-Path $BackupPath 'plugins';$gp=Join-Path $Game 'plugins'
+ if(Test-Path -LiteralPath $bp -PathType Container){
+   New-Item -ItemType Directory -Path $gp -Force|Out-Null
+   Get-ChildItem -LiteralPath $bp -File -ErrorAction SilentlyContinue|ForEach-Object{Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $gp $_.Name) -Force}
+ }
+}
+function Recover-PartialPreviousAttempt{
+ $partial=(Test-Path -LiteralPath $Trex -PathType Container) -or (Test-Path -LiteralPath (Join-Path $Game 'd3d9Hooked.dll') -PathType Leaf)
+ $complete=(Test-Path -LiteralPath (Join-Path $Game 'DLAA_INSTALL_MANIFEST.txt') -PathType Leaf)
+ if(-not $partial -or $complete){return}
+ $backup=Get-ChildItem -LiteralPath $Game -Directory -Filter '_DLAA_PREINSTALL_BACKUP_*' -ErrorAction SilentlyContinue|Sort-Object LastWriteTime -Descending|Select-Object -First 1
+ if(-not $backup){Fail 'A partial previous DLAA install was detected, but no _DLAA_PREINSTALL_BACKUP_* folder exists to restore it safely.'}
+ Write-Host 'Partial previous DLAA attempt detected. Rolling it back automatically...' -ForegroundColor Yellow
+ Restore-GameBaseline $backup.FullName
+}
+
 if(-not(Is-Admin)){Write-Host 'Administrator permission is required for the ReShade Vulkan layer.' -ForegroundColor Yellow;$p=Start-Process -FilePath $Self -Verb RunAs -Wait -PassThru;exit $p.ExitCode}
 $Log=Join-Path $Game 'DLAA_AIO_install.log'
 try{
  Start-Transcript -LiteralPath $Log -Force|Out-Null;$TranscriptStarted=$true
  if(-not(Test-Path -LiteralPath (Join-Path $Game 'GTAIV.exe'))){Fail 'GTAIV.exe was not found.'};if(-not(Test-Path -LiteralPath (Join-Path $Game 'dinput8.dll'))){Fail 'FusionFix is not detected.'}
- if(Test-Path -LiteralPath $Trex){Fail '.trex already exists. Restore/clean the previous bridge attempt first.'};if(Test-Path -LiteralPath (Join-Path $Game 'd3d9Hooked.dll')){Fail 'd3d9Hooked.dll already exists; baseline is not clean.'}
+ Recover-PartialPreviousAttempt
+ if(Test-Path -LiteralPath $Trex){Fail '.trex already exists after recovery; baseline is not clean.'};if(Test-Path -LiteralPath (Join-Path $Game 'd3d9Hooked.dll')){Fail 'd3d9Hooked.dll already exists after recovery; baseline is not clean.'}
  if(-not $ReshadeSetup -or -not(Test-Path -LiteralPath $ReshadeSetup)){Fail 'Official ReShade installer was not supplied.'};Assert-SHA256 $ReshadeSetup $ReShadeSetupHash
  if(-not $LumenitePackage -or -not(Test-Path -LiteralPath $LumenitePackage)){Fail 'LumeniteFX ZIP was not supplied.'};Assert-SHA256 $LumenitePackage $LumenitePackageHash
  $ffCfg=Join-Path $Game 'plugins\GTAIV.EFLC.FusionFix.cfg';if(-not(Test-Path -LiteralPath $ffCfg)){$o=Get-ChildItem -LiteralPath (Join-Path $Game 'plugins') -Filter '*FusionFix*.cfg' -File -ErrorAction SilentlyContinue|Select-Object -First 1;if(-not $o){Fail 'FusionFix CFG not found.'};$ffCfg=$o.FullName}
@@ -72,7 +103,7 @@ try{
 GTA IV DLAA clean installation
 Created: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
 ReShade: official 6.8.0 Full Add-On Support supplied by user
-LumeniteFX: official pinned ZIP supplied by user
+LumeniteFX: pinned GitHub archive downloaded/verified by setup
 DLSS5-Feeder: project runtime
 nvngx_dlss.dll: official NVIDIA 310.9.1 packaged in project runtime
 DLSS5 Neural Rendering: NOT INSTALLED
@@ -82,6 +113,8 @@ $Backup
  Write-Host '';Write-Host 'SUCCESS: GTA IV DLAA STACK INSTALLED' -ForegroundColor Green
  if($TranscriptStarted){Stop-Transcript|Out-Null;$TranscriptStarted=$false};exit 0
 }catch{$err=$_.Exception.Message;Write-Host '';Write-Host 'INSTALL FAILED:' -ForegroundColor Red;Write-Host $err -ForegroundColor Red
+ Write-SetupResult $err
  try{if($ReShadeInstalled -and (Test-Path -LiteralPath $ReshadeSetup) -and (Test-Path -LiteralPath (Join-Path $Trex 'NvRemixBridge.exe'))){$target=Join-Path $Trex 'NvRemixBridge.exe';Start-Process -FilePath $ReshadeSetup -ArgumentList @("`"$target`"",'--api','vulkan','--headless','--state','uninstall') -Wait|Out-Null}}catch{}
+ try{if($Backup){Restore-GameBaseline $Backup}}catch{Write-Host ('Rollback warning: '+$_.Exception.Message) -ForegroundColor Yellow}
  if($TranscriptStarted){try{Stop-Transcript|Out-Null}catch{};$TranscriptStarted=$false};Read-Host 'Press Enter to close';exit 1
 }finally{Cleanup}
