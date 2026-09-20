@@ -66,39 +66,39 @@ jobs:
       - name: Write release notes
         shell: pwsh
         run: |
-          @'
-# GTA IV DLAA + DLSS 4.5 + DLSS 5 Neural Rendering v1.0.0
-
-**Normal users: download only GTAIV-DLSS-Setup.exe.**
-
-The installer guides the whole process and automatically obtains the GitHub-hosted dependencies it needs.
-
-## Installation
-
-1. Download and run GTAIV-DLSS-Setup.exe as Administrator.
-2. Select the GTA IV folder containing GTAIV.exe.
-3. Choose DLAA or Full DLSS.
-4. If FusionFix is installed automatically, launch GTA IV once to the main menu, close it, then rerun setup.
-5. When asked, select the official ReShade 6.8.0 Full Add-On Support setup EXE.
-6. Full DLSS detects RTX 40/50 and downloads the matching NR package automatically. Advanced users may use **I brought my own** to select an existing validated nvngx_dlssnr.dll.
-
-Full DLSS starts at **Quality** with **Neural Rendering OFF**.
-
-## Release assets
-
-- GTAIV-DLSS-Setup.exe — user-facing installer
-- GTAIV-DLSS-Full-Runtime.zip — downloaded by the installer
-- ReShade64-bbridge.dll — downloaded by the installer
-
-## SHA256
-
-E11B32837D9725015465A16C33E9FB1F5375C4AA1172CF788B9193AE33F2443A  GTAIV-DLSS-Setup.exe
-7560102921FFD2FFFEBB7A76763F87B4F0A7DD994B27B49C6BCBC3FBD9F06BA4  GTAIV-DLSS-Full-Runtime.zip
-D5BD8CB2B6E935506888EA71711361B9AFCD72ED7C70926C0F52E8F8E47C7510  ReShade64-bbridge.dll
-
-See the repository README for screenshots, prerequisites, architecture, troubleshooting, and credits.
-          '@ | Set-Content -LiteralPath .\release-notes.md -Encoding utf8
-
+          $lines = @(
+            '# GTA IV DLAA + DLSS 4.5 + DLSS 5 Neural Rendering v1.0.0',
+            '',
+            '**Normal users: download only GTAIV-DLSS-Setup.exe.**',
+            '',
+            'The installer guides the whole process and automatically obtains the GitHub-hosted dependencies it needs.',
+            '',
+            '## Installation',
+            '',
+            '1. Download and run GTAIV-DLSS-Setup.exe as Administrator.',
+            '2. Select the GTA IV folder containing GTAIV.exe.',
+            '3. Choose DLAA or Full DLSS.',
+            '4. If FusionFix is installed automatically, launch GTA IV once to the main menu, close it, then rerun setup.',
+            '5. When asked, select the official ReShade 6.8.0 Full Add-On Support setup EXE.',
+            '6. Full DLSS detects RTX 40/50 and downloads the matching NR package automatically. Advanced users may use I brought my own to select an existing validated nvngx_dlssnr.dll.',
+            '',
+            'Full DLSS starts at Quality with Neural Rendering OFF.',
+            '',
+            '## Release assets',
+            '',
+            '- GTAIV-DLSS-Setup.exe — user-facing installer',
+            '- GTAIV-DLSS-Full-Runtime.zip — downloaded by the installer',
+            '- ReShade64-bbridge.dll — downloaded by the installer',
+            '',
+            '## SHA256',
+            '',
+            'E11B32837D9725015465A16C33E9FB1F5375C4AA1172CF788B9193AE33F2443A  GTAIV-DLSS-Setup.exe',
+            '7560102921FFD2FFFEBB7A76763F87B4F0A7DD994B27B49C6BCBC3FBD9F06BA4  GTAIV-DLSS-Full-Runtime.zip',
+            'D5BD8CB2B6E935506888EA71711361B9AFCD72ED7C70926C0F52E8F8E47C7510  ReShade64-bbridge.dll',
+            '',
+            'See the repository README for screenshots, prerequisites, architecture, troubleshooting, and credits.'
+          )
+          [IO.File]::WriteAllLines('.\release-notes.md', $lines, [Text.UTF8Encoding]::new($false))
       - name: Publish GitHub release
         shell: pwsh
         env:
