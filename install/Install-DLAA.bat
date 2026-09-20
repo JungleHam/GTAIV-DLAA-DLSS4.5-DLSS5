@@ -106,7 +106,7 @@ try {
     Ensure-ReShade $Game $Trex
     if (-not (Has-PatchMarker $GlobalReShade)) {
         Write-Host ''; Write-Host '[2/2] Installing the project ReShade b-bridge input patch...' -ForegroundColor Cyan
-        $patched=Join-Path $Temp 'ReShade64-bbridge.dll'; $patchedUrl=Resolve-ProjectAssetUrl $PatchedReShadeAsset; Download $patchedUrl $patched; Assert-SHA256 $patched $PatchedReShadeHash
+        $patched=Join-Path $Temp 'ReShade64-bbridge.dll'; if($env:GTAIV_SETUP_RESHADE_PATCH -and (Test-Path -LiteralPath $env:GTAIV_SETUP_RESHADE_PATCH -PathType Leaf)){Write-Host 'Using local ReShade input patch beside setup EXE.' -ForegroundColor DarkGray;Copy-Item -LiteralPath $env:GTAIV_SETUP_RESHADE_PATCH -Destination $patched -Force}else{$patchedUrl=Resolve-ProjectAssetUrl $PatchedReShadeAsset;Download $patchedUrl $patched}; Assert-SHA256 $patched $PatchedReShadeHash
         if (-not (Has-PatchMarker $patched)) { Fail 'ReShade64-bbridge.dll is missing the expected patch marker.' }
         if (-not (Test-Path -LiteralPath $GlobalReShadeBackup)) { Copy-Item -LiteralPath $GlobalReShade -Destination $GlobalReShadeBackup -Force }
         Copy-Item -LiteralPath $patched -Destination $GlobalReShade -Force; Assert-SHA256 $GlobalReShade $PatchedReShadeHash
