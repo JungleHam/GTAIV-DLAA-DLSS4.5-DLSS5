@@ -7,6 +7,63 @@ permissions:
   contents: read
 
 jobs:
+  build-presenter:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install DXVK build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mingw-w64 meson ninja-build glslang-tools
+
+      - name: Clone frozen project and exact DXVK 3.0.2 source
+        run: |
+          git clone --filter=blob:none https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5.git _project
+          git -C _project checkout 57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f
+          test "$(git -C _project rev-parse HEAD)" = "57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f"
+
+          git clone --recursive https://github.com/doitsujin/dxvk.git _dxvk
+          git -C _dxvk checkout 6b20f622a77b87b2921fe5d2c1774d2f2ba3e9b7
+          git -C _dxvk submodule update --init --recursive
+          test "$(git -C _dxvk rev-parse HEAD)" = "6b20f622a77b87b2921fe5d2c1774d2f2ba3e9b7"
+
+      - name: Apply frozen M3K presenter patches
+        run: |
+          git -C _dxvk apply "$GITHUB_WORKSPACE/_project/tools/m3k-nr/dxvk-v3.0.2-m3k-source-tap.patch"
+          python3 _project/tools/m3k-nr/a2-s1b-dxvk.py _dxvk
+          git -C _dxvk diff --check
+          grep -q 'M3K_QueryPresentSourceV1' _dxvk/src/d3d9/d3d9_swapchain.cpp
+          grep -q '\[M3K-S1B\] config' _dxvk/src/d3d9/d3d9_swapchain.cpp
+
+      - name: Build x64 presenter
+        working-directory: _dxvk
+        run: |
+          meson setup --cross-file build-win64.txt --buildtype release --prefix "$GITHUB_WORKSPACE/_dxvk_install" build.w64
+          meson compile -C build.w64 d3d9
+          meson install -C build.w64
+
+      - name: Verify presenter
+        shell: bash
+        run: |
+          set -euo pipefail
+          dll="$(find _dxvk_install -type f -iname d3d9.dll | head -n1)"
+          test -n "$dll"
+          cp "$dll" d3d9vk_x64.dll
+          actual="$(sha256sum d3d9vk_x64.dll | awk '{print toupper($1)}')"
+          expected="511E0C2509E1922DB2EC38940507BA956908FE6DC5FD9B3DB9FEC489DC05F297"
+          echo "Presenter SHA256: $actual"
+          test "$actual" = "$expected"
+          strings d3d9vk_x64.dll | grep -q '\[M3K-S1B\] config'
+          strings d3d9vk_x64.dll | grep -q 'M3K_QueryPresentSourceV1'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cleaned-runtime-presenter
+          path: d3d9vk_x64.dll
+          if-no-files-found: error
+
   build-reshade:
     runs-on: windows-2022
     timeout-minutes: 45
@@ -46,12 +103,19 @@ jobs:
           path: out-reshade/*
 
   build-runtime:
+    needs: build-presenter
     runs-on: windows-2022
     timeout-minutes: 75
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Download freshly built presenter
+        uses: actions/download-artifact@v4
+        with:
+          name: cleaned-runtime-presenter
+          path: _presenter-artifact
 
       - name: Checkout frozen project rendering core
         shell: pwsh
@@ -141,13 +205,9 @@ jobs:
           Copy-Item .\_project\tools\m3k-nr\out-m3k-a3-s5\dlss5-feed.addon64 .\out-runtime\dlss5-feed.addon64 -Force
           Copy-Item .\_project\tools\m3k-nr\out-m3k-s27\m3k\m3k-nvngx.dll .\out-runtime\m3k\m3k-nvngx.dll -Force
 
-          # The standalone presenter asset was intentionally removed from the public release.
-          # Reuse the hardware-tested presenter from the existing project runtime archive.
-          New-Item -ItemType Directory -Path .\_old-runtime -Force | Out-Null
-          gh release download v1.0.0 --repo $env:GITHUB_REPOSITORY --pattern 'GTAIV-DLSS-Full-Runtime.zip' --dir .\_old-runtime
-          if ($LASTEXITCODE -ne 0) { throw 'Could not download the existing project runtime archive.' }
-          Expand-Archive -LiteralPath .\_old-runtime\GTAIV-DLSS-Full-Runtime.zip -DestinationPath .\_old-runtime\expanded -Force
-          Copy-Item .\_old-runtime\expanded\d3d9vk_x64.dll .\out-runtime\d3d9vk_x64.dll -Force
+          # Build the hardware-tested presenter reproducibly in this workflow.
+          # Do not depend on a previous public release asset.
+          Copy-Item .\_presenter-artifact\d3d9vk_x64.dll .\out-runtime\d3d9vk_x64.dll -Force
 
           Copy-Item .\_bbridge\GTAIV\.trex\bridge.conf .\out-runtime\bridge.conf -Force
           Copy-Item .\_bbridge\GTAIV\dxvk.conf .\out-runtime\dxvk.conf -Force
