@@ -1,4 +1,4 @@
-@rem GTAIV-DLAA-DLSS4.5-DLSS5 combined SR + NR installer. See docs/DLSS-FULL.md before use.
+@rem GTAIV-DLAA-DLSS4.5-DLSS5 developer SR + NR installer. Normal users should use GTAIV-DLSS-Setup.exe.
 @echo off
 setlocal
 set "DLSSF_SELF=%~f0"
