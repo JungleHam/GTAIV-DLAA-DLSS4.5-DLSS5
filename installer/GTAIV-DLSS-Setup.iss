@@ -56,22 +56,10 @@ var
 function QuoteArg(const S: string): string;
 begin Result := '"' + S + '"'; end;
 
-procedure OpenFusionFixGitHub(Sender: TObject);
-var ShellResult: Integer;
-begin
-  ShellExec('open', 'https://github.com/ThirteenAG/GTAIV.EFLC.FusionFix', '', '', SW_SHOWNORMAL, ewNoWait, ShellResult);
-end;
-
 procedure OpenReShadeGitHub(Sender: TObject);
 var ShellResult: Integer;
 begin
   ShellExec('open', 'https://github.com/crosire/reshade', '', '', SW_SHOWNORMAL, ewNoWait, ShellResult);
-end;
-
-procedure OpenLumeniteGitHub(Sender: TObject);
-var ShellResult: Integer;
-begin
-  ShellExec('open', 'https://github.com/umar-afzaal/LumeniteFX/tree/f8cbbb4eccfcb7adf0d74bb358ba349272e3c1e9', '', '', SW_SHOWNORMAL, ewNoWait, ShellResult);
 end;
 
 procedure OpenNrGitHub(Sender: TObject);
