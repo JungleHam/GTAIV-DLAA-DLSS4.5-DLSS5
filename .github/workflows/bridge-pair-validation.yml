@@ -42,6 +42,11 @@ jobs:
           $downloadDir=Join-Path $env:RUNNER_TEMP 'published-runtime'
           $dir=Join-Path $env:RUNNER_TEMP 'runtime'
           New-Item -ItemType Directory -Path $downloadDir -Force | Out-Null
+          gh release view v1.0.0 --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host 'No public v1.0.0 release exists yet; skipping published bridge-pair verification during pre-release rebuild.' -ForegroundColor Yellow
+            exit 0
+          }
           gh release download v1.0.0 --repo $env:GITHUB_REPOSITORY --pattern 'GTAIV-DLSS-Full-Runtime.zip' --dir $downloadDir --clobber
           if ($LASTEXITCODE -ne 0) { throw "gh release download failed: $LASTEXITCODE" }
           $zip=Join-Path $downloadDir 'GTAIV-DLSS-Full-Runtime.zip'
