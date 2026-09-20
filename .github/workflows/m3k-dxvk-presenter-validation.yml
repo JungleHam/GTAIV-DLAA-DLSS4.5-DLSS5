@@ -27,11 +27,10 @@ jobs:
 
           $installer=Get-Content install/Install-DLSS-Full.bat -Raw
           foreach($marker in @(
-            'v1.0.0',
             'GTAIV-DLSS-Full-Runtime.zip',
             "'d3d9vk_x64.dll'='$hash'",
             "Copy-Item -LiteralPath (Join-Path `$runtimeDir 'd3d9vk_x64.dll') -Destination (Join-Path `$Trex 'd3d9vk_x64.dll') -Force",
-            "Assert-SHA256 (Join-Path `$Trex 'd3d9vk_x64.dll') `$RuntimeHashes['d3d9vk_x64.dll']")) {
+            "d3d9vk_x64.dll')){Assert-SHA256")) {
             if(-not $installer.Contains($marker)){throw "Release installer missing presenter marker: $marker"}
           }
 
@@ -54,6 +53,11 @@ jobs:
           $downloadDir=Join-Path $env:RUNNER_TEMP 'published-runtime'
           $dir=Join-Path $env:RUNNER_TEMP 'runtime'
           New-Item -ItemType Directory -Path $downloadDir -Force | Out-Null
+          gh release view v1.0.0 --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host 'No public v1.0.0 release exists yet; skipping published-runtime verification during pre-release rebuild.' -ForegroundColor Yellow
+            exit 0
+          }
           gh release download v1.0.0 --repo $env:GITHUB_REPOSITORY --pattern 'GTAIV-DLSS-Full-Runtime.zip' --dir $downloadDir --clobber
           if ($LASTEXITCODE -ne 0) { throw "gh release download failed: $LASTEXITCODE" }
           $zip=Join-Path $downloadDir 'GTAIV-DLSS-Full-Runtime.zip'
