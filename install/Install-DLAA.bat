@@ -20,7 +20,7 @@ $CoreTemp = $null
 $ReShadeSetup = $env:GTAIV_SETUP_RESHADE
 $LumenitePackage = $env:GTAIV_SETUP_LUMENITE
 $ReShadeSetupHash = 'AFE4C8F13048306307983B8B3D41D5BF00A86820440B0E57DEA10950E1176445'
-$LumenitePackageHash = '43220F99FC0FFA0216E01EBD657180F8C9D043C939F760283B896EA257F1B6A2'
+$LumenitePackageHash = '572FEFB20D466AFE50998E16996B4833BEC675264485C99FE768A2337636E756'
 
 function Is-Admin { $id=[Security.Principal.WindowsIdentity]::GetCurrent(); $p=New-Object Security.Principal.WindowsPrincipal($id); return $p.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator) }
 function Fail([string]$m) { throw $m }
