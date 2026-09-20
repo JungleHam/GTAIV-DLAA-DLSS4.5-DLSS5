@@ -35,7 +35,7 @@ jobs:
             'Resolve-GameFolder',
             'Find-DlaaPreinstallBackup',
             '_DLAA_PREINSTALL_BACKUP_',
-            'C:\ProgramData\ReShade\ReShade64\ReShade64.dll',
+            'C:\ProgramData\ReShade\ReShade64.dll',
             'ReShade64.dll.pre-bbridge-input',
             'Restore-PreinstallState',
             'Validate-RestoredState',
