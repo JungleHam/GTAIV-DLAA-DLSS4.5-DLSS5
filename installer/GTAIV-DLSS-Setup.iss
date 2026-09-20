@@ -40,6 +40,10 @@ var
   ReShadePage: TInputFileWizardPage;
   ReShadeGitHubButton: TNewButton;
   NrGitHubButton: TNewButton;
+  OwnNrCheck: TNewCheckBox;
+  OwnNrLabel: TNewStaticText;
+  OwnNrEdit: TNewEdit;
+  OwnNrBrowseButton: TNewButton;
   GameDir: string;
   SelectedAction: Integer;
   DetectedDLAA: Boolean;
@@ -168,6 +172,28 @@ begin
   if FileExists(P) then Page.Values[0] := P;
 end;
 
+procedure UpdateOwnNrControls;
+var Visible: Boolean;
+begin
+  Visible := OwnNrCheck.Checked;
+  OwnNrLabel.Visible := Visible;
+  OwnNrEdit.Visible := Visible;
+  OwnNrBrowseButton.Visible := Visible;
+end;
+
+procedure OwnNrCheckClick(Sender: TObject);
+begin
+  UpdateOwnNrControls;
+end;
+
+procedure OwnNrBrowseClick(Sender: TObject);
+var P: string;
+begin
+  P := OwnNrEdit.Text;
+  if GetOpenFileName('Select nvngx_dlssnr.dll', P, '', 'DLL files|*.dll|All files|*.*', 'dll') then
+    OwnNrEdit.Text := P;
+end;
+
 procedure InitializeWizard;
 var PrepText: AnsiString;
 begin
@@ -200,6 +226,37 @@ begin
   NrGitHubButton.Top := GpuPage.MsgLabel.Top + GpuPage.MsgLabel.Height + ScaleY(16);
   NrGitHubButton.Width := ScaleX(180);
   NrGitHubButton.OnClick := @OpenNrGitHub;
+
+  OwnNrCheck := TNewCheckBox.Create(WizardForm);
+  OwnNrCheck.Parent := GpuPage.Surface;
+  OwnNrCheck.Caption := 'I brought my own';
+  OwnNrCheck.Left := ScaleX(0);
+  OwnNrCheck.Top := NrGitHubButton.Top + NrGitHubButton.Height + ScaleY(14);
+  OwnNrCheck.Width := ScaleX(180);
+  OwnNrCheck.Checked := False;
+  OwnNrCheck.OnClick := @OwnNrCheckClick;
+
+  OwnNrLabel := TNewStaticText.Create(WizardForm);
+  OwnNrLabel.Parent := GpuPage.Surface;
+  OwnNrLabel.Caption := 'Path to nvngx_dlssnr.dll:';
+  OwnNrLabel.Left := ScaleX(0);
+  OwnNrLabel.Top := OwnNrCheck.Top + OwnNrCheck.Height + ScaleY(10);
+
+  OwnNrEdit := TNewEdit.Create(WizardForm);
+  OwnNrEdit.Parent := GpuPage.Surface;
+  OwnNrEdit.Left := ScaleX(0);
+  OwnNrEdit.Top := OwnNrLabel.Top + OwnNrLabel.Height + ScaleY(4);
+  OwnNrEdit.Width := ScaleX(330);
+
+  OwnNrBrowseButton := TNewButton.Create(WizardForm);
+  OwnNrBrowseButton.Parent := GpuPage.Surface;
+  OwnNrBrowseButton.Caption := 'Browse...';
+  OwnNrBrowseButton.Left := OwnNrEdit.Left + OwnNrEdit.Width + ScaleX(8);
+  OwnNrBrowseButton.Top := OwnNrEdit.Top - ScaleY(1);
+  OwnNrBrowseButton.Width := ScaleX(80);
+  OwnNrBrowseButton.OnClick := @OwnNrBrowseClick;
+
+  UpdateOwnNrControls;
 
   ReShadePage := CreateInputFilePage(GpuPage.ID, 'Official ReShade prerequisite', 'Select ReShade 6.8.0 Full Add-On Support', 'Open the ReShade GitHub repository below. In its About box, open the official project website and download ReShade 6.8.0 with full add-on support. Select that EXE here. Setup runs it for you.');
   ReShadePage.Add('ReShade setup EXE:', 'Executable files|*.exe|All files|*.*', '.exe');
@@ -288,6 +345,18 @@ begin
       Result := False;
       exit;
     end;
+    if OwnNrCheck.Checked then begin
+      if not FileExists(OwnNrEdit.Text) then begin
+        MsgBox('Select your nvngx_dlssnr.dll file.', mbError, MB_OK);
+        Result := False;
+        exit;
+      end;
+      if CompareText(ExtractFileExt(OwnNrEdit.Text), '.dll') <> 0 then begin
+        MsgBox('The NR path must point to a DLL file.', mbError, MB_OK);
+        Result := False;
+        exit;
+      end;
+    end;
   end
   else if CurPageID = ReShadePage.ID then begin
     if ((SelectedAction = 0) or ((SelectedAction = 1) and (not DetectedDLAA))) and (not FileExists(ReShadePage.Values[0])) then begin
@@ -307,12 +376,18 @@ begin
     if NeedFusionFixPackage then Result := Result + '  FusionFix 5.0.1' + NewLine;
     if (SelectedAction = 0) or ((SelectedAction = 1) and (not DetectedDLAA)) then
       Result := Result + '  Pinned LumeniteFX' + NewLine;
-    if SelectedAction = 1 then
-      Result := Result + '  GPU-matched DLSS Neural Rendering 310.8.0' + NewLine;
+    if SelectedAction = 1 then begin
+      if OwnNrCheck.Checked then
+        Result := Result + '  Neural Rendering: use your DLL' + NewLine
+      else
+        Result := Result + '  GPU-matched DLSS Neural Rendering 310.8.0' + NewLine;
+    end;
     Result := Result + '  Project runtime / input patch' + NewLine + NewLine;
 
     if ((SelectedAction = 0) or ((SelectedAction = 1) and (not DetectedDLAA))) and (not NeedFusionFixPackage) then
       Result := Result + 'Manual file:' + NewLine + '  ReShade: ' + ReShadePage.Values[0] + NewLine + NewLine;
+    if (SelectedAction = 1) and OwnNrCheck.Checked then
+      Result := Result + 'Own NR DLL:' + NewLine + '  ' + OwnNrEdit.Text + NewLine + NewLine;
 
     Result := Result + 'All downloaded components are hash-verified before use.';
   end;
@@ -346,6 +421,9 @@ begin
 
     if ((SelectedAction = 0) or ((SelectedAction = 1) and (not DetectedDLAA))) and (not NeedFusionFixPackage) then
       Args := Args + ' -ReShadeSetup ' + QuoteArg(ReShadePage.Values[0]);
+
+    if (SelectedAction = 1) and OwnNrCheck.Checked then
+      Args := Args + ' -NrPackage ' + QuoteArg(OwnNrEdit.Text);
 
     if not Exec(PowerShell, Args, GameDir, SW_SHOW, ewWaitUntilTerminated, ResultCode) then
       RaiseException('Could not start the setup action.');
