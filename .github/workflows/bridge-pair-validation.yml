@@ -25,8 +25,8 @@ jobs:
           foreach ($marker in @(
             'v1.0.0',
             'GTAIV-DLSS-Full-Runtime.zip',
-            "'d3d9.dll'='ECA7C9CF9CD1C4835CEA7FD57AD168A35E157F081C0EADBA51AF35F501026F28'",
-            "'NvRemixBridge.exe'='8A89A3DBBC02D56BA98254941B14E52D88EFEF3F95E491C9C6AF5ADC65FECFFA'",
+            "'d3d9.dll'='783EEB29A6ED72E241AC26D64753DEA23F89AE9D850EA7398D479A008324451B'",
+            "'NvRemixBridge.exe'='E4D5C00B622825E73373E489D5E47E8319DC6043999D2B062FF4A8031F916F32'",
             "Copy-Item -LiteralPath (Join-Path `$runtimeDir 'd3d9.dll') -Destination (Join-Path `$Game 'd3d9.dll') -Force",
             "Copy-Item -LiteralPath (Join-Path `$runtimeDir 'NvRemixBridge.exe') -Destination (Join-Path `$Trex 'NvRemixBridge.exe') -Force")) {
             if (-not $installer.Contains($marker)) { throw "Prebuilt matched-pair installer marker missing: $marker" }
@@ -53,8 +53,8 @@ jobs:
           Expand-Archive -LiteralPath $zip -DestinationPath $dir -Force
           $client=Join-Path $dir 'd3d9.dll'
           $server=Join-Path $dir 'NvRemixBridge.exe'
-          if ((Get-FileHash -Algorithm SHA256 $client).Hash.ToUpperInvariant() -ne 'ECA7C9CF9CD1C4835CEA7FD57AD168A35E157F081C0EADBA51AF35F501026F28') { throw 'Published x86 client hash mismatch' }
-          if ((Get-FileHash -Algorithm SHA256 $server).Hash.ToUpperInvariant() -ne '8A89A3DBBC02D56BA98254941B14E52D88EFEF3F95E491C9C6AF5ADC65FECFFA') { throw 'Published x64 server hash mismatch' }
+          if ((Get-FileHash -Algorithm SHA256 $client).Hash.ToUpperInvariant() -ne '783EEB29A6ED72E241AC26D64753DEA23F89AE9D850EA7398D479A008324451B') { throw 'Published x86 client hash mismatch' }
+          if ((Get-FileHash -Algorithm SHA256 $server).Hash.ToUpperInvariant() -ne 'E4D5C00B622825E73373E489D5E47E8319DC6043999D2B062FF4A8031F916F32') { throw 'Published x64 server hash mismatch' }
           $expectedVersion='remix-main+1dad5e6d'
           foreach ($p in @($client,$server)) {
             $ascii=[Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($p))
