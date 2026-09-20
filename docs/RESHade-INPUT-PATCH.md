@@ -91,13 +91,13 @@ B:\Games\Steam\steamapps\common\Grand Theft Auto IV\GTAIV
 The installer backs up:
 
 ```text
-C:\ProgramData\ReShade\ReShade64\ReShade64.dll
+C:\ProgramData\ReShade\ReShade64.dll
 ```
 
 to:
 
 ```text
-C:\ProgramData\ReShade\ReShade64\ReShade64.dll.pre-bbridge-input
+C:\ProgramData\ReShade\ReShade64.dll.pre-bbridge-input
 ```
 
 It also writes these b-bridge policies where possible:
