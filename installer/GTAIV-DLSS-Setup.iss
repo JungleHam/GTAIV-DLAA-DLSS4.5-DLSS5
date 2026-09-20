@@ -217,11 +217,10 @@ end;
 function ShouldSkipPage(PageID: Integer): Boolean;
 begin
   Result := False;
-  if PageID = FusionFixPage.ID then
-    Result := (SelectedAction = 2) or (SelectedAction = 3) or (not NeedFusionFixPackage)
-  else if (PageID = ReShadePage.ID) or (PageID = LumenitePage.ID) then
-    Result := (SelectedAction = 2) or (SelectedAction = 3) or ((SelectedAction = 1) and DetectedDLAA)
-  else if PageID = NrPage.ID then Result := SelectedAction <> 1;
+  if PageID = GpuPage.ID then
+    Result := SelectedAction <> 1
+  else if PageID = ReShadePage.ID then
+    Result := (SelectedAction = 2) or (SelectedAction = 3) or ((SelectedAction = 1) and DetectedDLAA);
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
