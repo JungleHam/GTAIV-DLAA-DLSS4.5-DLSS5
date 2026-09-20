@@ -66,10 +66,12 @@ Run `GTAIV-DLSS-Setup.exe` and choose **Install / repair Full DLSS**.
 
 ```text
 DLSS profile: Quality
-Neural Rendering: OFF
-NR passes: 1
+Neural Rendering: OFF on the first completed Full DLSS launch
+NR passes when enabled: 1
 startup stabilization: 1485×835 for 180 valid synchronized frames
 ```
+
+**Neural Rendering is installed but deliberately starts OFF.** The first Full DLSS launch therefore validates the DLSS 4.5 Super Resolution path without NR. Enable NR later from the ReShade Add-ons panel if wanted.
 
 Keep GTA IV's normal display resolution set to your monitor's native resolution. The project manages the internal render resolution independently.
 
