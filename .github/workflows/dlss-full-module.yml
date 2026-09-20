@@ -51,7 +51,7 @@ jobs:
           }
           [void][ScriptBlock]::Create($runner)
 
-          foreach ($marker in @('ReShade64-bbridge.dll','C:\ProgramData\ReShade\ReShade64\ReShade64.dll','AFE4C8F13048306307983B8B3D41D5BF00A86820440B0E57DEA10950E1176445','572FEFB20D466AFE50998E16996B4833BEC675264485C99FE768A2337636E756','Install-DLAA-Core.bat')) {
+          foreach ($marker in @('ReShade64-bbridge.dll','C:\ProgramData\ReShade\ReShade64.dll','AFE4C8F13048306307983B8B3D41D5BF00A86820440B0E57DEA10950E1176445','572FEFB20D466AFE50998E16996B4833BEC675264485C99FE768A2337636E756','Install-DLAA-Core.bat')) {
             if (-not $dlaa.Contains($marker)) { throw "DLAA installer missing: $marker" }
           }
           foreach ($marker in @('GTAIV_SETUP_NR_DLL','E16BCF15E16E13F527491CDF7845B2FE6521A738D8F7C9C721866A8496E1FC8E','4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05','Get-AuthenticodeSignature','project-tested modded DLL','LastNRMode=0','Mode=0','NeuralRendering=installed-off-by-default')) {
