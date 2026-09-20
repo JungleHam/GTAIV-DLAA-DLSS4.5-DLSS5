@@ -36,13 +36,9 @@ var
   PrepPage: TOutputMsgMemoWizardPage;
   GamePage: TInputDirWizardPage;
   ActionPage: TInputOptionWizardPage;
-  FusionFixPage: TInputFileWizardPage;
+  GpuPage: TOutputMsgWizardPage;
   ReShadePage: TInputFileWizardPage;
-  LumenitePage: TInputFileWizardPage;
-  NrPage: TInputFileWizardPage;
-  FusionFixGitHubButton: TNewButton;
   ReShadeGitHubButton: TNewButton;
-  LumeniteGitHubButton: TNewButton;
   NrGitHubButton: TNewButton;
   GameDir: string;
   SelectedAction: Integer;
