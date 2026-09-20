@@ -136,7 +136,6 @@ function Get-GpuInfo {
 }
 
 function Resolve-AutoNrPackage {
-    if ($NrPackage -and (Test-Path -LiteralPath $NrPackage -PathType Leaf)) { return (Resolve-Path -LiteralPath $NrPackage).Path }
     $gpu = Get-GpuInfo
     if ($gpu.Series -eq 40) { $tag='dlssnr-310.8.0-RTX40'; $asset='nvngx_dlssnr_310.8.0-RTX40.zip'; $label='DLSS NR 310.8.0 RTX 40 compatibility package' }
     elseif ($gpu.Series -eq 50) { $tag='dlssnr-310.8.0'; $asset='nvngx_dlssnr_310.8.0.zip'; $label='DLSS NR 310.8.0 RTX 50 package' }
@@ -299,14 +298,40 @@ if ($needsFoundationInputs) {
     $env:GTAIV_SETUP_LUMENITE = $lum
 }
 if ($Action -eq 'FULL') {
-    $nrZip = Resolve-AutoNrPackage
     $gpuInfo = Get-GpuInfo
-    if ($gpuInfo.Series -eq 40) {
-        Assert-SHA256 $nrZip '46124CFAEF532AD5F6DA07494772EA8C1B3E719F934E254385697F38D1289E3F' 'RTX 40 DLSS NR ZIP'
-    } else {
-        Assert-SHA256 $nrZip '388C0A7912E15EC911B9C9E11A692142B11FE387DDF2B637D8C358138FFFB3AC' 'RTX 50 DLSS NR ZIP'
+    $nr40DllHash = '4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05'
+    $nr50DllHash = 'E16BCF15E16E13F527491CDF7845B2FE6521A738D8F7C9C721866A8496E1FC8E'
+
+    if ($NrPackage) {
+        $ownNr = Require-InputFile $NrPackage 'Your Neural Rendering DLL'
+        if ([IO.Path]::GetExtension($ownNr).ToLowerInvariant() -ne '.dll') {
+            Fail 'I brought my own expects nvngx_dlssnr.dll, not a ZIP or another file type.'
+        }
+        if ($gpuInfo.Series -eq 40) {
+            Assert-SHA256 $ownNr $nr40DllHash 'RTX 40 Neural Rendering DLL'
+        } elseif ($gpuInfo.Series -eq 50) {
+            Assert-SHA256 $ownNr $nr50DllHash 'RTX 50 Neural Rendering DLL'
+            $sig = Get-AuthenticodeSignature -LiteralPath $ownNr
+            if ($sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notmatch 'NVIDIA') {
+                Fail 'RTX 50 Neural Rendering DLL is not the expected NVIDIA-signed runtime.'
+            }
+        } else {
+            Fail "Full DLSS currently supports RTX 40/50. Detected: $($gpuInfo.Name)"
+        }
+        Write-Host 'Using user-provided Neural Rendering DLL.' -ForegroundColor Cyan
+        $env:GTAIV_SETUP_NR_DLL = $ownNr
     }
-    $env:GTAIV_SETUP_NR_DLL = Resolve-NrPackage $nrZip
+    else {
+        $nrZip = Resolve-AutoNrPackage
+        if ($gpuInfo.Series -eq 40) {
+            Assert-SHA256 $nrZip '46124CFAEF532AD5F6DA07494772EA8C1B3E719F934E254385697F38D1289E3F' 'RTX 40 DLSS NR ZIP'
+        } elseif ($gpuInfo.Series -eq 50) {
+            Assert-SHA256 $nrZip '388C0A7912E15EC911B9C9E11A692142B11FE387DDF2B637D8C358138FFFB3AC' 'RTX 50 DLSS NR ZIP'
+        } else {
+            Fail "Full DLSS currently supports RTX 40/50. Detected: $($gpuInfo.Name)"
+        }
+        $env:GTAIV_SETUP_NR_DLL = Resolve-NrPackage $nrZip
+    }
 }
 
 Write-Host ''; Write-Host '============================================================' -ForegroundColor Green
