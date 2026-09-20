@@ -10,76 +10,54 @@ Tested release target: **RTX 4070 Ti SUPER at 2560×1440**.
 
 ## Installation — all steps in order
 
-This is the entire install process from start to finish. Detailed instructions for every download are further down.
+This is the whole flow. Detailed notes follow underneath.
 
-1. Create one temporary folder somewhere easy to find, for example:
-   ```text
-   Desktop\GTA IV DLSS Setup Files\
-   ```
-2. Download **`GTAIV-DLSS-Setup.exe`** from this project's [GitHub Releases page](https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases) and put it in that folder.
-3. Run the setup EXE as Administrator and select the folder containing **`GTAIV.exe`**.
-4. Choose **Install / repair DLAA** or **Install / repair Full DLSS**.
-5. If FusionFix is missing, open [ThirteenAG/GTAIV.EFLC.FusionFix on GitHub](https://github.com/ThirteenAG/GTAIV.EFLC.FusionFix). On the right side click **Releases**, open **GTAIV.EFLC.FusionFix v5.0.1**, expand **Assets**, and download **`GTAIV.EFLC.FusionFix.zip`**. Put the ZIP beside the setup EXE. **Do not extract it.**
-6. Run setup again if needed. Setup installs FusionFix for you. If FusionFix was just installed, launch GTA IV normally once, wait for the main menu, close the game, then run the same setup EXE again.
-7. For a fresh DLAA or Full install, collect two prerequisites:
-   - **ReShade 6.8.0 with Full Add-On Support** — start at [crosire/reshade on GitHub](https://github.com/crosire/reshade). In the GitHub **About** box, click the official project website shown there; on that site look for **ReShade 6.8.0 with full add-on support**. Do not use the normal build.
-   - **LumeniteFX ZIP** — open the [pinned LumeniteFX commit on GitHub](https://github.com/umar-afzaal/LumeniteFX/tree/f8cbbb4eccfcb7adf0d74bb358ba349272e3c1e9), then click **Code → Download ZIP**.
-   Put both downloaded files beside the setup EXE. **Do not install or extract either one yourself.**
-8. If you chose **Full DLSS**, open [RankFTW/rhi-repo on GitHub](https://github.com/RankFTW/rhi-repo). Setup detects whether the GPU is RTX 40 or RTX 50 and tells you the exact **DLSS Neural Rendering 310.8.0** release/tag and ZIP filename to find. On GitHub click **Releases** in the right sidebar, then use **Next** through older release pages until the exact tag appears. Put that ZIP beside the setup EXE. **Do not extract it.**
-9. Continue setup. It validates the prerequisite files, installs ReShade itself, extracts the required packages, downloads the project's own runtime from [this GitHub repository](https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5), applies the b-bridge ReShade input patch, and finishes the selected mode automatically.
-10. Launch GTA IV.
-    - **DLAA:** DLAA is ready immediately.
-    - **Full DLSS:** initial DLSS profile is **Quality**. **Neural Rendering is installed but starts OFF on the first launch.** Enable it later from the ReShade Add-ons panel if wanted.
+1. Download **`GTAIV-DLSS-Setup.exe`** from this project's [GitHub Releases](https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases).
+2. Run it as Administrator and select the folder containing **`GTAIV.exe`**.
+3. Choose **DLAA** or **Full DLSS**.
+4. Setup automatically downloads and verifies GitHub-hosted dependencies:
+   - [FusionFix 5.0.1](https://github.com/ThirteenAG/GTAIV.EFLC.FusionFix), if missing;
+   - pinned [LumeniteFX](https://github.com/umar-afzaal/LumeniteFX);
+   - for Full DLSS, the GPU-matched NR package from [RankFTW/rhi-repo](https://github.com/RankFTW/rhi-repo);
+   - this project's runtime and input patch.
+5. If FusionFix was just installed, launch GTA IV once to the main menu, close it, then run setup again.
+6. On a fresh DLAA foundation, setup asks for **ReShade 6.8.0 Full Add-On Support**. Open [crosire/reshade on GitHub](https://github.com/crosire/reshade), use the official website shown in its **About** box, download the **6.8.0 full add-on support** installer, then select that EXE in setup. **Do not run ReShade yourself.**
+7. Continue setup. For Full DLSS, the installer shows the detected RTX series inside the wizard, downloads the correct NR package automatically, and installs NR **OFF by default**.
 
-**Do not manually install, extract, or copy prerequisite files into GTA IV.** Keep all downloaded prerequisite files beside `GTAIV-DLSS-Setup.exe` and let setup handle them.
+That is it. **ReShade is the only dependency you may need to download manually.**
 
-## What you may need to download
+## What setup downloads automatically
 
-| File | When needed | Start here |
-|---|---|---|
-| **FusionFix 5.0.1 ZIP** | Only if FusionFix is not already installed | [ThirteenAG/GTAIV.EFLC.FusionFix](https://github.com/ThirteenAG/GTAIV.EFLC.FusionFix) |
-| **ReShade 6.8.0 Full Add-On Support installer** | Fresh DLAA / fresh Full install | [crosire/reshade](https://github.com/crosire/reshade) |
-| **Pinned LumeniteFX ZIP** | Fresh DLAA / fresh Full install | [Pinned LumeniteFX commit](https://github.com/umar-afzaal/LumeniteFX/tree/f8cbbb4eccfcb7adf0d74bb358ba349272e3c1e9) |
-| **DLSS Neural Rendering ZIP** | Full DLSS only | [RankFTW/rhi-repo](https://github.com/RankFTW/rhi-repo) |
+| Component | Source |
+|---|---|
+| FusionFix 5.0.1 | [ThirteenAG/GTAIV.EFLC.FusionFix](https://github.com/ThirteenAG/GTAIV.EFLC.FusionFix) |
+| Pinned LumeniteFX | [umar-afzaal/LumeniteFX](https://github.com/umar-afzaal/LumeniteFX) |
+| DLSS NR 310.8.0 for RTX 40/50 | [RankFTW/rhi-repo](https://github.com/RankFTW/rhi-repo) |
+| Standard DLSS runtime | [NVIDIA/DLSS](https://github.com/NVIDIA/DLSS) |
+| Project runtime / input patch | [this repository](https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5) |
 
-You do **not** need to find b-bridge, DLSS5-Feeder, DXVK/presenter files, the normal `nvngx_dlss.dll`, ReShade headers, or project-built DLLs. Those are handled by the project runtime.
+The installer resolves release assets through GitHub, downloads them itself, and verifies the pinned SHA256 values before using them.
 
-## Step 1 — Make the setup-files folder
+## Step 1 — Choose GTA IV and install mode
 
-Create one temporary folder, for example:
+Run `GTAIV-DLSS-Setup.exe` as Administrator.
+
+Select the GTA IV folder containing:
 
 ```text
-Desktop\GTA IV DLSS Setup Files\
+GTAIV.exe
 ```
 
-Put `GTAIV-DLSS-Setup.exe` there. Every prerequisite you download should go into this same folder.
+Then choose:
 
-A fresh Full DLSS setup will usually end up looking like:
+| Mode | Result |
+|---|---|
+| **DLAA** | Native-resolution DLAA + ReShade + Lumenite temporal data + b-bridge input patch |
+| **Full DLSS** | Everything above + DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering |
 
-```text
-GTA IV DLSS Setup Files\
-├── GTAIV-DLSS-Setup.exe
-├── GTAIV.EFLC.FusionFix.zip        (only if FusionFix was missing)
-├── ReShade_Setup_6.8.0_Addon.exe
-├── LumeniteFX-....zip
-└── nvngx_dlssnr_310.8.0-....zip
-```
+## Step 2 — FusionFix
 
-Leave those files untouched. Setup recognizes the normal filenames automatically where possible.
-
-## Step 2 — FusionFix 5.0.1
-
-If FusionFix is already installed and has been run once, setup skips this step.
-
-Otherwise open [ThirteenAG/GTAIV.EFLC.FusionFix](https://github.com/ThirteenAG/GTAIV.EFLC.FusionFix).
-
-1. Look at the **right-hand side** of the GitHub repository page.
-2. Click **Releases**.
-3. Open **GTAIV.EFLC.FusionFix v5.0.1**.
-4. Find **Assets** and expand it if necessary.
-5. Download **`GTAIV.EFLC.FusionFix.zip`**.
-6. Save it beside `GTAIV-DLSS-Setup.exe`.
-7. **Do not extract it.**
+If FusionFix is missing, setup automatically obtains **FusionFix 5.0.1** from [ThirteenAG/GTAIV.EFLC.FusionFix](https://github.com/ThirteenAG/GTAIV.EFLC.FusionFix), validates it, and installs it.
 
 Expected ZIP SHA256:
 
@@ -87,22 +65,21 @@ Expected ZIP SHA256:
 3C202398C133392BE985854654F169514E055812CC302EF24E6AA97495975B41
 ```
 
-Setup installs FusionFix itself. After that first installation, launch GTA IV normally once, wait until the main menu appears, close the game, and rerun `GTAIV-DLSS-Setup.exe` from the same setup-files folder.
+After a new FusionFix installation, setup stops intentionally.
 
-That GTA IV launch is the only unavoidable manual first-run step.
+Launch GTA IV normally once, wait for the main menu, close the game, then run setup again. This first run is required before the DLAA/DLSS stage.
 
 ## Step 3 — ReShade 6.8.0 Full Add-On Support
 
+This is the only manual download in the normal flow.
+
 Open [crosire/reshade](https://github.com/crosire/reshade).
 
-The official ReShade installer is not published as a GitHub Release, so use the official project route:
-
-1. On the ReShade GitHub page, find the **About** box on the right.
-2. Click the official project website shown in that box.
-3. On the official ReShade page, go to **Download**.
-4. Download **ReShade 6.8.0 with full add-on support** — not the normal build.
-5. Save the EXE beside `GTAIV-DLSS-Setup.exe`.
-6. **Do not run ReShade yourself.** Our setup verifies it and runs it against the correct bridge target.
+1. In the GitHub **About** box, open the official project website.
+2. Find **ReShade 6.8.0 with full add-on support**.
+3. Download that installer, not the normal build.
+4. Select the downloaded EXE in our setup.
+5. **Do not run ReShade yourself.**
 
 Expected setup SHA256:
 
@@ -110,143 +87,62 @@ Expected setup SHA256:
 AFE4C8F13048306307983B8B3D41D5BF00A86820440B0E57DEA10950E1176445
 ```
 
-## Step 4 — LumeniteFX
+Setup runs ReShade against the correct Vulkan bridge target automatically.
 
-Open the exact pinned tree:
+## Step 4 — Full DLSS GPU / Neural Rendering
 
-[LumeniteFX commit `f8cbbb4...`](https://github.com/umar-afzaal/LumeniteFX/tree/f8cbbb4eccfcb7adf0d74bb358ba349272e3c1e9)
-
-1. Click the green **Code** button.
-2. Click **Download ZIP**.
-3. Save the ZIP beside `GTAIV-DLSS-Setup.exe`.
-4. **Do not extract it.**
-
-Expected archive SHA256:
-
-```text
-43220F99FC0FFA0216E01EBD657180F8C9D043C939F760283B896EA257F1B6A2
-```
-
-Setup extracts only the required LumeniteFX files into the ReShade shader folders.
-
-## Step 5 — Choose DLAA or Full DLSS
-
-Run `GTAIV-DLSS-Setup.exe`, select the GTA IV folder and choose one of:
-
-| Mode | What it installs |
-|---|---|
-| **DLAA** | Native-resolution DLAA + ReShade + Lumenite temporal data + b-bridge input patch |
-| **Full DLSS** | Everything in DLAA + DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering runtime |
-
-For DLAA, there is no NR download step.
-
-For Full DLSS, continue with Step 6.
-
-## Step 6 — DLSS 5 Neural Rendering package — Full DLSS only
-
-The installer automatically detects whether the GPU is RTX 40 or RTX 50 and repeats the correct instructions on screen.
-
-Start here:
-
-[RankFTW/rhi-repo](https://github.com/RankFTW/rhi-repo)
-
-**Check the repository name at the top. It must say `RankFTW / rhi-repo`. Do not use the separate `RankFTW / RHI` repository.**
-
-Then:
-
-1. On the **right-hand side** of the repository page, click **Releases**.
-2. You will see a long list. **Do not download the newest release.** This project uses a specific older 310.8.0 package.
-3. Scroll to the bottom of the Releases page.
-4. Click **Next** to show older releases.
-5. Keep clicking **Next** until the exact release for your GPU appears. You may need to press Next a couple of times; the exact number changes as newer releases are added.
-6. If GitHub shows a **Find a release** box, you can type the exact release/tag below. If it does not immediately find it, keep using **Next**.
-7. Open the exact release.
-8. Expand **Assets**.
-9. Download the exact ZIP listed below.
-10. Put the ZIP beside `GTAIV-DLSS-Setup.exe`.
-11. **Do not extract it.**
+For **Full DLSS**, GPU detection is shown directly inside the installer.
 
 ### RTX 40 Series
 
-Find this exact release/tag:
+Setup displays:
+
+```text
+Detected: RTX 40 Series
+DLSS NR: 310.8.0 RTX 40 compatibility build
+Source: RankFTW/rhi-repo on GitHub
+Setup will download and verify it automatically.
+Neural Rendering starts OFF.
+```
+
+The package is resolved from [RankFTW/rhi-repo](https://github.com/RankFTW/rhi-repo) using the exact pinned release:
 
 ```text
 dlssnr-310.8.0-RTX40
-```
-
-Under **Assets**, download:
-
-```text
 nvngx_dlssnr_310.8.0-RTX40.zip
 ```
 
-Expected archive SHA256:
-
-```text
-46124CFAEF532AD5F6DA07494772EA8C1B3E719F934E254385697F38D1289E3F
-```
-
-Expected extracted DLL SHA256:
-
-```text
-4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05
-```
-
-This is the project-tested **modded RTX 40 compatibility** Neural Rendering DLL.
-
 ### RTX 50 Series
 
-Find this exact release/tag:
+Setup uses the original NVIDIA-signed 310.8.0 package from the same [RankFTW/rhi-repo](https://github.com/RankFTW/rhi-repo) catalog:
 
 ```text
 dlssnr-310.8.0
-```
-
-**Do not choose `dlssnr-310.8.0-RTX40`.**
-
-Under **Assets**, download:
-
-```text
 nvngx_dlssnr_310.8.0.zip
 ```
 
-Expected archive SHA256:
+You do not browse old release pages or select the ZIP manually anymore.
 
-```text
-388C0A7912E15EC911B9C9E11A692142B11FE387DDF2B637D8C358138FFFB3AC
-```
+## Step 5 — What setup installs
 
-Expected extracted DLL SHA256:
+Setup automatically handles:
 
-```text
-E16BCF15E16E13F527491CDF7845B2FE6521A738D8F7C9C721866A8496E1FC8E
-```
-
-The RTX 50 DLL must also retain a valid NVIDIA Authenticode signature.
-
-> Newer Neural Rendering packages may exist. **Do not substitute a newer package unless this project explicitly updates its tested version.**
-
-## Step 7 — Let setup install everything
-
-Once the required files are beside the setup EXE, continue through setup.
-
-Setup handles:
-
-- prerequisite SHA256 validation;
-- FusionFix ZIP extraction when FusionFix is missing;
+- FusionFix installation when needed;
+- pinned LumeniteFX download and extraction;
+- GPU-matched NR download and validation for Full DLSS;
 - official ReShade installation against `.trex\NvRemixBridge.exe`;
-- LumeniteFX extraction;
 - project runtime installation;
 - DLSS5-Feeder;
-- official NVIDIA `nvngx_dlss.dll` 310.9.1 for DLAA/DLSS 4.5;
+- official NVIDIA `nvngx_dlss.dll` for DLAA/DLSS 4.5;
 - custom DXVK/presenter and bridge files;
 - the b-bridge ReShade input patch;
-- Full DLSS NR package extraction and GPU-specific validation;
-- backups required for later removal/rollback.
+- rollback backups.
 
-The normal DLSS 4.5 / DLAA `nvngx_dlss.dll` comes from [NVIDIA/DLSS](https://github.com/NVIDIA/DLSS) as part of the project runtime. Users do not locate it themselves.
+All stored repository hyperlinks remain GitHub links. ReShade's off-GitHub installer location is described via the official website linked from the ReShade GitHub repository rather than embedded directly.
 
-## Step 8 — First launch and defaults
+## First launch and defaults
+
+
 
 Keep GTA IV's normal display resolution set to your monitor's native resolution.
 
