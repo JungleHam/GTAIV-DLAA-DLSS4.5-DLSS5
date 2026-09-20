@@ -6,6 +6,8 @@ on:
     branches: [ main ]
     paths:
       - 'installer/**'
+      - 'install/core/Install-DLAA-Core.bat'
+      - 'install/core/Install-DLSS-Full-Core.bat'
       - 'install/Install-DLAA.bat'
       - 'install/Install-DLSS-Full.bat'
       - 'install/Uninstall-DLSS-Full.bat'
