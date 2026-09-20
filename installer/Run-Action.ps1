@@ -260,6 +260,16 @@ function Invoke-RemoveAll([string]$Root) {
     Invoke-BundledBat -Path $script -WorkingDirectory $Root -NonInteractive
 }
 
+trap {
+    $message = $_.Exception.Message
+    Write-Host ''
+    Write-Host ('INSTALL FAILED: ' + $message) -ForegroundColor Red
+    Write-Result $message
+    if ($script:NrExtractTemp -and (Test-Path -LiteralPath $script:NrExtractTemp)) { Remove-Item -LiteralPath $script:NrExtractTemp -Recurse -Force -ErrorAction SilentlyContinue }
+    if ($script:AutoTemp -and (Test-Path -LiteralPath $script:AutoTemp)) { Remove-Item -LiteralPath $script:AutoTemp -Recurse -Force -ErrorAction SilentlyContinue }
+    exit 1
+}
+
 $Game = Normalize-GamePath $Game
 if (-not (Test-Path -LiteralPath (Join-Path $Game 'dinput8.dll'))) {
     if ($Action -eq 'REMOVE_FULL' -or $Action -eq 'REMOVE_ALL') { Fail 'FusionFix is not detected and there is no supported installation state to remove.' }
