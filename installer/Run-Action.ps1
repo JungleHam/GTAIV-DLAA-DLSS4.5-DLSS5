@@ -263,11 +263,13 @@ function Invoke-RemoveAll([string]$Root) {
 $Game = Normalize-GamePath $Game
 if (-not (Test-Path -LiteralPath (Join-Path $Game 'dinput8.dll'))) {
     if ($Action -eq 'REMOVE_FULL' -or $Action -eq 'REMOVE_ALL') { Fail 'FusionFix is not detected and there is no supported installation state to remove.' }
-    Install-FusionFixPackage -Root $Game -Path $FusionFixPackage
+    $ffPackage = Resolve-FusionFixPackage
+    Install-FusionFixPackage -Root $Game -Path $ffPackage
     Write-Host ''
     Write-Host 'FUSIONFIX INSTALLED.' -ForegroundColor Green
     Write-Host 'Launch GTA IV normally once, wait until the main menu appears, then close the game.' -ForegroundColor Yellow
-    Write-Host 'After that, run GTAIV-DLSS-Setup.exe again from the same prerequisite folder. Do not install or extract the other downloaded files yourself.' -ForegroundColor Yellow
+    Write-Host 'After that, run GTAIV-DLSS-Setup.exe again. GitHub prerequisites are downloaded automatically.' -ForegroundColor Yellow
+    Write-Result 'FusionFix 5.0.1 was installed automatically. Launch GTA IV once to the main menu, close it, then run this setup again.'
     exit 20
 }
 if (($Action -eq 'DLAA' -or $Action -eq 'FULL') -and -not (Test-FusionFixFirstRun $Game)) { Fail 'FusionFix is installed, but its first-run runtime file was not found. Launch GTA IV normally once with FusionFix installed, wait until the main menu appears, close the game, then run setup again from the same prerequisite folder.' }
@@ -277,9 +279,20 @@ if (Get-Process NvRemixBridge -ErrorAction SilentlyContinue) { Fail 'Close NvRem
 $needsFoundationInputs = ($Action -eq 'DLAA') -or (($Action -eq 'FULL') -and -not (Test-DLAA $Game))
 if ($needsFoundationInputs) {
     $env:GTAIV_SETUP_RESHADE = Require-InputFile $ReShadeSetup 'Official ReShade 6.8.0 Add-On installer'
-    $env:GTAIV_SETUP_LUMENITE = Require-InputFile $LumenitePackage 'LumeniteFX ZIP'
+    $lum = Resolve-LumenitePackage
+    Assert-SHA256 $lum '43220F99FC0FFA0216E01EBD657180F8C9D043C939F760283B896EA257F1B6A2' 'Pinned LumeniteFX ZIP'
+    $env:GTAIV_SETUP_LUMENITE = $lum
 }
-if ($Action -eq 'FULL') { $env:GTAIV_SETUP_NR_DLL = Resolve-NrPackage $NrPackage }
+if ($Action -eq 'FULL') {
+    $nrZip = Resolve-AutoNrPackage
+    $gpuInfo = Get-GpuInfo
+    if ($gpuInfo.Series -eq 40) {
+        Assert-SHA256 $nrZip '46124CFAEF532AD5F6DA07494772EA8C1B3E719F934E254385697F38D1289E3F' 'RTX 40 DLSS NR ZIP'
+    } else {
+        Assert-SHA256 $nrZip '388C0A7912E15EC911B9C9E11A692142B11FE387DDF2B637D8C358138FFFB3AC' 'RTX 50 DLSS NR ZIP'
+    }
+    $env:GTAIV_SETUP_NR_DLL = Resolve-NrPackage $nrZip
+}
 
 Write-Host ''; Write-Host '============================================================' -ForegroundColor Green
 Write-Host ' GTA IV DLSS Setup & Maintenance' -ForegroundColor Green
@@ -294,10 +307,21 @@ try {
         'REMOVE_ALL' { Invoke-RemoveAll $Game }
     }
     Write-Host ''; Write-Host 'ACTION COMPLETED SUCCESSFULLY.' -ForegroundColor Green
+    Write-Result 'Action completed successfully.'
+}
+catch {
+    $message = $_.Exception.Message
+    Write-Host ''
+    Write-Host ('INSTALL FAILED: ' + $message) -ForegroundColor Red
+    Write-Result $message
+    exit 1
 }
 finally {
     if ($script:NrExtractTemp -and (Test-Path -LiteralPath $script:NrExtractTemp)) {
         Remove-Item -LiteralPath $script:NrExtractTemp -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    if ($script:AutoTemp -and (Test-Path -LiteralPath $script:AutoTemp)) {
+        Remove-Item -LiteralPath $script:AutoTemp -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
 exit 0
