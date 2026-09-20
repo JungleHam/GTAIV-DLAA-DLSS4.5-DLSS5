@@ -9,11 +9,19 @@ param(
     [string]$FusionFixPackage = '',
     [string]$ReShadeSetup = '',
     [string]$LumenitePackage = '',
-    [string]$NrPackage = ''
+    [string]$NrPackage = '',
+    [string]$SetupSource = ''
 )
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+
+if ($SetupSource -and (Test-Path -LiteralPath $SetupSource -PathType Container)) {
+    $candidateRuntime = Join-Path $SetupSource 'GTAIV-DLSS-Full-Runtime.zip'
+    $candidatePatch = Join-Path $SetupSource 'ReShade64-bbridge.dll'
+    if (Test-Path -LiteralPath $candidateRuntime -PathType Leaf) { $env:GTAIV_SETUP_PROJECT_RUNTIME = (Resolve-Path -LiteralPath $candidateRuntime).Path }
+    if (Test-Path -LiteralPath $candidatePatch -PathType Leaf) { $env:GTAIV_SETUP_RESHADE_PATCH = (Resolve-Path -LiteralPath $candidatePatch).Path }
+}
 
 function Fail([string]$Message) { throw $Message }
 
@@ -136,6 +144,8 @@ function Invoke-BundledBat {
     if ($env:GTAIV_SETUP_RESHADE) { $psi.EnvironmentVariables['GTAIV_SETUP_RESHADE'] = $env:GTAIV_SETUP_RESHADE }
     if ($env:GTAIV_SETUP_LUMENITE) { $psi.EnvironmentVariables['GTAIV_SETUP_LUMENITE'] = $env:GTAIV_SETUP_LUMENITE }
     if ($env:GTAIV_SETUP_NR_DLL) { $psi.EnvironmentVariables['GTAIV_SETUP_NR_DLL'] = $env:GTAIV_SETUP_NR_DLL }
+    if ($env:GTAIV_SETUP_PROJECT_RUNTIME) { $psi.EnvironmentVariables['GTAIV_SETUP_PROJECT_RUNTIME'] = $env:GTAIV_SETUP_PROJECT_RUNTIME }
+    if ($env:GTAIV_SETUP_RESHADE_PATCH) { $psi.EnvironmentVariables['GTAIV_SETUP_RESHADE_PATCH'] = $env:GTAIV_SETUP_RESHADE_PATCH }
     $proc = New-Object System.Diagnostics.Process
     $proc.StartInfo = $psi
     if (-not $proc.Start()) { Fail "Could not start: $Path" }
