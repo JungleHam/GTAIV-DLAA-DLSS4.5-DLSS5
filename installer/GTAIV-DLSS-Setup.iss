@@ -220,7 +220,7 @@ begin
   if PageID = GpuPage.ID then
     Result := SelectedAction <> 1
   else if PageID = ReShadePage.ID then
-    Result := (SelectedAction = 2) or (SelectedAction = 3) or ((SelectedAction = 1) and DetectedDLAA);
+    Result := (SelectedAction = 2) or (SelectedAction = 3) or NeedFusionFixPackage or ((SelectedAction = 1) and DetectedDLAA);
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
@@ -311,7 +311,7 @@ begin
       Result := Result + '  GPU-matched DLSS Neural Rendering 310.8.0' + NewLine;
     Result := Result + '  Project runtime / input patch' + NewLine + NewLine;
 
-    if (SelectedAction = 0) or ((SelectedAction = 1) and (not DetectedDLAA)) then
+    if ((SelectedAction = 0) or ((SelectedAction = 1) and (not DetectedDLAA))) and (not NeedFusionFixPackage) then
       Result := Result + 'Manual file:' + NewLine + '  ReShade: ' + ReShadePage.Values[0] + NewLine + NewLine;
 
     Result := Result + 'All downloaded components are hash-verified before use.';
@@ -344,7 +344,7 @@ begin
       ' -SetupSource ' + QuoteArg(ExpandConstant('{src}')) +
       ' -ResultFile ' + QuoteArg(ResultPath);
 
-    if (SelectedAction = 0) or ((SelectedAction = 1) and (not DetectedDLAA)) then
+    if ((SelectedAction = 0) or ((SelectedAction = 1) and (not DetectedDLAA))) and (not NeedFusionFixPackage) then
       Args := Args + ' -ReShadeSetup ' + QuoteArg(ReShadePage.Values[0]);
 
     if not Exec(PowerShell, Args, GameDir, SW_SHOW, ewWaitUntilTerminated, ResultCode) then
