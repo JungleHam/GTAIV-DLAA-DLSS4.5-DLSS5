@@ -162,7 +162,7 @@ function Install-FusionFixPackage([string]$Root,[string]$Path) {
             Copy-Item -LiteralPath $_.FullName -Destination $Root -Recurse -Force
         }
         if (-not (Test-Path -LiteralPath (Join-Path $Root 'dinput8.dll'))) { Fail 'FusionFix extraction completed, but dinput8.dll is still missing from the GTA IV folder.' }
-        [IO.File]::WriteAllText((Join-Path $Root 'GTAIV_DLSS_FUSIONFIX_INSTALLED_BY_SETUP.txt'), "FusionFix 5.0.1 installed by GTA IV DLSS setup from user-supplied ZIP.`r`n", [Text.UTF8Encoding]::new($false))
+        [IO.File]::WriteAllText((Join-Path $Root 'GTAIV_DLSS_FUSIONFIX_INSTALLED_BY_SETUP.txt'), "FusionFix 5.0.1 downloaded from the official GitHub release and installed by GTA IV DLSS setup.`r`n", [Text.UTF8Encoding]::new($false))
     }
     finally {
         if (Test-Path -LiteralPath $temp) { Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue }
