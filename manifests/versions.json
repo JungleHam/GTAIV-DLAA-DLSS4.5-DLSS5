@@ -1,5 +1,5 @@
 {
-  "project_status": "github-clean-auto-download-flow-test-build",
+  "project_status": "working-installer-clean-repository",
   "components": {
     "fusionfix": {
       "version": "5.0.1",
@@ -143,7 +143,7 @@
       "variants": {
         "rtx50_original_nvidia_signed": {
           "gpu": "RTX 50 Series",
-          "search_instruction": "RankFTW/rhi-repo > Releases > older pages via Next > exact tag dlssnr-310.8.0 > Assets > nvngx_dlssnr_310.8.0.zip",
+          "search_instruction": "Automatically resolved from GitHub tag dlssnr-310.8.0 unless I brought my own is selected.",
           "dll_sha256": "e16bcf15e16e13f527491cdf7845b2fe6521a738d8f7c9c721866a8496e1fc8e",
           "authenticode": "Require valid NVIDIA signature",
           "release_search": "dlssnr-310.8.0",
@@ -152,7 +152,7 @@
         },
         "rtx40_compatibility": {
           "gpu": "RTX 40 Series",
-          "search_instruction": "RankFTW/rhi-repo > Releases > older pages via Next > exact tag dlssnr-310.8.0-RTX40 > Assets > nvngx_dlssnr_310.8.0-RTX40.zip",
+          "search_instruction": "Automatically resolved from GitHub tag dlssnr-310.8.0-RTX40 unless I brought my own is selected.",
           "dll_sha256": "4b8d19bc3eff58a084f5eca7489c921501c203450169fb82ff4f649a4482ba05",
           "validation": "Project-tested modded compatibility DLL on RTX 4070 Ti SUPER",
           "release_search": "dlssnr-310.8.0-RTX40",
@@ -161,9 +161,10 @@
         }
       },
       "catalog_release_page": "https://github.com/RankFTW/rhi-repo",
-      "installer_accepts": "Automatically resolved GPU-matched GitHub ZIP; local ZIP/DLL remains supported internally.",
-      "navigation_instruction": "No manual release browsing in the normal flow. Setup detects RTX 40/50 and resolves the exact pinned GitHub release asset automatically.",
-      "automatic_download": true
+      "installer_accepts": "Automatic GPU-matched GitHub package by default; optional I brought my own nvngx_dlssnr.dll path.",
+      "navigation_instruction": "Normal flow is automatic. The installer shows detected RTX 40/50 and lets advanced users select a local validated DLL instead.",
+      "automatic_download": true,
+      "optional_user_supplied_dll": true
     },
     "m3k-dxvk-presenter": {
       "product": "M3K DXVK render/output presenter for DLSS Super Resolution",
