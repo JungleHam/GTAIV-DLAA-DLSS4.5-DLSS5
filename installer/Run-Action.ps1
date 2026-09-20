@@ -231,7 +231,13 @@ function Invoke-BundledBat {
     $proc.StartInfo = $psi
     if (-not $proc.Start()) { Fail "Could not start: $Path" }
     $proc.WaitForExit(); $code = $proc.ExitCode; $proc.Dispose()
-    if ($code -ne 0) { Fail "Installer component failed with exit code $code.`n$Path" }
+    if ($code -ne 0) {
+        if ($ResultFile -and (Test-Path -LiteralPath $ResultFile -PathType Leaf)) {
+            $detail = [IO.File]::ReadAllText($ResultFile).Trim()
+            if ($detail) { Fail $detail }
+        }
+        Fail "Installer component failed with exit code $code: $([IO.Path]::GetFileName($Path))"
+    }
 }
 
 function Invoke-DLAA([string]$Root) {
