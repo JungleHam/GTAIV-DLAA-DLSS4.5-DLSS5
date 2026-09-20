@@ -180,6 +180,24 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "x64 bridge build failed: $LASTEXITCODE" }
           Pop-Location
 
+      - name: Download pinned b-bridge release configs
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Path .\_bbridge-release -Force | Out-Null
+          gh release download v0.1.0 --repo gutbash/b-bridge --pattern 'b-bridge-0.1.0.zip' --dir .\_bbridge-release --clobber
+          if ($LASTEXITCODE -ne 0) { throw "b-bridge release download failed: $LASTEXITCODE" }
+          Expand-Archive -LiteralPath .\_bbridge-release\b-bridge-0.1.0.zip -DestinationPath .\_bbridge-package -Force
+          $bridgeConf = Get-ChildItem .\_bbridge-package -Recurse -File -Filter 'bridge.conf' | Select-Object -First 1
+          $dxvkConf = Get-ChildItem .\_bbridge-package -Recurse -File -Filter 'dxvk.conf' | Select-Object -First 1
+          if (-not $bridgeConf) { throw 'bridge.conf missing from b-bridge v0.1.0 release package.' }
+          if (-not $dxvkConf) { throw 'dxvk.conf missing from b-bridge v0.1.0 release package.' }
+          New-Item -ItemType Directory -Path .\_bbridge-configs -Force | Out-Null
+          Copy-Item $bridgeConf.FullName .\_bbridge-configs\bridge.conf -Force
+          Copy-Item $dxvkConf.FullName .\_bbridge-configs\dxvk.conf -Force
+
       - name: Checkout redistributable runtime sources
         shell: pwsh
         run: |
@@ -210,8 +228,8 @@ jobs:
           # Do not depend on a previous public release asset.
           Copy-Item .\_presenter-artifact\d3d9vk_x64.dll .\out-runtime\d3d9vk_x64.dll -Force
 
-          Copy-Item .\_bbridge\GTAIV\.trex\bridge.conf .\out-runtime\bridge.conf -Force
-          Copy-Item .\_bbridge\GTAIV\dxvk.conf .\out-runtime\dxvk.conf -Force
+          Copy-Item .\_bbridge-configs\bridge.conf .\out-runtime\bridge.conf -Force
+          Copy-Item .\_bbridge-configs\dxvk.conf .\out-runtime\dxvk.conf -Force
 
           $feedFx = Get-ChildItem .\_feeder-release -Recurse -File -Filter 'DLSS5_Feed.fx' | Select-Object -First 1
           if (-not $feedFx) { throw 'DLSS5_Feed.fx not found in pinned Feeder source.' }
