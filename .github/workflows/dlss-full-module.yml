@@ -26,6 +26,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Probe pinned Lumenite GitHub archive
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $p = Join-Path $env:RUNNER_TEMP 'LumeniteFX-pinned.zip'
+          Invoke-WebRequest -UseBasicParsing -Headers @{'User-Agent'='GTAIV-DLSS-Setup'} -Uri 'https://api.github.com/repos/umar-afzaal/LumeniteFX/zipball/f8cbbb4eccfcb7adf0d74bb358ba349272e3c1e9' -OutFile $p
+          $h = (Get-FileHash -Algorithm SHA256 -LiteralPath $p).Hash.ToUpperInvariant()
+          Write-Host "LUMENITE_API_ZIP_SHA256=$h" -ForegroundColor Cyan
+
       - name: Validate cleaned installer source
         shell: pwsh
         run: |
