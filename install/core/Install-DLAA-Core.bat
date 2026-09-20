@@ -15,6 +15,7 @@ $ReShadeSetupHash='AFE4C8F13048306307983B8B3D41D5BF00A86820440B0E57DEA10950E1176
 $LumenitePackageHash='43220F99FC0FFA0216E01EBD657180F8C9D043C939F760283B896EA257F1B6A2'
 $ReleaseApi='https://api.github.com/repos/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/tags/v1.0.0'
 $RuntimeAsset='GTAIV-DLSS-Full-Runtime.zip'
+$RuntimeZipHash='7560102921FFD2FFFEBB7A76763F87B4F0A7DD994B27B49C6BCBC3FBD9F06BA4'
 $RuntimeHashes=@{
  'd3d9.dll'='783EEB29A6ED72E241AC26D64753DEA23F89AE9D850EA7398D479A008324451B';
  'NvRemixBridge.exe'='E4D5C00B622825E73373E489D5E47E8319DC6043999D2B062FF4A8031F916F32';
@@ -52,7 +53,7 @@ try{
  $stamp=Get-Date -Format 'yyyyMMdd_HHmmss';$Backup=Join-Path $Game ("_DLAA_PREINSTALL_BACKUP_"+$stamp);New-Item -ItemType Directory -Path (Join-Path $Backup 'plugins') -Force|Out-Null
  foreach($n in @('d3d9.dll','vulkan.dll','dxvk.conf','commandline.txt')){Copy-IfExists (Join-Path $Game $n) (Join-Path $Backup $n)};Copy-IfExists $ffCfg (Join-Path $Backup ('plugins\'+[IO.Path]::GetFileName($ffCfg)));$ffIni=Join-Path (Split-Path -Parent $ffCfg) 'GTAIV.EFLC.FusionFix.ini';Copy-IfExists $ffIni (Join-Path $Backup 'plugins\GTAIV.EFLC.FusionFix.ini')
  Cleanup;New-Item -ItemType Directory -Path $Temp -Force|Out-Null;$runtimeZip=Join-Path $Temp 'runtime.zip';$runtime=Join-Path $Temp 'runtime';$lum=Join-Path $Temp 'lumenite'
- if($env:GTAIV_SETUP_PROJECT_RUNTIME -and (Test-Path -LiteralPath $env:GTAIV_SETUP_PROJECT_RUNTIME -PathType Leaf)){Write-Host 'Using local project runtime beside setup EXE.' -ForegroundColor DarkGray;Copy-Item -LiteralPath $env:GTAIV_SETUP_PROJECT_RUNTIME -Destination $runtimeZip -Force}else{$runtimeUrl=Resolve-ProjectAssetUrl $RuntimeAsset;Download $runtimeUrl $runtimeZip};Expand-Archive -LiteralPath $runtimeZip -DestinationPath $runtime -Force
+ if($env:GTAIV_SETUP_PROJECT_RUNTIME -and (Test-Path -LiteralPath $env:GTAIV_SETUP_PROJECT_RUNTIME -PathType Leaf)){Write-Host 'Using local project runtime beside setup EXE.' -ForegroundColor DarkGray;Copy-Item -LiteralPath $env:GTAIV_SETUP_PROJECT_RUNTIME -Destination $runtimeZip -Force}else{$runtimeUrl=Resolve-ProjectAssetUrl $RuntimeAsset;Download $runtimeUrl $runtimeZip};Assert-SHA256 $runtimeZip $RuntimeZipHash;Expand-Archive -LiteralPath $runtimeZip -DestinationPath $runtime -Force
  foreach($rel in $RuntimeHashes.Keys){$p=Join-Path $runtime $rel;if(-not(Test-Path -LiteralPath $p)){Fail "Project runtime is missing $rel. Rebuild GTAIV-DLSS-Full-Runtime.zip with the cleaned runtime workflow."};Assert-SHA256 $p $RuntimeHashes[$rel]}
  Expand-Archive -LiteralPath $LumenitePackage -DestinationPath $lum -Force
  Set-IniValue $ffCfg 'MAIN' 'GraphicsAPI' '0';Set-IniValue $ffCfg 'MAIN' 'Windowed' '1';Set-IniValue $ffCfg 'MAIN' 'BorderlessWindowed' '1';Set-IniValue $ffCfg 'FRAMELIMIT' 'FpsLimitPreset' '0';Set-IniValue $ffCfg 'MISC' 'Antialiasing' '5'
