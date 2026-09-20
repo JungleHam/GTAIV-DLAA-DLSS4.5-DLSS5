@@ -4,8 +4,8 @@ cd /d "%~dp0"
 
 set "BB_SELF=%~f0"
 set "PATCHED=%~dp0ReShade64-bbridge.dll"
-set "RESHADESYS=C:\ProgramData\ReShade\ReShade64\ReShade64.dll"
-set "BACKUP=C:\ProgramData\ReShade\ReShade64\ReShade64.dll.pre-bbridge-input"
+set "RESHADESYS=C:\ProgramData\ReShade\ReShade64.dll"
+set "BACKUP=C:\ProgramData\ReShade\ReShade64.dll.pre-bbridge-input"
 set "BB_PATCHED=%PATCHED%"
 set "BB_RESHADESYS=%RESHADESYS%"
 
