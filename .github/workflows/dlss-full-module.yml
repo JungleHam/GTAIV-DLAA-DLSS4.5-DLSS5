@@ -40,13 +40,13 @@ jobs:
           $full = Get-Content install/Install-DLSS-Full.bat -Raw
           $manifest = Get-Content manifests/versions.json -Raw | ConvertFrom-Json
 
-          foreach ($marker in @('Installation — all steps in order','ReShade 6.8.0 Full Add-On Support','Setup will download and verify it automatically.','dlssnr-310.8.0-RTX40','nvngx_dlssnr_310.8.0-RTX40.zip','Neural Rendering: OFF')) {
+          foreach ($marker in @('## [Screenshots]','## Installation','I brought my own','## Prerequisites','## What this solution is','## Credits','Neural Rendering: OFF')) {
             if (-not $readme.Contains($marker)) { throw "README missing guided-install marker: $marker" }
           }
-          foreach ($marker in @('Official ReShade prerequisite','Full DLSS GPU','Open ReShade repository on GitHub','Open NR source on GitHub','DetectNvidiaGpuSeries','ResultFile','PrivilegesRequired=admin','Run-Action.ps1')) {
+          foreach ($marker in @('Official ReShade prerequisite','Full DLSS GPU','I brought my own','OwnNrEdit','Open ReShade repository on GitHub','Open NR source on GitHub','DetectNvidiaGpuSeries','ResultFile','PrivilegesRequired=admin','Run-Action.ps1')) {
             if (-not $setup.Contains($marker)) { throw "Unified setup missing: $marker" }
           }
-          foreach ($marker in @("ValidateSet('DLAA','FULL','REMOVE_FULL','REMOVE_ALL')",'Download-GitHubReleaseAsset','Resolve-FusionFixPackage','Resolve-LumenitePackage','Resolve-AutoNrPackage','GTAIV_SETUP_RESHADE','GTAIV_SETUP_LUMENITE','GTAIV_SETUP_NR_DLL','Write-Result')) {
+          foreach ($marker in @("ValidateSet('DLAA','FULL','REMOVE_FULL','REMOVE_ALL')",'Download-GitHubReleaseAsset','Resolve-FusionFixPackage','Resolve-LumenitePackage','Resolve-AutoNrPackage','Your Neural Rendering DLL','4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05','E16BCF15E16E13F527491CDF7845B2FE6521A738D8F7C9C721866A8496E1FC8E','GTAIV_SETUP_NR_DLL','Write-Result')) {
             if (-not $runner.Contains($marker)) { throw "Setup action runner missing: $marker" }
           }
           [void][ScriptBlock]::Create($runner)
@@ -70,6 +70,7 @@ jobs:
           if ($manifest.components.lumenitefx.user_supplied_official_archive) { throw 'LumeniteFX should be automatic in the current installer flow.' }
           if (-not $manifest.components.nvngx_dlssnr.automatic_download) { throw 'NR runtime must be auto-downloaded from GitHub.' }
           if ($manifest.components.nvngx_dlssnr.user_supplied) { throw 'NR runtime should not require a user-supplied package in the normal flow.' }
+          if (-not $manifest.components.nvngx_dlssnr.optional_user_supplied_dll) { throw 'Manifest must record the optional I brought my own DLL path.' }
           if ($manifest.components.nvngx_dlssnr.direct_download_links_provided) { throw 'Manifest should not store direct NR download links.' }
           if ($manifest.components.nvngx_dlss.official_source_repository -ne 'https://github.com/NVIDIA/DLSS') { throw 'DLSS 310.9.1 must use the official NVIDIA source.' }
 
