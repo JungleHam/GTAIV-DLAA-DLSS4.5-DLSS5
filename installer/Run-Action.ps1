@@ -226,6 +226,7 @@ function Invoke-BundledBat {
     if ($env:GTAIV_SETUP_NR_DLL) { $psi.EnvironmentVariables['GTAIV_SETUP_NR_DLL'] = $env:GTAIV_SETUP_NR_DLL }
     if ($env:GTAIV_SETUP_PROJECT_RUNTIME) { $psi.EnvironmentVariables['GTAIV_SETUP_PROJECT_RUNTIME'] = $env:GTAIV_SETUP_PROJECT_RUNTIME }
     if ($env:GTAIV_SETUP_RESHADE_PATCH) { $psi.EnvironmentVariables['GTAIV_SETUP_RESHADE_PATCH'] = $env:GTAIV_SETUP_RESHADE_PATCH }
+    if ($ResultFile) { $psi.EnvironmentVariables['GTAIV_SETUP_RESULT_FILE'] = $ResultFile }
     $proc = New-Object System.Diagnostics.Process
     $proc.StartInfo = $psi
     if (-not $proc.Start()) { Fail "Could not start: $Path" }
