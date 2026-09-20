@@ -21,7 +21,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $hash='208607B43B0832C32F5EC92C9E20FE5988E435101AF83A81ED6BA5538353E366'
+          $hash='370BE394DE7BFC612D227CBE4B2A57A4AB5C23A420BE00AA839876DEF653DF97'
           $upstream='6b20f622a77b87b2921fe5d2c1774d2f2ba3e9b7'
           $checkpoint='57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f'
 
@@ -63,6 +63,6 @@ jobs:
           Expand-Archive -LiteralPath $zip -DestinationPath $dir -Force
           $presenter=Join-Path $dir 'd3d9vk_x64.dll'
           $actual=(Get-FileHash -Algorithm SHA256 $presenter).Hash.ToUpperInvariant()
-          $expected='208607B43B0832C32F5EC92C9E20FE5988E435101AF83A81ED6BA5538353E366'
+          $expected='370BE394DE7BFC612D227CBE4B2A57A4AB5C23A420BE00AA839876DEF653DF97'
           if($actual -ne $expected){throw "Presenter hash mismatch: expected $expected, got $actual"}
           Write-Host "PUBLIC M3K DXVK PRESENTER VERIFIED: $actual" -ForegroundColor Green
