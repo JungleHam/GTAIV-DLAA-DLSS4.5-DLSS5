@@ -9,14 +9,14 @@
 1. Download **`GTAIV-DLSS-Setup.exe`** from this project's [Releases](https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases).
 2. Run it as **Administrator**.
 3. Select the GTA IV folder containing **`GTAIV.exe`**.
-4. Choose **DLAA** or **Full DLSS**.
-5. If FusionFix is missing, setup downloads and installs it automatically. Launch GTA IV once to the main menu, close it, then run setup again.
-6. For a fresh DLAA foundation, setup asks for **ReShade 6.8.0 Full Add-On Support**. Start at [crosire/reshade](https://github.com/crosire/reshade), open the official website from the GitHub **About** box, download the 6.8.0 **Full Add-On Support** installer, and select that EXE. Do not run it yourself.
+4. Choose **DLAA** or **Full DLSS** (contains DLAA).
+5. If FusionFix is missing, setup downloads and installs it automatically. **Launch GTA IV once to the main menu, close it, then run setup again.**
+6. For a fresh DLAA foundation, setup **will ask** for **ReShade 6.8.0 Full Add-On Support**.  **Do not install it yourself, it will be faster to let the installer handle it**. Just go to [crosire/reshade](https://github.com/crosire/reshade), open the official website from the GitHub **About** box, download the 6.8.0 **Full Add-On Support** installer. In our installer you can now point to the downloaded reshade installer.
 7. For **Full DLSS**, setup detects RTX 40/50 and downloads the matching Neural Rendering runtime automatically.
-   - Already have the correct `nvngx_dlssnr.dll`? Check **I brought my own** and select it instead.
+   - If you already have the correct `nvngx_dlssnr.dll`, just check **I brought my own** and select it instead, this is purely for speed, as the package zip is usually 100MB+.
 8. Finish setup and launch GTA IV.
 
-To modify or remove the project later, run the same installer again and choose the maintenance action you want.
+To modify/repair or partially/fully remove this mod later, run the same installer again and choose the action you want.
 
 Full DLSS starts with:
 
@@ -36,10 +36,10 @@ Home -> Add-ons -> DLSS 5 Feed -> GTA IV DLSS
 - **GTA IV: Complete Edition**
 - **Windows 10/11 64-bit**
 - **Administrator access** for the ReShade Vulkan layer
-- An **NVIDIA RTX GPU** for DLAA / DLSS
-- **RTX 40 or RTX 50** for this project's DLSS 5 Neural Rendering path
+- An **NVIDIA RTX 20/30/40/50 Series GPU** for DLAA / DLSS 4.5
+- **RTX 40 or RTX 50** for this project's DLSS 5 Neural Rendering implementation
 - The tested NR setup expects a recent NVIDIA driver; **615.00+** is recommended for the validated configuration
-- **ReShade 6.8.0 Full Add-On Support** is the only normal manual download
+- **ReShade 6.8.0 Full Add-On Support** is the only normal manual download (no external site links here, just to be safe from Github ToS)
 
 The installer automatically obtains and verifies the GitHub-hosted parts it needs, including FusionFix, LumeniteFX, the GPU-matched NR package, and this project's runtime.
 
