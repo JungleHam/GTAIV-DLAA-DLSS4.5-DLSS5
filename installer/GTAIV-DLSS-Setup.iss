@@ -222,7 +222,7 @@ begin
   FusionFixGitHubButton.Caption := 'Open FusionFix repository on GitHub';
   FusionFixGitHubButton.Left := FusionFixPage.Edits[0].Left;
   FusionFixGitHubButton.Top := FusionFixPage.Edits[0].Top + FusionFixPage.Edits[0].Height + ScaleY(12);
-  FusionFixGitHubButton.Width := ScaleX(165);
+  FusionFixGitHubButton.Width := ScaleX(245);
   FusionFixGitHubButton.OnClick := @OpenFusionFixGitHub;
 
   ReShadePage := CreateInputFilePage(FusionFixPage.ID, 'Official ReShade prerequisite', 'Select ReShade 6.8.0 Full Add-On Support', 'Click the GitHub button below. Confirm the page says crosire/reshade. ReShade does NOT provide the installer EXE as a GitHub Release. In the GitHub About box on the RIGHT, click the official project website shown there. On that site look for ReShade 6.8.0 with full add-on support (NOT the normal build). Save the EXE beside this setup EXE. Do NOT run it yourself; setup runs it correctly for GTA IV.');
@@ -232,7 +232,7 @@ begin
   ReShadeGitHubButton.Caption := 'Open ReShade repository on GitHub';
   ReShadeGitHubButton.Left := ReShadePage.Edits[0].Left;
   ReShadeGitHubButton.Top := ReShadePage.Edits[0].Top + ReShadePage.Edits[0].Height + ScaleY(12);
-  ReShadeGitHubButton.Width := ScaleX(150);
+  ReShadeGitHubButton.Width := ScaleX(245);
   ReShadeGitHubButton.OnClick := @OpenReShadeGitHub;
 
   LumenitePage := CreateInputFilePage(ReShadePage.ID, 'LumeniteFX prerequisite', 'Select the pinned LumeniteFX ZIP', 'Click the GitHub button below. It opens the exact pinned LumeniteFX commit. On GitHub click the green Code button, then Download ZIP. Save that ZIP beside this setup EXE. Do NOT extract it; setup extracts exactly what GTA IV needs.');
@@ -242,7 +242,7 @@ begin
   LumeniteGitHubButton.Caption := 'Open pinned LumeniteFX on GitHub';
   LumeniteGitHubButton.Left := LumenitePage.Edits[0].Left;
   LumeniteGitHubButton.Top := LumenitePage.Edits[0].Top + LumenitePage.Edits[0].Height + ScaleY(12);
-  LumeniteGitHubButton.Width := ScaleX(190);
+  LumeniteGitHubButton.Width := ScaleX(245);
   LumeniteGitHubButton.OnClick := @OpenLumeniteGitHub;
 
   NrPage := CreateInputFilePage(LumenitePage.ID, 'Neural Rendering prerequisite', 'Select the GPU-matched NR ZIP', 'Setup detects RTX 40/50 and shows the exact old release/tag and ZIP filename. Click the GitHub button below and confirm the page says RankFTW/rhi-repo (NOT RankFTW/RHI). On the RIGHT side click Releases. Do NOT use the newest release. Scroll to the bottom and click Next through older pages until the exact 310.8.0 tag setup tells you to find appears. Open Assets, download the exact ZIP setup names, save it beside this EXE, and do NOT extract it.');
@@ -252,7 +252,7 @@ begin
   NrGitHubButton.Caption := 'Open RankFTW/rhi-repo on GitHub';
   NrGitHubButton.Left := NrPage.Edits[0].Left;
   NrGitHubButton.Top := NrPage.Edits[0].Top + NrPage.Edits[0].Height + ScaleY(12);
-  NrGitHubButton.Width := ScaleX(205);
+  NrGitHubButton.Width := ScaleX(245);
   NrGitHubButton.OnClick := @OpenNrGitHub;
 
   PrefillIfPresent(FusionFixPage, 'GTAIV.EFLC.FusionFix.zip');
