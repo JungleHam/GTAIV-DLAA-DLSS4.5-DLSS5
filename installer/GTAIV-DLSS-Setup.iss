@@ -227,38 +227,73 @@ function NextButtonClick(CurPageID: Integer): Boolean;
 var P: string;
 begin
   Result := True;
+
   if CurPageID = GamePage.ID then begin
     P := NormalizeGameDir(GamePage.Values[0]);
-    if P = '' then begin MsgBox('GTAIV.exe was not found in that folder.', mbError, MB_OK); Result := False; exit; end;
-    GameDir := P; GamePage.Values[0] := P; DetectCurrentState;
-    ActionPage.Values[0] := False; ActionPage.Values[1] := False; ActionPage.Values[2] := False; ActionPage.Values[3] := False;
-    if DetectedFull then ActionPage.Values[1] := True else if DetectedDLAA then ActionPage.Values[0] := True else ActionPage.Values[1] := True;
-  end else if CurPageID = ActionPage.ID then begin
-    SelectedAction := GetSelectedActionIndex;
-    if SelectedAction < 0 then begin MsgBox('Choose an action.', mbError, MB_OK); Result := False; exit; end;
-    DetectCurrentState;
-    if (SelectedAction = 2) and (not DetectedFull) then begin MsgBox('DLSS Full is not detected in this GTA IV folder.', mbInformation, MB_OK); Result := False; exit; end;
-    if (SelectedAction = 3) and (not DetectedDLAA) then begin MsgBox('No DLAA/DLSS installation from this project is detected.', mbInformation, MB_OK); Result := False; exit; end;
-    if ((SelectedAction = 0) or (SelectedAction = 1)) and (not NeedFusionFixPackage) and (not DetectedFusionFixFirstRun) then begin
-      MsgBox('FusionFix is already installed, but its first-run file was not found.' + #13#10 + #13#10 + 'Do not install anything else manually. Close setup, launch GTA IV normally once, wait until the main menu appears, close the game, then run this same setup EXE again from your setup-files folder.', mbInformation, MB_OK);
-      Result := False; exit;
+    if P = '' then begin
+      MsgBox('GTAIV.exe was not found in that folder.', mbError, MB_OK);
+      Result := False;
+      exit;
     end;
+
+    GameDir := P;
+    GamePage.Values[0] := P;
+    DetectCurrentState;
+
+    ActionPage.Values[0] := False;
+    ActionPage.Values[1] := False;
+    ActionPage.Values[2] := False;
+    ActionPage.Values[3] := False;
+
+    if DetectedFull then ActionPage.Values[1] := True
+    else if DetectedDLAA then ActionPage.Values[0] := True
+    else ActionPage.Values[1] := True;
+  end
+  else if CurPageID = ActionPage.ID then begin
+    SelectedAction := GetSelectedActionIndex;
+    if SelectedAction < 0 then begin
+      MsgBox('Choose an action.', mbError, MB_OK);
+      Result := False;
+      exit;
+    end;
+
+    DetectCurrentState;
+
+    if (SelectedAction = 2) and (not DetectedFull) then begin
+      MsgBox('DLSS Full is not detected in this GTA IV folder.', mbInformation, MB_OK);
+      Result := False;
+      exit;
+    end;
+
+    if (SelectedAction = 3) and (not DetectedDLAA) then begin
+      MsgBox('No DLAA/DLSS installation from this project is detected.', mbInformation, MB_OK);
+      Result := False;
+      exit;
+    end;
+
+    if ((SelectedAction = 0) or (SelectedAction = 1)) and (not NeedFusionFixPackage) and (not DetectedFusionFixFirstRun) then begin
+      MsgBox('FusionFix is installed but has not completed its first run.' + #13#10 + #13#10 +
+        'Launch GTA IV once to the main menu, close it, then run this setup again.', mbInformation, MB_OK);
+      Result := False;
+      exit;
+    end;
+
     if SelectedAction = 1 then begin
       DetectedGpuSeries := DetectNvidiaGpuSeries;
-      PrefillNrForSeries(DetectedGpuSeries);
-      MsgBox(NrInstructions(DetectedGpuSeries), mbInformation, MB_OK);
-      if DetectedGpuSeries = 0 then begin Result := False; exit; end;
+      GpuPage.MsgLabel.Caption := NrInstructions(DetectedGpuSeries);
     end;
-  end else if CurPageID = FusionFixPage.ID then begin
-    if ((SelectedAction = 0) or (SelectedAction = 1)) and NeedFusionFixPackage and (not FileExists(FusionFixPage.Values[0])) then begin
-      MsgBox('Select GTAIV.EFLC.FusionFix.zip. Keep it as a ZIP; setup installs it for you.', mbError, MB_OK); Result := False;
+  end
+  else if CurPageID = GpuPage.ID then begin
+    if (SelectedAction = 1) and (DetectedGpuSeries = 0) then begin
+      Result := False;
+      exit;
     end;
-  end else if CurPageID = ReShadePage.ID then begin
-    if ((SelectedAction = 0) or ((SelectedAction = 1) and (not DetectedDLAA))) and (not FileExists(ReShadePage.Values[0])) then begin MsgBox('Select the official ReShade 6.8.0 Full Add-On Support installer. Do not run it yourself.', mbError, MB_OK); Result := False; end;
-  end else if CurPageID = LumenitePage.ID then begin
-    if ((SelectedAction = 0) or ((SelectedAction = 1) and (not DetectedDLAA))) and (not FileExists(LumenitePage.Values[0])) then begin MsgBox('Select the pinned official LumeniteFX ZIP. Do not extract it.', mbError, MB_OK); Result := False; end;
-  end else if CurPageID = NrPage.ID then begin
-    if (SelectedAction = 1) and (not FileExists(NrPage.Values[0])) then begin MsgBox('Select the downloaded Neural Rendering ZIP. Do not extract it.', mbError, MB_OK); Result := False; end;
+  end
+  else if CurPageID = ReShadePage.ID then begin
+    if ((SelectedAction = 0) or ((SelectedAction = 1) and (not DetectedDLAA))) and (not FileExists(ReShadePage.Values[0])) then begin
+      MsgBox('Select the official ReShade 6.8.0 Full Add-On Support installer.', mbError, MB_OK);
+      Result := False;
+    end;
   end;
 end;
 
