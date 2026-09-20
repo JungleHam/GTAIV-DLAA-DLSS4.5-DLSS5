@@ -16,9 +16,9 @@ Keep `GTAIV-DLSS-Setup.exe` and every prerequisite download in that folder. **Do
 
 For a fresh DLAA setup you may need:
 
-- `GTAIV.EFLC.FusionFix.zip` if FusionFix is not already installed;
-- official ReShade 6.8.0 **Full Add-On Support** setup EXE;
-- official LumeniteFX ZIP from commit `f8cbbb4eccfcb7adf0d74bb358ba349272e3c1e9`.
+- [`GTAIV.EFLC.FusionFix.zip`](https://github.com/ThirteenAG/GTAIV.EFLC.FusionFix) if FusionFix is not already installed — use the repository's **Releases** section;
+- official ReShade 6.8.0 **Full Add-On Support** setup EXE — start at [crosire/reshade on GitHub](https://github.com/crosire/reshade), then use the official website shown in the GitHub **About** box and look for the Full Add-On Support build;
+- official LumeniteFX ZIP from the [pinned commit on GitHub](https://github.com/umar-afzaal/LumeniteFX/tree/f8cbbb4eccfcb7adf0d74bb358ba349272e3c1e9) — use **Code → Download ZIP**.
 
 Setup installs/extracts these itself. If it installs FusionFix, it will ask you to launch GTA IV normally once to the main menu, close it, then rerun setup from the same folder. That first game launch is required by FusionFix; there is no other manual install step.
 
