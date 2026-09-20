@@ -334,7 +334,7 @@ begin
   if CurStep = ssInstall then begin
     ExtractSetupFiles; WizardForm.StatusLabel.Caption := ActionTitle(SelectedAction) + '...';
     PowerShell := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
-    Args := '-NoLogo -NoProfile -ExecutionPolicy Bypass -File ' + QuoteArg(ExpandConstant('{tmp}\Run-Action.ps1')) + ' -Action ' + ActionCode(SelectedAction) + ' -Game ' + QuoteArg(GameDir);
+    Args := '-NoLogo -NoProfile -ExecutionPolicy Bypass -File ' + QuoteArg(ExpandConstant('{tmp}\Run-Action.ps1')) + ' -Action ' + ActionCode(SelectedAction) + ' -Game ' + QuoteArg(GameDir) + ' -SetupSource ' + QuoteArg(ExpandConstant('{src}'));
     if NeedFusionFixPackage and ((SelectedAction = 0) or (SelectedAction = 1)) then
       Args := Args + ' -FusionFixPackage ' + QuoteArg(FusionFixPage.Values[0]);
     if (SelectedAction = 0) or ((SelectedAction = 1) and (not DetectedDLAA)) then
