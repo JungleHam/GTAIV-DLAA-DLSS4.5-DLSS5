@@ -118,9 +118,10 @@
       "source_repository": "https://github.com/umar-afzaal/LumeniteFX",
       "commit": "f8cbbb4eccfcb7adf0d74bb358ba349272e3c1e9",
       "user_supplied_official_archive": false,
-      "expected_archive_sha256": "43220f99fc0ffa0216e01ebd657180f8c9d043c939f760283b896ea257f1b6a2",
+      "expected_archive_sha256": "572fefb20d466afe50998e16996b4833bec675264485c99fe768a2337636e756",
       "installer_instruction": "Downloaded automatically from the pinned GitHub commit and verified before installation.",
-      "download_mode": "automatic via GitHub API pinned commit"
+      "download_mode": "automatic via GitHub API pinned commit",
+      "archive_source": "GitHub API zipball for pinned commit"
     },
     "nvngx_dlss": {
       "product": "DLSS 4.5 Super Resolution / DLAA runtime",
