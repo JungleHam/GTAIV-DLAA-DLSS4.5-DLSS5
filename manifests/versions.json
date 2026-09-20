@@ -15,7 +15,7 @@
       "release_url": "https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/tag/v1.0.0",
       "reshade_input_patch": {
         "asset": "ReShade64-bbridge.dll",
-        "sha256": "0b18b61e318317f3b99f5a1d6f453c002490323b04dd43d33e079bd7e5ece9f0",
+        "sha256": "d5bd8cb2b6e935506888ea71711361b9afcd72ed7c70926c0f52e8f8e47c7510",
         "source": "ReShade 6.8.0 + tools/reshade-bbridge-input/apply_patch.ps1",
         "build": "GitHub Actions"
       },
