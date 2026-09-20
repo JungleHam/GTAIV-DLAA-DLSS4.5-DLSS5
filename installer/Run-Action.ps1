@@ -120,8 +120,6 @@ function Resolve-FusionFixPackage {
 function Resolve-LumenitePackage {
     if ($LumenitePackage -and (Test-Path -LiteralPath $LumenitePackage -PathType Leaf)) { return (Resolve-Path -LiteralPath $LumenitePackage).Path }
     $name = 'LumeniteFX-f8cbbb4eccfcb7adf0d74bb358ba349272e3c1e9.zip'
-    $local = Find-BesideSetup $name
-    if ($local) { return $local }
     $dest = Join-Path (Get-AutoTemp) $name
     $uri = 'https://api.github.com/repos/umar-afzaal/LumeniteFX/zipball/f8cbbb4eccfcb7adf0d74bb358ba349272e3c1e9'
     Download-GitHubUrl -Uri $uri -Destination $dest -Label 'pinned LumeniteFX'
@@ -290,7 +288,7 @@ $needsFoundationInputs = ($Action -eq 'DLAA') -or (($Action -eq 'FULL') -and -no
 if ($needsFoundationInputs) {
     $env:GTAIV_SETUP_RESHADE = Require-InputFile $ReShadeSetup 'Official ReShade 6.8.0 Add-On installer'
     $lum = Resolve-LumenitePackage
-    Assert-SHA256 $lum '43220F99FC0FFA0216E01EBD657180F8C9D043C939F760283B896EA257F1B6A2' 'Pinned LumeniteFX ZIP'
+    Assert-SHA256 $lum '572FEFB20D466AFE50998E16996B4833BEC675264485C99FE768A2337636E756' 'Pinned LumeniteFX ZIP'
     $env:GTAIV_SETUP_LUMENITE = $lum
 }
 if ($Action -eq 'FULL') {
