@@ -299,15 +299,22 @@ end;
 
 function UpdateReadyMemo(Space, NewLine, MemoUserInfoInfo, MemoDirInfo, MemoTypeInfo, MemoComponentsInfo, MemoGroupInfo, MemoTasksInfo: String): String;
 begin
-  Result := 'GTA IV folder:' + NewLine + '  ' + GameDir + NewLine + NewLine + 'Action:' + NewLine + '  ' + ActionTitle(SelectedAction) + NewLine + NewLine;
+  Result := 'GTA IV folder:' + NewLine + '  ' + GameDir + NewLine + NewLine +
+            'Action:' + NewLine + '  ' + ActionTitle(SelectedAction) + NewLine + NewLine;
+
   if SelectedAction <= 1 then begin
-    Result := Result + 'Prerequisite files (setup will install/extract them; you do not do that manually):' + NewLine;
-    if NeedFusionFixPackage then Result := Result + '  FusionFix: ' + FusionFixPage.Values[0] + NewLine;
-    if (SelectedAction = 0) or ((SelectedAction = 1) and (not DetectedDLAA)) then begin
-      Result := Result + '  ReShade: ' + ReShadePage.Values[0] + NewLine + '  LumeniteFX: ' + LumenitePage.Values[0] + NewLine;
-    end;
-    if SelectedAction = 1 then Result := Result + '  Neural Rendering ZIP: ' + NrPage.Values[0] + NewLine;
-    Result := Result + NewLine + 'Keep the prerequisite files beside GTAIV-DLSS-Setup.exe. Setup validates them before use. Repository navigation starts on GitHub; no direct third-party binary/archive download URL is embedded.';
+    Result := Result + 'Automatic GitHub downloads:' + NewLine;
+    if NeedFusionFixPackage then Result := Result + '  FusionFix 5.0.1' + NewLine;
+    if (SelectedAction = 0) or ((SelectedAction = 1) and (not DetectedDLAA)) then
+      Result := Result + '  Pinned LumeniteFX' + NewLine;
+    if SelectedAction = 1 then
+      Result := Result + '  GPU-matched DLSS Neural Rendering 310.8.0' + NewLine;
+    Result := Result + '  Project runtime / input patch' + NewLine + NewLine;
+
+    if (SelectedAction = 0) or ((SelectedAction = 1) and (not DetectedDLAA)) then
+      Result := Result + 'Manual file:' + NewLine + '  ReShade: ' + ReShadePage.Values[0] + NewLine + NewLine;
+
+    Result := Result + 'All downloaded components are hash-verified before use.';
   end;
 end;
 
