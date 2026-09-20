@@ -46,7 +46,7 @@ try{
  elseif($gpuName -match 'RTX\s*40'){$flavor='RTX40';$nrLabel='RTX 40 compatibility DLSS NR 310.8 (project-tested modded DLL)';$nrDll=$Nr40DllHash}
  else{Fail "Full DLSS release support currently requires RTX 40/50. Detected: $gpuName"}
  Assert-SHA256 $NrDllInput $nrDll
- Write-Host '';Write-Host "GPU: $gpuName";Write-Host "NR:  $nrLabel";Write-Host 'The NR DLL was supplied by the user; this project contains no NR download link.' -ForegroundColor Green
+ Write-Host '';Write-Host "GPU: $gpuName";Write-Host "NR:  $nrLabel";Write-Host 'The NR DLL was selected and validated by setup.' -ForegroundColor Green
  $ok=if($env:GTAIV_SETUP_GAME){'y'}else{Read-Host 'Continue? [Y/n]'};if($ok -and $ok -notmatch '^(y|yes)$'){exit 0}
  New-Item -ItemType Directory -Path $Temp -Force|Out-Null;$runtimeZip=Join-Path $Temp 'runtime.zip';$runtimeDir=Join-Path $Temp 'runtime'
  if($env:GTAIV_SETUP_PROJECT_RUNTIME -and (Test-Path -LiteralPath $env:GTAIV_SETUP_PROJECT_RUNTIME -PathType Leaf)){Write-Host 'Using local project runtime beside setup EXE.' -ForegroundColor DarkGray;Copy-Item -LiteralPath $env:GTAIV_SETUP_PROJECT_RUNTIME -Destination $runtimeZip -Force}else{$runtimeUrl=Resolve-ProjectAssetUrl $RuntimeAsset;Download $runtimeUrl $runtimeZip};Assert-SHA256 $runtimeZip $RuntimeZipHash;Expand-Archive -LiteralPath $runtimeZip -DestinationPath $runtimeDir -Force;foreach($rel in $RuntimeHashes.Keys){$p=Join-Path $runtimeDir $rel;if(-not(Test-Path -LiteralPath $p)){Fail "Runtime archive is missing $rel"};Assert-SHA256 $p $RuntimeHashes[$rel]}
