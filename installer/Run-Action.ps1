@@ -10,11 +10,18 @@ param(
     [string]$ReShadeSetup = '',
     [string]$LumenitePackage = '',
     [string]$NrPackage = '',
-    [string]$SetupSource = ''
+    [string]$SetupSource = '',
+    [string]$ResultFile = ''
 )
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+$script:AutoTemp = $null
+
+function Write-Result([string]$Text) {
+    if (-not $ResultFile) { return }
+    try { [IO.File]::WriteAllText($ResultFile, $Text, [Text.UTF8Encoding]::new($false)) } catch {}
+}
 
 if ($SetupSource -and (Test-Path -LiteralPath $SetupSource -PathType Container)) {
     $candidateRuntime = Join-Path $SetupSource 'GTAIV-DLSS-Full-Runtime.zip'
@@ -67,6 +74,81 @@ function Assert-SHA256([string]$Path,[string]$Expected,[string]$Label) {
     $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash.ToUpperInvariant()
     if ($actual -ne $Expected.ToUpperInvariant()) { Fail "$Label SHA256 did not match the tested file.`nExpected: $Expected`nActual:   $actual" }
 }
+
+function Get-AutoTemp {
+    if (-not $script:AutoTemp) {
+        $script:AutoTemp = Join-Path $env:TEMP ('GTAIV_DLSS_AUTO_' + [Guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $script:AutoTemp -Force | Out-Null
+    }
+    return $script:AutoTemp
+}
+
+function Download-GitHubUrl([string]$Uri,[string]$Destination,[string]$Label) {
+    Write-Host "Downloading $Label from GitHub..." -ForegroundColor Cyan
+    $headers = @{ 'User-Agent' = 'GTAIV-DLSS-Setup' }
+    try { Invoke-WebRequest -UseBasicParsing -Headers $headers -Uri $Uri -OutFile $Destination }
+    catch { Fail "Could not download $Label from GitHub. $($_.Exception.Message)" }
+    if (-not (Test-Path -LiteralPath $Destination -PathType Leaf)) { Fail "$Label download did not create a file." }
+}
+
+function Download-GitHubReleaseAsset([string]$Repo,[string]$Tag,[string]$Asset,[string]$Destination,[string]$Label) {
+    $headers = @{ 'User-Agent' = 'GTAIV-DLSS-Setup'; 'Accept' = 'application/vnd.github+json' }
+    $api = "https://api.github.com/repos/$Repo/releases/tags/$Tag"
+    try { $release = Invoke-RestMethod -UseBasicParsing -Headers $headers -Uri $api }
+    catch { Fail "Could not read the GitHub release for $Label. $($_.Exception.Message)" }
+    $match = @($release.assets | Where-Object { $_.name -eq $Asset }) | Select-Object -First 1
+    if (-not $match -or -not $match.browser_download_url) { Fail "GitHub release asset was not found: $Repo / $Tag / $Asset" }
+    Download-GitHubUrl -Uri ([string]$match.browser_download_url) -Destination $Destination -Label $Label
+    return $Destination
+}
+
+function Find-BesideSetup([string]$FileName) {
+    if (-not $SetupSource) { return $null }
+    $p = Join-Path $SetupSource $FileName
+    if (Test-Path -LiteralPath $p -PathType Leaf) { return (Resolve-Path -LiteralPath $p).Path }
+    return $null
+}
+
+function Resolve-FusionFixPackage {
+    if ($FusionFixPackage -and (Test-Path -LiteralPath $FusionFixPackage -PathType Leaf)) { return (Resolve-Path -LiteralPath $FusionFixPackage).Path }
+    $local = Find-BesideSetup 'GTAIV.EFLC.FusionFix.zip'
+    if ($local) { return $local }
+    $dest = Join-Path (Get-AutoTemp) 'GTAIV.EFLC.FusionFix.zip'
+    return Download-GitHubReleaseAsset -Repo 'ThirteenAG/GTAIV.EFLC.FusionFix' -Tag 'v5.0.1' -Asset 'GTAIV.EFLC.FusionFix.zip' -Destination $dest -Label 'FusionFix 5.0.1'
+}
+
+function Resolve-LumenitePackage {
+    if ($LumenitePackage -and (Test-Path -LiteralPath $LumenitePackage -PathType Leaf)) { return (Resolve-Path -LiteralPath $LumenitePackage).Path }
+    $name = 'LumeniteFX-f8cbbb4eccfcb7adf0d74bb358ba349272e3c1e9.zip'
+    $local = Find-BesideSetup $name
+    if ($local) { return $local }
+    $dest = Join-Path (Get-AutoTemp) $name
+    $uri = 'https://api.github.com/repos/umar-afzaal/LumeniteFX/zipball/f8cbbb4eccfcb7adf0d74bb358ba349272e3c1e9'
+    Download-GitHubUrl -Uri $uri -Destination $dest -Label 'pinned LumeniteFX'
+    return $dest
+}
+
+function Get-GpuInfo {
+    $gpu = Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue | Where-Object { $_.Name -match 'NVIDIA' } | Select-Object -First 1
+    $name = if ($gpu) { [string]$gpu.Name } else { '' }
+    $series = 0
+    if ($name -match 'RTX\s*50') { $series = 50 }
+    elseif ($name -match 'RTX\s*40') { $series = 40 }
+    return [pscustomobject]@{ Name=$name; Series=$series }
+}
+
+function Resolve-AutoNrPackage {
+    if ($NrPackage -and (Test-Path -LiteralPath $NrPackage -PathType Leaf)) { return (Resolve-Path -LiteralPath $NrPackage).Path }
+    $gpu = Get-GpuInfo
+    if ($gpu.Series -eq 40) { $tag='dlssnr-310.8.0-RTX40'; $asset='nvngx_dlssnr_310.8.0-RTX40.zip'; $label='DLSS NR 310.8.0 RTX 40 compatibility package' }
+    elseif ($gpu.Series -eq 50) { $tag='dlssnr-310.8.0'; $asset='nvngx_dlssnr_310.8.0.zip'; $label='DLSS NR 310.8.0 RTX 50 package' }
+    else { Fail "Full DLSS currently supports RTX 40/50. Detected: $($gpu.Name)" }
+    $local = Find-BesideSetup $asset
+    if ($local) { return $local }
+    $dest = Join-Path (Get-AutoTemp) $asset
+    return Download-GitHubReleaseAsset -Repo 'RankFTW/rhi-repo' -Tag $tag -Asset $asset -Destination $dest -Label $label
+}
+
 
 function Install-FusionFixPackage([string]$Root,[string]$Path) {
     $input = Require-InputFile $Path 'FusionFix 5.0.1 ZIP'
