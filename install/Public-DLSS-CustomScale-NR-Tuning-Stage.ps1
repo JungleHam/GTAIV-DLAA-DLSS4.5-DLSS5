@@ -379,10 +379,78 @@ static void M3kSyncSharpenUniform(reshade::api::effect_runtime *rt)
 $feed=$feed.Substring(0,$sharpenFnAt)+$sharpenHelpers+$feed.Substring($sharpenFnAt)
 $feed=Once $feed '    FeedFrame(rt, cl, rtv);' ('    FeedFrame(rt, cl, rtv);' + [Environment]::NewLine + '    M3kSyncSharpenUniform(rt);') 'post-DLSS sharpen uniform sync'
 
+# ---- Vulkan resize/runtime-churn safety: never ReleaseFeature from inside ReShade runtime destruction. ----
+# The user crash log showed a foreign-thread 0xC0000005 in ReShade64.dll while
+# ReleaseFrameResources -> SafeReleaseFeature ran during the 1485x835 -> native swapchain rebuild.
+# ReShade/NGX hooks are re-arming at this exact point. Detach the handle, rebuild game-side
+# imports/resources normally, then release the old NGX feature only after the existing
+# create-grace has elapsed on the fresh runtime.
+$deferAnchor='static void OnDestroyEffectRuntime(reshade::api::effect_runtime *rt)'
+$deferAt=$feed.IndexOf($deferAnchor,[StringComparison]::Ordinal)
+if($deferAt -lt 0){throw 'runtime-destroy safety anchor missing'}
+$deferHelpers=@'
+static NVSDK_NGX_Handle *g_m3kDeferredRuntimeChurnFeature=nullptr;
+
+static void M3kDeferRuntimeChurnFeatureRelease()
+{
+    if(g.feature==nullptr)return;
+    if(g_m3kDeferredRuntimeChurnFeature!=nullptr && g_m3kDeferredRuntimeChurnFeature!=g.feature)
+    {
+        // This should not normally happen: no new feature is built until the fresh runtime
+        // survives its hook grace. If it does, keep the older handle alive rather than make
+        // an unsafe NGX call from the runtime-destroy callback.
+        Log("M3K-SAFE-RESIZE: another runtime teardown arrived before deferred feature release; preserving older handle until process exit");
+    }
+    else
+    {
+        g_m3kDeferredRuntimeChurnFeature=g.feature;
+    }
+    g.feature=nullptr;
+    Log("M3K-SAFE-RESIZE: detached old DLSS feature from ReShade runtime teardown; release deferred until fresh-runtime grace");
+}
+
+static void M3kReleaseDeferredRuntimeChurnFeature()
+{
+    if(g_m3kDeferredRuntimeChurnFeature==nullptr)return;
+    NVSDK_NGX_Handle *old=g_m3kDeferredRuntimeChurnFeature;
+    g_m3kDeferredRuntimeChurnFeature=nullptr;
+    Breadcrumb("releasing deferred DLSS feature after runtime grace");
+    Log("M3K-SAFE-RESIZE: fresh runtime survived hook grace; releasing deferred DLSS feature now");
+    SafeReleaseFeature(old);
+}
+
+'@
+$feed=$feed.Substring(0,$deferAt)+$deferHelpers+$feed.Substring($deferAt)
+
+$destroyOld='    if (g.dev12_owned && g.dev11 == nullptr) ReleaseFrameResources();'
+$destroyNew=@'
+    if (g.dev12_owned && g.dev11 == nullptr)
+    {
+        M3kDeferRuntimeChurnFeatureRelease();
+        ReleaseFrameResources();
+    }
+'@
+$feed=Once $feed $destroyOld $destroyNew 'defer feature release during Vulkan runtime destruction'
+
+$vkBuildOld=@'
+    if (ok && needs_build_vk)
+    {
+        Log("[feed] building: %ux%u backbuffer %s (Vulkan transport, depth reversed=%d)", w, h,
+'@
+$vkBuildNew=@'
+    if (ok && needs_build_vk)
+    {
+        // We are past the existing create_delay hook grace on the fresh ReShade runtime.
+        // This is the first safe point to touch the old NGX feature from the previous runtime.
+        M3kReleaseDeferredRuntimeChurnFeature();
+        Log("[feed] building: %ux%u backbuffer %s (Vulkan transport, depth reversed=%d)", w, h,
+'@
+$feed=Once $feed $vkBuildOld $vkBuildNew 'release deferred feature only after fresh-runtime grace'
+
 [IO.File]::WriteAllText($nrPath,$nr,[Text.UTF8Encoding]::new($false))
 [IO.File]::WriteAllText($vkPath,$vk,[Text.UTF8Encoding]::new($false))
 [IO.File]::WriteAllText($FeederSource,$feed,[Text.UTF8Encoding]::new($false))
 $verify=$nr+$vk+$feed
-foreach($m in @('case 6: return "Custom Render Scale";','M3K-CUSTOM-SCALE:','Apply##M3KCustomScaleApply','NR Style##M3KNrStyle','Default\0Natural\0Cinematic','DLSSNR.Intensity','DLSSNR.LocalToneStrength','DLSSNR.LocalStructureStrength','DLSSNR.SkinStructureStrength','DLSSNR.UseAutoMask','DLSSNR.UICorrection','M3K_Sharpen.fx','M3kSyncSharpenUniform','Sharpening##M3KSharpness','M3K-DLAA-JITTER:','dlaa.InJitterOffsetX','Reset NR Advanced##M3KNrReset','Quality (67%)','FORCED %ux%u')){if($verify.IndexOf($m,[StringComparison]::Ordinal)-lt 0){throw "Missing verification marker: $m"}}
+foreach($m in @('case 6: return "Custom Render Scale";','M3K-CUSTOM-SCALE:','Apply##M3KCustomScaleApply','NR Style##M3KNrStyle','Default\0Natural\0Cinematic','DLSSNR.Intensity','DLSSNR.LocalToneStrength','DLSSNR.LocalStructureStrength','DLSSNR.SkinStructureStrength','DLSSNR.UseAutoMask','DLSSNR.UICorrection','M3K_Sharpen.fx','M3kSyncSharpenUniform','Sharpening##M3KSharpness','M3K-DLAA-JITTER:','dlaa.InJitterOffsetX','M3K-SAFE-RESIZE:','M3kReleaseDeferredRuntimeChurnFeature','Reset NR Advanced##M3KNrReset','Quality (67%)','FORCED %ux%u')){if($verify.IndexOf($m,[StringComparison]::Ordinal)-lt 0){throw "Missing verification marker: $m"}}
 foreach($bad in @('if (profile > 5) profile = 2;','g_m3kMasterSavedProfile <= 5 ? g_m3kMasterSavedProfile : 2','savedProfileRaw <= 5 ? savedProfileRaw : 2','requestedSrProfile <= 5 ? requestedSrProfile : 2','g_m3kStartupPrimeInitialProfile <= 5','g_m3kSrProfileRequested > 5','if (profile < 1 || profile > 5) return false;')){if($verify.IndexOf($bad,[StringComparison]::Ordinal)-ge 0){throw "Stale SR bound remains: $bad"}}
 Write-Host 'Next controls ready: Apply-only custom DLSS scale + NR style/tuning.'
