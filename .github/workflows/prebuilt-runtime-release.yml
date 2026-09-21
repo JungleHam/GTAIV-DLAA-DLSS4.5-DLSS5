@@ -1,5 +1,5 @@
 name: Build cleaned prebuilt runtime artifacts
-# Feature-branch validation refresh: custom scale + NR tuning v4
+# Feature-branch validation refresh: forced scale + sharpening + NR reset v5
 
 on:
   workflow_dispatch:
@@ -246,6 +246,7 @@ jobs:
           $feedFx = Get-ChildItem .\_feeder-release -Recurse -File -Filter 'DLSS5_Feed.fx' | Select-Object -First 1
           if (-not $feedFx) { throw 'DLSS5_Feed.fx not found in pinned Feeder source.' }
           Copy-Item $feedFx.FullName .\out-runtime\DLSS5_Feed.fx -Force
+          Copy-Item .\install\M3K_Sharpen.fx .\out-runtime\M3K_Sharpen.fx -Force
 
           foreach ($name in @('ReShade.fxh','ReShadeUI.fxh','DrawText.fxh')) {
             $src = Get-ChildItem .\_reshade-shaders -Recurse -File -Filter $name | Select-Object -First 1
