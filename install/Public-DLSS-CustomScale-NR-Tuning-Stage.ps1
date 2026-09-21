@@ -200,3 +200,52 @@ static UINT M3kRequestedNrPasses() { return g_m3kNrPasses; }
 $vk=Once $vk $api $apiNew 'public API'
 
 # ---- Replace the final compact panel. Slider edits are staged; only Apply changes render size. ----
+$mark='    if (ImGui::CollapsingHeader("GTA IV DLSS", ImGuiTreeNodeFlags_DefaultOpen))'
+$start=$feed.IndexOf($mark,[StringComparison]::Ordinal);if($start -lt 0){throw 'final UI marker missing'}
+$open=$feed.IndexOf('{',$start);$depth=0;$end=-1
+for($i=$open;$i -lt $feed.Length;$i++){if($feed[$i]-eq '{'){$depth++}elseif($feed[$i]-eq '}'){$depth--;if($depth-eq 0){$end=$i+1;break}}}
+if($end -lt 0){throw 'final UI closing brace missing'}
+$ui=@'
+    if (ImGui::CollapsingHeader("GTA IV DLSS", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        bool master=M3kMasterEnabledRequested(); if(ImGui::Checkbox("DLSS / DLAA processing##M3KMaster",&master))M3kRequestMasterEnabledLive(master);
+        ImGui::SameLine(); ImGui::TextDisabled("%s",master?"ON":"OFF");
+        ImGui::Separator(); ImGui::TextUnformatted("Reconstruction");
+        ImGui::BeginDisabled(!master); int reconstruction=static_cast<int>(M3kRequestedSrProfile()); if(reconstruction<0||reconstruction>6)reconstruction=2;
+        const char *items="DLAA Native\0Custom Ultra Quality (77%)\0Quality\0Balanced\0Performance\0Ultra Performance\0Custom Render Scale\0\0";
+        if(ImGui::Combo("Mode##M3KSRProfile",&reconstruction,items)){if(reconstruction==6)M3kApplyCustomScaleLive(M3kCustomScalePercent());else M3kRequestSrProfileLive(static_cast<UINT>(reconstruction));}
+        ImGui::EndDisabled();
+        const int saved=static_cast<int>(M3kCustomScalePercent()); static int draft=-1,seen=-1;
+        if(draft<10||draft>100){draft=saved;seen=saved;}else if(saved!=seen){if(draft==seen)draft=saved;seen=saved;}
+        ImGui::BeginDisabled(!master); ImGui::SliderInt("Render Scale##M3KCustomScale",&draft,10,100,"%d%%");
+        if(draft!=saved){ImGui::SameLine();if(ImGui::Button("Apply##M3KCustomScaleApply"))M3kApplyCustomScaleLive(static_cast<UINT>(draft));} ImGui::EndDisabled();
+        if(draft>=100)ImGui::Text("100%% = DLAA Native (%u x %u)",M3kScaleW(100),M3kScaleH(100));else ImGui::Text("Custom preview: %d%% = %u x %u -> %u x %u",draft,M3kScaleW(static_cast<UINT>(draft)),M3kScaleH(static_cast<UINT>(draft)),g.width,g.height);
+        if(M3kCustomScaleLastRejected())ImGui::TextColored(ImVec4(1.0f,0.45f,0.35f,1.0f),"Unsupported by DLSS at this output; current mode kept.");
+        ImGui::Text("Current: %s",M3kSrProfileName(M3kAppliedSrProfile())); if(master&&M3kAppliedSrProfile()!=M3kRequestedSrProfile())ImGui::TextColored(ImVec4(1.0f,0.78f,0.25f,1.0f),"Applying %s...",M3kSrProfileName(M3kRequestedSrProfile()));
+
+        ImGui::Separator(); ImGui::TextUnformatted("Neural Rendering"); bool nr=M3kNrEnabledRequested(); ImGui::BeginDisabled(!master); if(ImGui::Checkbox("Enable Neural Rendering##M3KNrEnabled",&nr))M3kRequestNrEnabledLive(nr); ImGui::EndDisabled();
+        if(ImGui::CollapsingHeader("Advanced##M3KAdvanced")){
+            ImGui::BeginDisabled(!master||!nr); int style=static_cast<int>(M3kNrStyleRequested()); const char *styles="Default\0Natural\0Cinematic\0\0";
+            if(ImGui::Combo("NR Style##M3KNrStyle",&style,styles))M3kRequestNrTuningLive(static_cast<UINT>(style),M3kNrIntensityRequested(),M3kNrLocalToneRequested(),M3kNrLocalStructureRequested(),M3kNrSkinStructureRequested(),M3kNrAutoMaskRequested(),M3kNrUiCorrectionRequested());
+            static float i=-1,t=-1,s=-1,skin=-1; if(i<0)i=M3kNrIntensityRequested();if(t<0)t=M3kNrLocalToneRequested();if(s<0)s=M3kNrLocalStructureRequested();if(skin<0)skin=M3kNrSkinStructureRequested();
+            ImGui::SliderFloat("Intensity##M3KNrIntensity",&i,0.0f,2.0f,"%.2f");if(ImGui::IsItemDeactivatedAfterEdit())M3kRequestNrTuningLive(M3kNrStyleRequested(),i,M3kNrLocalToneRequested(),M3kNrLocalStructureRequested(),M3kNrSkinStructureRequested(),M3kNrAutoMaskRequested(),M3kNrUiCorrectionRequested());
+            ImGui::SliderFloat("Local Tone##M3KNrTone",&t,0.0f,2.0f,"%.2f");if(ImGui::IsItemDeactivatedAfterEdit())M3kRequestNrTuningLive(M3kNrStyleRequested(),M3kNrIntensityRequested(),t,M3kNrLocalStructureRequested(),M3kNrSkinStructureRequested(),M3kNrAutoMaskRequested(),M3kNrUiCorrectionRequested());
+            ImGui::SliderFloat("Local Structure##M3KNrStructure",&s,0.0f,2.0f,"%.2f");if(ImGui::IsItemDeactivatedAfterEdit())M3kRequestNrTuningLive(M3kNrStyleRequested(),M3kNrIntensityRequested(),M3kNrLocalToneRequested(),s,M3kNrSkinStructureRequested(),M3kNrAutoMaskRequested(),M3kNrUiCorrectionRequested());
+            ImGui::SliderFloat("Skin Structure##M3KNrSkin",&skin,0.0f,2.0f,"%.2f");if(ImGui::IsItemDeactivatedAfterEdit())M3kRequestNrTuningLive(M3kNrStyleRequested(),M3kNrIntensityRequested(),M3kNrLocalToneRequested(),M3kNrLocalStructureRequested(),skin,M3kNrAutoMaskRequested(),M3kNrUiCorrectionRequested());
+            bool mask=M3kNrAutoMaskRequested();if(ImGui::Checkbox("Auto Mask##M3KNrAutoMask",&mask))M3kRequestNrTuningLive(M3kNrStyleRequested(),M3kNrIntensityRequested(),M3kNrLocalToneRequested(),M3kNrLocalStructureRequested(),M3kNrSkinStructureRequested(),mask,M3kNrUiCorrectionRequested());
+            bool ui=M3kNrUiCorrectionRequested();if(ImGui::Checkbox("UI Correction##M3KNrUiCorrection",&ui))M3kRequestNrTuningLive(M3kNrStyleRequested(),M3kNrIntensityRequested(),M3kNrLocalToneRequested(),M3kNrLocalStructureRequested(),M3kNrSkinStructureRequested(),M3kNrAutoMaskRequested(),ui);
+            ImGui::Spacing(); const UINT requested=M3kRequestedNrPasses(); ImGui::TextUnformatted("Neural Rendering passes");
+            for(UINT p=1;p<=5;++p){if(p>1)ImGui::SameLine();char label[24]={};_snprintf_s(label,sizeof(label),_TRUNCATE,"%u##M3KPass",p);if(ImGui::RadioButton(label,requested==p))M3kRequestNrPassesLive(p);} ImGui::Text("Active: %u    Warmed: %u / 5",M3kActiveNrPasses(),M3kCreatedNrPasses()); ImGui::EndDisabled();}
+        if(ImGui::CollapsingHeader("Diagnostics##M3KDiagnostics")){ImGui::Text("Requested render: %u x %u",M3kDesiredRenderWidth(),M3kDesiredRenderHeight());ImGui::Text("DXVK source: %u x %u",M3kCurrentSourceWidth(),M3kCurrentSourceHeight());ImGui::Text("Output: %u x %u",g.width,g.height);ImGui::Text("Saved custom scale: %u%%",M3kCustomScalePercent());ImGui::Text("NR style=%u intensity=%.2f tone=%.2f structure=%.2f skin=%.2f",M3kNrStyleRequested(),M3kNrIntensityRequested(),M3kNrLocalToneRequested(),M3kNrLocalStructureRequested(),M3kNrSkinStructureRequested());}
+        ImGui::Separator();
+    }
+'@
+$feed=$feed.Substring(0,$start)+$ui+$feed.Substring($end)
+
+[IO.File]::WriteAllText($nrPath,$nr,[Text.UTF8Encoding]::new($false))
+[IO.File]::WriteAllText($vkPath,$vk,[Text.UTF8Encoding]::new($false))
+[IO.File]::WriteAllText($FeederSource,$feed,[Text.UTF8Encoding]::new($false))
+$verify=$nr+$vk+$feed
+foreach($m in @('case 6: return "Custom Render Scale";','M3K-CUSTOM-SCALE:','Apply##M3KCustomScaleApply','NR Style##M3KNrStyle','Default\0Natural\0Cinematic','DLSSNR.Intensity','DLSSNR.LocalToneStrength','DLSSNR.LocalStructureStrength','DLSSNR.SkinStructureStrength','DLSSNR.UseAutoMask','DLSSNR.UICorrection')){if($verify.IndexOf($m,[StringComparison]::Ordinal)-lt 0){throw "Missing verification marker: $m"}}
+foreach($bad in @('if (profile > 5) profile = 2;','g_m3kMasterSavedProfile <= 5 ? g_m3kMasterSavedProfile : 2','savedProfileRaw <= 5 ? savedProfileRaw : 2','requestedSrProfile <= 5 ? requestedSrProfile : 2','g_m3kStartupPrimeInitialProfile <= 5','g_m3kSrProfileRequested > 5','if (profile < 1 || profile > 5) return false;')){if($verify.IndexOf($bad,[StringComparison]::Ordinal)-ge 0){throw "Stale SR bound remains: $bad"}}
+Write-Host 'Next controls ready: Apply-only custom DLSS scale + NR style/tuning.'
