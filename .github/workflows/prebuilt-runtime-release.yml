@@ -1,5 +1,5 @@
 name: Build cleaned prebuilt runtime artifacts
-# Feature-branch validation refresh: custom scale + NR tuning
+# Feature-branch validation refresh: custom scale + NR tuning v3
 
 on:
   workflow_dispatch:
