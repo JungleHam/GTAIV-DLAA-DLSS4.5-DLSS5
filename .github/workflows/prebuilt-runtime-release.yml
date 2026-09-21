@@ -1,5 +1,5 @@
 name: Build cleaned prebuilt runtime artifacts
-# Feature-branch validation refresh: forced scale + sharpening + NR reset v6
+# Feature-branch validation refresh: forced scale + sharpening + NR reset v7
 
 on:
   workflow_dispatch:
