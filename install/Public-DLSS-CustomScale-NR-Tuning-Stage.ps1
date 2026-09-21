@@ -178,8 +178,16 @@ static bool M3kFindCustomContract(UINT rw,UINT rh,UINT tw,UINT th,M3kCustomContr
 
 '@
 $vk=$vk.Substring(0,$findAt)+$finder+$vk.Substring($findAt)
-$manual='    UINT manualW = 0, manualH = 0;'
-$customQuery=@'
+$queryHead=@'
+static bool M3kQueryProfileRenderSize(UINT profile, UINT targetW, UINT targetH, UINT *renderW, UINT *renderH)
+{
+    if (!renderW || !renderH || !targetW || !targetH) return false;
+    UINT manualW = 0, manualH = 0;
+'@
+$queryHeadNew=@'
+static bool M3kQueryProfileRenderSize(UINT profile, UINT targetW, UINT targetH, UINT *renderW, UINT *renderH)
+{
+    if (!renderW || !renderH || !targetW || !targetH) return false;
     if(profile==6){
         const UINT p=g_m3kCustomScalePercent<10?10:(g_m3kCustomScalePercent>100?100:g_m3kCustomScalePercent);
         if(p>=100){*renderW=targetW;*renderH=targetH;return true;}
@@ -189,7 +197,7 @@ $customQuery=@'
     }
     UINT manualW = 0, manualH = 0;
 '@
-$vk=Once $vk $manual $customQuery 'custom size query'
+$vk=Once $vk $queryHead $queryHeadNew 'custom size query'
 $select='    if (profile < 1 || profile > 5) return false;'
 $selectNew=@'
     if (profile < 1 || profile > 6) return false;
