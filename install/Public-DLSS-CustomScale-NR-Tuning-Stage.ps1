@@ -27,44 +27,56 @@ $vk=[IO.File]::ReadAllText($vkPath)
 $feed=[IO.File]::ReadAllText($FeederSource)
 
 # ---- Feature 18 tuning state. Changing tuning rebuilds the independent NR chain once. ----
-$nr=Once $nr '    unsigned passes_ = 1;' @'
+$nrState = @'
     unsigned passes_ = 1;
     unsigned nrStyle_ = 0, nrAutoMask_ = 1, nrUiCorrection_ = 0;
     float nrIntensity_ = 1.0f, nrLocalTone_ = 1.0f, nrLocalStructure_ = 1.0f, nrSkinStructure_ = 1.0f;
-'@ 'NR state'
-$nr=Once $nr '                 unsigned w, unsigned h, int flags, unsigned requestedPasses = 1) {' @'
+'@
+$nr = Once $nr '    unsigned passes_ = 1;' $nrState 'NR state'
+
+$nrPrepareSignature = @'
                  unsigned w, unsigned h, int flags, unsigned requestedPasses = 1,
                  unsigned nrStyle = 0, float nrIntensity = 1.0f, float nrLocalTone = 1.0f,
                  float nrLocalStructure = 1.0f, float nrSkinStructure = 1.0f,
                  unsigned nrAutoMask = 1, unsigned nrUiCorrection = 0) {
-'@ 'NR Prepare signature'
-$nr=Once $nr '        if (requestedPasses > MaxPasses) requestedPasses = MaxPasses;' @'
+'@
+$nr = Once $nr '                 unsigned w, unsigned h, int flags, unsigned requestedPasses = 1) {' $nrPrepareSignature 'NR Prepare signature'
+
+$nrClamp = @'
         if (requestedPasses > MaxPasses) requestedPasses = MaxPasses;
         if (nrStyle > 2) nrStyle = 0;
         const auto clampNr=[](float v){return v<0.0f?0.0f:(v>2.0f?2.0f:v);};
         nrIntensity=clampNr(nrIntensity); nrLocalTone=clampNr(nrLocalTone);
         nrLocalStructure=clampNr(nrLocalStructure); nrSkinStructure=clampNr(nrSkinStructure);
         nrAutoMask=nrAutoMask?1u:0u; nrUiCorrection=nrUiCorrection?1u:0u;
-'@ 'NR clamp'
-$nr=Once $nr '            (device_ != device || w_ != w || h_ != h || flags_ != flags || passes_ != requestedPasses)) {' @'
+'@
+$nr = Once $nr '        if (requestedPasses > MaxPasses) requestedPasses = MaxPasses;' $nrClamp 'NR clamp'
+
+$nrRebuildGate = @'
             (device_ != device || w_ != w || h_ != h || flags_ != flags || passes_ != requestedPasses ||
              nrStyle_ != nrStyle || nrIntensity_ != nrIntensity || nrLocalTone_ != nrLocalTone ||
              nrLocalStructure_ != nrLocalStructure || nrSkinStructure_ != nrSkinStructure ||
              nrAutoMask_ != nrAutoMask || nrUiCorrection_ != nrUiCorrection)) {
-'@ 'NR rebuild gate'
-$nr=Once $nr '            return Ready() && device_ == device && w_ == w && h_ == h && flags_ == flags && passes_ == requestedPasses;' @'
+'@
+$nr = Once $nr '            (device_ != device || w_ != w || h_ != h || flags_ != flags || passes_ != requestedPasses)) {' $nrRebuildGate 'NR rebuild gate'
+
+$nrReadyGate = @'
             return Ready() && device_ == device && w_ == w && h_ == h && flags_ == flags && passes_ == requestedPasses &&
                 nrStyle_ == nrStyle && nrIntensity_ == nrIntensity && nrLocalTone_ == nrLocalTone &&
                 nrLocalStructure_ == nrLocalStructure && nrSkinStructure_ == nrSkinStructure &&
                 nrAutoMask_ == nrAutoMask && nrUiCorrection_ == nrUiCorrection;
-'@ 'NR ready gate'
-$nr=Once $nr '        w_ = w; h_ = h; flags_ = flags; passes_ = requestedPasses;' @'
+'@
+$nr = Once $nr '            return Ready() && device_ == device && w_ == w && h_ == h && flags_ == flags && passes_ == requestedPasses;' $nrReadyGate 'NR ready gate'
+
+$nrAssign = @'
         w_ = w; h_ = h; flags_ = flags; passes_ = requestedPasses;
         nrStyle_=nrStyle; nrIntensity_=nrIntensity; nrLocalTone_=nrLocalTone;
         nrLocalStructure_=nrLocalStructure; nrSkinStructure_=nrSkinStructure;
         nrAutoMask_=nrAutoMask; nrUiCorrection_=nrUiCorrection;
-'@ 'NR assign'
-$nr=Once $nr '            m3k::CreateContract(pass_[i].params, w, h, flags);' @'
+'@
+$nr = Once $nr '        w_ = w; h_ = h; flags_ = flags; passes_ = requestedPasses;' $nrAssign 'NR assign'
+
+$nrParameterOverride = @'
             m3k::CreateContract(pass_[i].params, w, h, flags);
             pass_[i].params->Set("DLSSNR.Style", nrStyle_);
             pass_[i].params->Set("DLSSNR.Intensity", nrIntensity_);
@@ -73,15 +85,17 @@ $nr=Once $nr '            m3k::CreateContract(pass_[i].params, w, h, flags);' @'
             pass_[i].params->Set("DLSSNR.SkinStructureStrength", nrSkinStructure_);
             pass_[i].params->Set("DLSSNR.UseAutoMask", nrAutoMask_);
             pass_[i].params->Set("DLSSNR.UICorrection", nrUiCorrection_);
-'@ 'NR parameter override'
+'@
+$nr = Once $nr '            m3k::CreateContract(pass_[i].params, w, h, flags);' $nrParameterOverride 'NR parameter override'
 
-$vk=Once $vk 'static UINT g_m3kNrPasses = 1;' @'
+$publicState = @'
 static UINT g_m3kNrPasses = 1;
 static UINT g_m3kNrStyle=0, g_m3kNrAutoMask=1, g_m3kNrUiCorrection=0;
 static float g_m3kNrIntensity=1.0f, g_m3kNrLocalTone=1.0f, g_m3kNrLocalStructure=1.0f, g_m3kNrSkinStructure=1.0f;
 static UINT g_m3kCustomScalePercent=77;
 static bool g_m3kCustomScaleRejected=false;
-'@ 'public state'
+'@
+$vk = Once $vk 'static UINT g_m3kNrPasses = 1;' $publicState 'public state'
 
 $prepareAt=$vk.IndexOf('static void M3kPrepareFrame()',[StringComparison]::Ordinal)
 if($prepareAt -lt 0){throw 'M3kPrepareFrame marker missing'}
@@ -129,7 +143,8 @@ $vk=Once $vk 'g_m3k.Prepare(g_self, g.dev12, g.queue, g_m3kSrW, g_m3kSrH, g.crea
 $vk=Once $vk 'g_m3k.Prepare(g_self, g.dev12, g.queue, g.width, g.height, g.create_flags, g_m3kNrPasses);' 'g_m3k.Prepare(g_self,g.dev12,g.queue,g.width,g.height,g.create_flags,g_m3kNrPasses,g_m3kNrStyle,g_m3kNrIntensity,g_m3kNrLocalTone,g_m3kNrLocalStructure,g_m3kNrSkinStructure,g_m3kNrAutoMask,g_m3kNrUiCorrection);' 'native NR handoff'
 
 # ---- Profile 6 = custom percentage. Existing named profiles 0..5 are unchanged. ----
-$vk=Once $vk '        case 5: return "Ultra Performance";' "        case 5: return \"Ultra Performance\";`r`n        case 6: return \"Custom Render Scale\";" 'profile name'
+$profileNameNew = '        case 5: return "Ultra Performance";' + [Environment]::NewLine + '        case 6: return "Custom Render Scale";'
+$vk = Once $vk '        case 5: return "Ultra Performance";' $profileNameNew 'profile name'
 $vk=All $vk 'if (profile > 5) profile = 2;' 'if (profile > 6) profile = 2;' 'profile bounds'
 $vk=All $vk 'g_m3kMasterSavedProfile <= 5 ? g_m3kMasterSavedProfile : 2' 'g_m3kMasterSavedProfile <= 6 ? g_m3kMasterSavedProfile : 2' 'master restore bounds'
 $vk=All $vk 'savedProfileRaw <= 5 ? savedProfileRaw : 2' 'savedProfileRaw <= 6 ? savedProfileRaw : 2' 'master INI bounds'
