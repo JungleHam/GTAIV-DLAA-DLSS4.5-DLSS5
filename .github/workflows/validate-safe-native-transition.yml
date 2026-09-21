@@ -1,4 +1,5 @@
 name: Validate safe native transition
+# rerun after declaration-order fix
 
 on:
   push:
