@@ -385,6 +385,11 @@ $feed=Once $feed '    FeedFrame(rt, cl, rtv);' ('    FeedFrame(rt, cl, rtv);' + 
 # ReShade/NGX hooks are re-arming at this exact point. Detach the handle, rebuild game-side
 # imports/resources normally, then release the old NGX feature only after the existing
 # create-grace has elapsed on the fresh runtime.
+$vkFrameDecl='static void FeedFrameVk('
+$vkFrameAt=$feed.IndexOf($vkFrameDecl,[StringComparison]::Ordinal)
+if($vkFrameAt -lt 0){throw 'Vulkan frame declaration anchor missing'}
+$feed=$feed.Substring(0,$vkFrameAt)+"static void M3kReleaseDeferredRuntimeChurnFeature();`r`n`r`n"+$feed.Substring($vkFrameAt)
+
 $deferAnchor='static void OnDestroyEffectRuntime(reshade::api::effect_runtime *rt)'
 $deferAt=$feed.IndexOf($deferAnchor,[StringComparison]::Ordinal)
 if($deferAt -lt 0){throw 'runtime-destroy safety anchor missing'}
