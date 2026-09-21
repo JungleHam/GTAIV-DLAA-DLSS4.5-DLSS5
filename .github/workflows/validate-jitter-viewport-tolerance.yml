@@ -1,0 +1,53 @@
+name: Validate jitter viewport tolerance
+
+on:
+  push:
+    branches: [ feature/dlss-custom-scale-nr-controls ]
+    paths:
+      - '.github/workflows/validate-jitter-viewport-tolerance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-client:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rebuild patched x86 b-bridge client
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git clone --filter=blob:none https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5.git _verify_project
+          git -C _verify_project checkout 57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f
+          git clone --filter=blob:none https://github.com/gutbash/b-bridge.git _verify_bbridge
+          git -C _verify_bbridge checkout 1dad5e6d4dcf8647e354aa9a87f611256fb61142
+          git -C _verify_bbridge submodule update --init --recursive
+
+          python .\_verify_project\tools\m3k-nr\a2-s21-bbridge-ui.py .\_verify_bbridge
+          python .\_verify_project\tools\m3k-nr\a3-s2-bbridge-coherent-draw-jitter.py .\_verify_bbridge
+          python .\install\Public-BBridge-Jitter-Viewport-Tolerance.py .\_verify_bbridge
+          git -C _verify_bbridge diff --check
+
+          python -m pip install --disable-pip-version-check meson==0.64.1 ninja==1.11.1.1
+          Push-Location _verify_bbridge
+          . .\build_common.ps1
+          SetupVS -Platform x86
+          meson setup --buildtype release --backend ninja _compJitter32 --debug
+          Copy-Item .\Directory.Build.Props .\_compJitter32 -Force
+          meson compile -C _compJitter32 d3d9
+          if ($LASTEXITCODE -ne 0) { throw "x86 d3d9 build failed: $LASTEXITCODE" }
+          $client=(Resolve-Path '.\_compJitter32\src\client\d3d9.dll').Path
+          Pop-Location
+
+          New-Item -ItemType Directory -Path .\candidate -Force | Out-Null
+          Copy-Item $client .\candidate\d3d9.dll -Force
+          Get-FileHash -Algorithm SHA256 .\candidate\d3d9.dll | Format-Table -AutoSize
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jitter-viewport-tolerance-client
+          path: candidate/**
