@@ -400,6 +400,7 @@ static ULONGLONG g_m3kSharpenNextResolve=0;
 
 static void M3kSyncSharpenUniform(reshade::api::effect_runtime *rt)
 {
+    M3kSyncJitterPhasesLive();
     const ULONGLONG now=GetTickCount64();
     if(rt!=g_m3kSharpenRuntime || now>=g_m3kSharpenNextResolve)
     {
