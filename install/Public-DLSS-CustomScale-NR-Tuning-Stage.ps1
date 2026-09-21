@@ -146,14 +146,8 @@ $vk=Once $vk 'g_m3k.Prepare(g_self, g.dev12, g.queue, g_m3kSrW, g_m3kSrH, g.crea
 $vk=Once $vk 'g_m3k.Prepare(g_self, g.dev12, g.queue, g.width, g.height, g.create_flags, g_m3kNrPasses);' 'g_m3k.Prepare(g_self,g.dev12,g.queue,g.width,g.height,g.create_flags,g_m3kNrPasses,g_m3kNrStyle,g_m3kNrIntensity,g_m3kNrLocalTone,g_m3kNrLocalStructure,g_m3kNrSkinStructure,g_m3kNrAutoMask,g_m3kNrUiCorrection);' 'native NR handoff'
 
 # ---- Profile 6 = custom percentage. Existing named profiles 0..5 are unchanged. ----
-$vk=All $vk 'case 0: return "DLAA Native";' 'case 0: return "DLAA Native (100%)";' 'DLAA percent label'
-$vk=All $vk 'case 2: return "Quality";' 'case 2: return "Quality (67%)";' 'Quality percent label'
-$vk=All $vk 'case 3: return "Balanced";' 'case 3: return "Balanced (58%)";' 'Balanced percent label'
-$vk=All $vk 'case 4: return "Performance";' 'case 4: return "Performance (50%)";' 'Performance percent label'
-$vk=All $vk 'case 5: return "Ultra Performance";' 'case 5: return "Ultra Performance (33%)";' 'Ultra Performance percent label'
-
-$profileNameNew = '        case 5: return "Ultra Performance (33%)";' + [Environment]::NewLine + '        case 6: return "Custom Render Scale";'
-$vk = Once $vk '        case 5: return "Ultra Performance (33%)";' $profileNameNew 'profile name'
+$profileNameNew = '        case 5: return "Ultra Performance";' + [Environment]::NewLine + '        case 6: return "Custom Render Scale";'
+$vk = Once $vk '        case 5: return "Ultra Performance";' $profileNameNew 'profile name'
 $vk=All $vk 'if (profile > 5) profile = 2;' 'if (profile > 6) profile = 2;' 'profile bounds'
 $vk=All $vk 'g_m3kMasterSavedProfile <= 5 ? g_m3kMasterSavedProfile : 2' 'g_m3kMasterSavedProfile <= 6 ? g_m3kMasterSavedProfile : 2' 'master restore bounds'
 $vk=All $vk 'savedProfileRaw <= 5 ? savedProfileRaw : 2' 'savedProfileRaw <= 6 ? savedProfileRaw : 2' 'master INI bounds'
