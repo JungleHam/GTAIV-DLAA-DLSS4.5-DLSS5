@@ -144,6 +144,7 @@ jobs:
           Copy-Item .\install\Public-ReShade-UX-Master-Stage.ps1 "$tool\public-reshade-ux-master-stage.ps1" -Force
           Copy-Item .\install\Public-ReShade-UX-Master-Fixup.ps1 "$tool\public-reshade-ux-master-fixup.ps1" -Force
           Copy-Item .\install\Public-ReShade-UX-Master-V2-Fixup.ps1 "$tool\public-reshade-ux-master-v2-fixup.ps1" -Force
+          Copy-Item .\install\Public-DLSS-CustomScale-NR-Tuning-Stage.ps1 "$tool\public-dlss-customscale-nr-tuning-stage.ps1" -Force
           $build = "$tool\build-a3-s5.ps1"
           $text = [IO.File]::ReadAllText($build)
           $anchor = "& (Join-Path `$toolRoot 'a3-s5-startup-prime-stage.ps1') -GeneratedRoot `$generated"
@@ -153,7 +154,8 @@ jobs:
             "& (Join-Path `$toolRoot 'public-startup-prime-fix-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
             "& (Join-Path `$toolRoot 'public-reshade-ux-master-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
             "& (Join-Path `$toolRoot 'public-reshade-ux-master-fixup.ps1') -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
-            "& (Join-Path `$toolRoot 'public-reshade-ux-master-v2-fixup.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')"
+            "& (Join-Path `$toolRoot 'public-reshade-ux-master-v2-fixup.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-dlss-customscale-nr-tuning-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')"
           ) -join "`r`n"
           if (($text.Split($anchor).Count - 1) -ne 1) { throw 'Could not attach production stages exactly once' }
           [IO.File]::WriteAllText($build,$text.Replace($anchor,$replacement),[Text.UTF8Encoding]::new($false))
