@@ -94,6 +94,7 @@ static UINT g_m3kNrStyle=0, g_m3kNrAutoMask=1, g_m3kNrUiCorrection=0;
 static float g_m3kNrIntensity=1.0f, g_m3kNrLocalTone=1.0f, g_m3kNrLocalStructure=1.0f, g_m3kNrSkinStructure=1.0f;
 static UINT g_m3kCustomScalePercent=77;
 static bool g_m3kCustomScaleRejected=false;
+static float g_m3kSharpness=0.0f;
 '@
 $vk = Once $vk 'static UINT g_m3kNrPasses = 1;' $publicState 'public state'
 
@@ -131,6 +132,8 @@ $pollNew=@'
             g_m3kSrNeedsReset=true;
 #endif
         }
+        const float sharpness=M3kReadPublicFloat(path,L"Sharpness",0.0f);
+        g_m3kSharpness=sharpness<0.0f?0.0f:(sharpness>1.0f?1.0f:sharpness);
         const UINT rawScale=GetPrivateProfileIntW(L"M3K",L"CustomScalePercent",77,path);
         const UINT customScale=rawScale<10?10:(rawScale>100?100:rawScale);
         if(customScale!=g_m3kCustomScalePercent){
@@ -143,6 +146,12 @@ $vk=Once $vk 'g_m3k.Prepare(g_self, g.dev12, g.queue, g_m3kSrW, g_m3kSrH, g.crea
 $vk=Once $vk 'g_m3k.Prepare(g_self, g.dev12, g.queue, g.width, g.height, g.create_flags, g_m3kNrPasses);' 'g_m3k.Prepare(g_self,g.dev12,g.queue,g.width,g.height,g.create_flags,g_m3kNrPasses,g_m3kNrStyle,g_m3kNrIntensity,g_m3kNrLocalTone,g_m3kNrLocalStructure,g_m3kNrSkinStructure,g_m3kNrAutoMask,g_m3kNrUiCorrection);' 'native NR handoff'
 
 # ---- Profile 6 = custom percentage. Existing named profiles 0..5 are unchanged. ----
+$vk=All $vk 'case 0: return "DLAA Native";' 'case 0: return "DLAA Native (100%)";' 'DLAA percent label'
+$vk=All $vk 'case 2: return "Quality";' 'case 2: return "Quality (67%)";' 'Quality percent label'
+$vk=All $vk 'case 3: return "Balanced";' 'case 3: return "Balanced (58%)";' 'Balanced percent label'
+$vk=All $vk 'case 4: return "Performance";' 'case 4: return "Performance (50%)";' 'Performance percent label'
+$vk=All $vk 'case 5: return "Ultra Performance";' 'case 5: return "Ultra Performance (33%)";' 'Ultra Performance percent label'
+
 $profileNameNew = '        case 5: return "Ultra Performance";' + [Environment]::NewLine + '        case 6: return "Custom Render Scale";'
 $vk = Once $vk '        case 5: return "Ultra Performance";' $profileNameNew 'profile name'
 $vk=All $vk 'if (profile > 5) profile = 2;' 'if (profile > 6) profile = 2;' 'profile bounds'
@@ -155,25 +164,20 @@ $vk=All $vk 'g_m3kSrProfileRequested > 5' 'g_m3kSrProfileRequested > 6' 'prime r
 $findAt=$vk.IndexOf('static bool M3kReadManualRenderSize(UINT *manualW, UINT *manualH)',[StringComparison]::Ordinal)
 if($findAt -lt 0){throw 'custom contract insertion marker missing'}
 $finder=@'
-struct M3kCustomContract{NVSDK_NGX_PerfQuality_Value q;const char *name;const char *hint;UINT optW,optH,minW,minH,maxW,maxH;};
+struct M3kCustomContract{NVSDK_NGX_PerfQuality_Value q;const char *name;const char *hint;};
 static bool M3kFindCustomContract(UINT rw,UINT rh,UINT tw,UINT th,M3kCustomContract *out)
 {
-    struct C{NVSDK_NGX_PerfQuality_Value q;const char *name;const char *hint;};
-    static const C cs[]={
-        {NVSDK_NGX_PerfQuality_Value_MaxQuality,"Quality",NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_Quality},
-        {NVSDK_NGX_PerfQuality_Value_Balanced,"Balanced",NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_Balanced},
-        {NVSDK_NGX_PerfQuality_Value_MaxPerf,"Performance",NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_Performance},
-        {NVSDK_NGX_PerfQuality_Value_UltraPerformance,"Ultra Performance",NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_UltraPerformance}};
-    NVSDK_NGX_Parameter *caps=nullptr; const auto cr=NVSDK_NGX_D3D12_GetCapabilityParameters(&caps);
-    if(NVSDK_NGX_FAILED(cr)||!caps)return false;
-    bool found=false; UINT best=0xFFFFFFFFu; M3kCustomContract pick={};
-    for(const auto &c:cs){unsigned ow=0,oh=0,maxw=0,maxh=0,minw=0,minh=0;float sharp=0.0f;
-        const auto qr=NGX_DLSS_GET_OPTIMAL_SETTINGS(caps,tw,th,c.q,&ow,&oh,&maxw,&maxh,&minw,&minh,&sharp);
-        if(NVSDK_NGX_FAILED(qr)||!ow||!oh||rw<minw||rw>maxw||rh<minh||rh>maxh)continue;
-        const UINT dx=rw>ow?rw-ow:ow-rw,dy=rh>oh?rh-oh:oh-rh,score=dx+dy;
-        if(!found||score<best){found=true;best=score;pick={c.q,c.name,c.hint,ow,oh,minw,minh,maxw,maxh};}}
-    if(!found){Log("M3K-CUSTOM-SCALE: unsupported %ux%u -> %ux%u",rw,rh,tw,th);return false;}
-    if(out)*out=pick; return true;
+    if(!rw||!rh||!tw||!th)return false;
+    const float sx=static_cast<float>(rw)/static_cast<float>(tw);
+    const float sy=static_cast<float>(rh)/static_cast<float>(th);
+    const float scale=sx<sy?sx:sy;
+    M3kCustomContract pick={NVSDK_NGX_PerfQuality_Value_UltraPerformance,"Ultra Performance",NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_UltraPerformance};
+    if(scale>=0.625f) pick={NVSDK_NGX_PerfQuality_Value_MaxQuality,"Quality",NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_Quality};
+    else if(scale>=0.540f) pick={NVSDK_NGX_PerfQuality_Value_Balanced,"Balanced",NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_Balanced};
+    else if(scale>=0.415f) pick={NVSDK_NGX_PerfQuality_Value_MaxPerf,"Performance",NVSDK_NGX_Parameter_DLSS_Hint_Render_Preset_Performance};
+    if(out)*out=pick;
+    Log("M3K-CUSTOM-SCALE: FORCED %ux%u -> %ux%u (%.1f%%), attempting %s contract without NGX range pre-rejection",rw,rh,tw,th,scale*100.0f,pick.name);
+    return true;
 }
 
 '@
@@ -190,8 +194,7 @@ $customQueryInsert = @'
         const UINT p=g_m3kCustomScalePercent<10?10:(g_m3kCustomScalePercent>100?100:g_m3kCustomScalePercent);
         if(p>=100){*renderW=targetW;*renderH=targetH;return true;}
         const UINT rw=(targetW*p+50u)/100u,rh=(targetH*p+50u)/100u;
-        if(!M3kFindCustomContract(rw,rh,targetW,targetH,nullptr))return false;
-        *renderW=rw;*renderH=rh;Log("M3K-CUSTOM-SCALE: %u%% -> %ux%u",p,rw,rh);return true;
+        *renderW=rw;*renderH=rh;Log("M3K-CUSTOM-SCALE: forcing %u%% true source %ux%u -> %ux%u",p,rw,rh,targetW,targetH);return true;
     }
 '@
 $vk = $vk.Substring(0,$queryBodyEnd) + $customQueryInsert + $vk.Substring($queryBodyEnd)
@@ -205,6 +208,39 @@ $selectNew=@'
 $vk=Once $vk $select $selectNew 'custom feature contract'
 $vk=Once $vk 'const UINT fallback = g_m3kSrProfileApplied <= 5 ? g_m3kSrProfileApplied : 2;' 'const UINT fallback = (g_m3kSrProfileApplied <= 6 && g_m3kSrProfileApplied != 6) ? g_m3kSrProfileApplied : 2;' 'custom fallback'
 
+$customFailOld=@'
+        Log("M3K-SR-LIVE: %s feature create %s; keeping currently applied reconstruction",
+            M3kSrProfileName(g_m3kSrProfileRequested), crashed ? "crashed (caught)" : "failed");
+        return false;
+'@
+$customFailNew=@'
+        if(g_m3kSrProfileRequested==6)g_m3kCustomScaleRejected=true;
+        Log("M3K-SR-LIVE: %s feature create %s; keeping currently applied reconstruction",
+            M3kSrProfileName(g_m3kSrProfileRequested), crashed ? "crashed (caught)" : "failed");
+        return false;
+'@
+$vk=Once $vk $customFailOld $customFailNew 'custom actual-create failure status'
+
+$customSameDimsOld=@'
+        if (!M3kSwapToSrFeature(info.width, info.height, info.presenterWidth, info.presenterHeight))
+        {
+            Log("M3K-SR-LIVE: requested %s rejected; keeping %s",
+                M3kSrProfileName(wanted), M3kSrProfileName(g_m3kSrProfileApplied));
+            g_m3kSrProfileRequested = g_m3kSrProfileApplied;
+            M3kWriteSrProfileIni(g_m3kSrProfileRequested);
+        }
+'@
+$customSameDimsNew=@'
+        if (!M3kSwapToSrFeature(info.width, info.height, info.presenterWidth, info.presenterHeight))
+        {
+            Log("M3K-SR-LIVE: requested %s rejected by feature creation; keeping %s",
+                M3kSrProfileName(wanted), M3kSrProfileName(g_m3kSrProfileApplied));
+            if(wanted==6){g_m3kCustomScaleRejected=true;g_m3kSrLatchedFail=true;}
+            else {g_m3kSrProfileRequested = g_m3kSrProfileApplied;M3kWriteSrProfileIni(g_m3kSrProfileRequested);}
+        }
+'@
+$vk=Once $vk $customSameDimsOld $customSameDimsNew 'custom selector stability'
+
 # Public setters/getters are inserted at the final accessor left by the master stages.
 $api='static UINT M3kRequestedNrPasses() { return g_m3kNrPasses; }'
 $apiNew=@'
@@ -212,7 +248,9 @@ static void M3kWritePublicUInt(const wchar_t *key,UINT value){wchar_t path[MAX_P
 static void M3kWritePublicFloat(const wchar_t *key,float value){wchar_t path[MAX_PATH]={};if(!GetModuleFileNameW(g_self,path,MAX_PATH))return;if(wchar_t *s=wcsrchr(path,L'\\')){*(s+1)=0;wcscat_s(path,L"m3k-nr.ini");wchar_t t[32]={};_snwprintf_s(t,_TRUNCATE,L"%.3f",static_cast<double>(value));WritePrivateProfileStringW(L"M3K",key,t,path);}}
 static UINT M3kCustomScalePercent(){return g_m3kCustomScalePercent;} static bool M3kCustomScaleLastRejected(){return g_m3kCustomScaleRejected;}
 static UINT M3kScaleW(UINT p){return g.width?(g.width*p+50u)/100u:0;} static UINT M3kScaleH(UINT p){return g.height?(g.height*p+50u)/100u:0;}
-static void M3kApplyCustomScaleLive(UINT p){p=p<10?10:(p>100?100:p);if(p<100&&!M3kFindCustomContract(M3kScaleW(p),M3kScaleH(p),g.width,g.height,nullptr)){g_m3kCustomScaleRejected=true;return;}g_m3kCustomScaleRejected=false;g_m3kCustomScalePercent=p;M3kWritePublicUInt(L"CustomScalePercent",p);g_m3kResolutionPlanProfile=0xFFFFFFFFu;g_m3kResolutionPlanOutW=g_m3kResolutionPlanOutH=0;g_m3kResolutionConfirmedLogged=false;g_m3kSrLatchedFail=false;g_m3kSrNeedsReset=true;g_m3k.ResetHistory();M3kRequestSrProfileLive(p>=100?0:6);}
+static void M3kApplyCustomScaleLive(UINT p){p=p<10?10:(p>100?100:p);g_m3kCustomScaleRejected=false;g_m3kCustomScalePercent=p;M3kWritePublicUInt(L"CustomScalePercent",p);g_m3kResolutionPlanProfile=0xFFFFFFFFu;g_m3kResolutionPlanOutW=g_m3kResolutionPlanOutH=0;g_m3kResolutionConfirmedLogged=false;g_m3kSrLatchedFail=false;g_m3kSrNeedsReset=true;g_m3k.ResetHistory();M3kRequestSrProfileLive(p>=100?0:6);}
+static float M3kSharpnessRequested(){return g_m3kSharpness;}
+static void M3kRequestSharpnessLive(float value){value=value<0.0f?0.0f:(value>1.0f?1.0f:value);g_m3kSharpness=value;M3kWritePublicFloat(L"Sharpness",value);}
 static UINT M3kNrStyleRequested(){return g_m3kNrStyle;} static float M3kNrIntensityRequested(){return g_m3kNrIntensity;} static float M3kNrLocalToneRequested(){return g_m3kNrLocalTone;} static float M3kNrLocalStructureRequested(){return g_m3kNrLocalStructure;} static float M3kNrSkinStructureRequested(){return g_m3kNrSkinStructure;} static bool M3kNrAutoMaskRequested(){return g_m3kNrAutoMask!=0;} static bool M3kNrUiCorrectionRequested(){return g_m3kNrUiCorrection!=0;}
 static void M3kRequestNrTuningLive(UINT style,float intensity,float tone,float structure,float skin,bool mask,bool ui){style=style>2?0:style;intensity=intensity<0.0f?0.0f:(intensity>2.0f?2.0f:intensity);tone=tone<0.0f?0.0f:(tone>2.0f?2.0f:tone);structure=structure<0.0f?0.0f:(structure>2.0f?2.0f:structure);skin=skin<0.0f?0.0f:(skin>2.0f?2.0f:skin);g_m3kNrStyle=style;g_m3kNrIntensity=intensity;g_m3kNrLocalTone=tone;g_m3kNrLocalStructure=structure;g_m3kNrSkinStructure=skin;g_m3kNrAutoMask=mask?1u:0u;g_m3kNrUiCorrection=ui?1u:0u;M3kWritePublicUInt(L"NRStyle",style);M3kWritePublicFloat(L"NRIntensity",intensity);M3kWritePublicFloat(L"NRLocalTone",tone);M3kWritePublicFloat(L"NRLocalStructure",structure);M3kWritePublicFloat(L"NRSkinStructure",skin);M3kWritePublicUInt(L"NRAutoMask",g_m3kNrAutoMask);M3kWritePublicUInt(L"NRUICorrection",g_m3kNrUiCorrection);g_m3k.ResetHistory();g_m3kSrNeedsReset=true;}
 static UINT M3kRequestedNrPasses() { return g_m3kNrPasses; }
@@ -232,7 +270,7 @@ $ui=@'
         ImGui::SameLine(); ImGui::TextDisabled("%s",master?"ON":"OFF");
         ImGui::Separator(); ImGui::TextUnformatted("Reconstruction");
         ImGui::BeginDisabled(!master); int reconstruction=static_cast<int>(M3kRequestedSrProfile()); if(reconstruction<0||reconstruction>6)reconstruction=2;
-        const char *items="DLAA Native\0Custom Ultra Quality (77%)\0Quality\0Balanced\0Performance\0Ultra Performance\0Custom Render Scale\0\0";
+        const char *items="DLAA Native (100%)\0Custom Ultra Quality (77%)\0Quality (67%)\0Balanced (58%)\0Performance (50%)\0Ultra Performance (33%)\0Custom Render Scale\0\0";
         if(ImGui::Combo("Mode##M3KSRProfile",&reconstruction,items)){if(reconstruction==6)M3kApplyCustomScaleLive(M3kCustomScalePercent());else M3kRequestSrProfileLive(static_cast<UINT>(reconstruction));}
         ImGui::EndDisabled();
         const int saved=static_cast<int>(M3kCustomScalePercent()); static int draft=-1,seen=-1;
@@ -240,8 +278,12 @@ $ui=@'
         ImGui::BeginDisabled(!master); ImGui::SliderInt("Render Scale##M3KCustomScale",&draft,10,100,"%d%%");
         if(draft!=saved){ImGui::SameLine();if(ImGui::Button("Apply##M3KCustomScaleApply"))M3kApplyCustomScaleLive(static_cast<UINT>(draft));} ImGui::EndDisabled();
         if(draft>=100)ImGui::Text("100%% = DLAA Native (%u x %u)",M3kScaleW(100),M3kScaleH(100));else ImGui::Text("Custom preview: %d%% = %u x %u -> %u x %u",draft,M3kScaleW(static_cast<UINT>(draft)),M3kScaleH(static_cast<UINT>(draft)),g.width,g.height);
-        if(M3kCustomScaleLastRejected())ImGui::TextColored(ImVec4(1.0f,0.45f,0.35f,1.0f),"Unsupported by DLSS at this output; current mode kept.");
+        if(M3kCustomScaleLastRejected())ImGui::TextColored(ImVec4(1.0f,0.45f,0.35f,1.0f),"NVIDIA rejected feature creation at this forced scale; previous reconstruction is still displayed.");
         ImGui::Text("Current: %s",M3kSrProfileName(M3kAppliedSrProfile())); if(master&&M3kAppliedSrProfile()!=M3kRequestedSrProfile())ImGui::TextColored(ImVec4(1.0f,0.78f,0.25f,1.0f),"Applying %s...",M3kSrProfileName(M3kRequestedSrProfile()));
+
+        static float sharpDraft=-1.0f; if(sharpDraft<0.0f)sharpDraft=M3kSharpnessRequested();
+        ImGui::BeginDisabled(!master); ImGui::SliderFloat("Sharpness##M3KSharpness",&sharpDraft,0.0f,1.0f,"%.2f"); if(ImGui::IsItemDeactivatedAfterEdit())M3kRequestSharpnessLive(sharpDraft); ImGui::EndDisabled();
+        ImGui::TextDisabled("Post-reconstruction sharpening; 0.00 = off.");
 
         ImGui::Separator(); ImGui::TextUnformatted("Neural Rendering"); bool nr=M3kNrEnabledRequested(); ImGui::BeginDisabled(!master); if(ImGui::Checkbox("Enable Neural Rendering##M3KNrEnabled",&nr))M3kRequestNrEnabledLive(nr); ImGui::EndDisabled();
         if(ImGui::CollapsingHeader("Advanced##M3KAdvanced")){
@@ -254,6 +296,8 @@ $ui=@'
             ImGui::SliderFloat("Skin Structure##M3KNrSkin",&skin,0.0f,2.0f,"%.2f");if(ImGui::IsItemDeactivatedAfterEdit())M3kRequestNrTuningLive(M3kNrStyleRequested(),M3kNrIntensityRequested(),M3kNrLocalToneRequested(),M3kNrLocalStructureRequested(),skin,M3kNrAutoMaskRequested(),M3kNrUiCorrectionRequested());
             bool mask=M3kNrAutoMaskRequested();if(ImGui::Checkbox("Auto Mask##M3KNrAutoMask",&mask))M3kRequestNrTuningLive(M3kNrStyleRequested(),M3kNrIntensityRequested(),M3kNrLocalToneRequested(),M3kNrLocalStructureRequested(),M3kNrSkinStructureRequested(),mask,M3kNrUiCorrectionRequested());
             bool ui=M3kNrUiCorrectionRequested();if(ImGui::Checkbox("UI Correction##M3KNrUiCorrection",&ui))M3kRequestNrTuningLive(M3kNrStyleRequested(),M3kNrIntensityRequested(),M3kNrLocalToneRequested(),M3kNrLocalStructureRequested(),M3kNrSkinStructureRequested(),M3kNrAutoMaskRequested(),ui);
+            if(ImGui::Button("Reset NR Advanced##M3KNrReset")){i=1.0f;t=1.0f;s=1.0f;skin=1.0f;M3kRequestNrTuningLive(0,1.0f,1.0f,1.0f,1.0f,true,false);}
+            ImGui::SameLine();ImGui::TextDisabled("Default style, 1.00 strengths, Auto Mask on, UI Correction off");
             ImGui::Spacing(); const UINT requested=M3kRequestedNrPasses(); ImGui::TextUnformatted("Neural Rendering passes");
             for(UINT p=1;p<=5;++p){if(p>1)ImGui::SameLine();char label[24]={};_snprintf_s(label,sizeof(label),_TRUNCATE,"%u##M3KPass",p);if(ImGui::RadioButton(label,requested==p))M3kRequestNrPassesLive(p);} ImGui::Text("Active passes: %u",M3kActiveNrPasses()); ImGui::EndDisabled();}
         if(ImGui::CollapsingHeader("Diagnostics##M3KDiagnostics")){ImGui::Text("Requested render: %u x %u",M3kDesiredRenderWidth(),M3kDesiredRenderHeight());ImGui::Text("DXVK source: %u x %u",M3kCurrentSourceWidth(),M3kCurrentSourceHeight());ImGui::Text("Output: %u x %u",g.width,g.height);ImGui::Text("Saved custom scale: %u%%",M3kCustomScalePercent());ImGui::Text("NR style=%u intensity=%.2f tone=%.2f structure=%.2f skin=%.2f",M3kNrStyleRequested(),M3kNrIntensityRequested(),M3kNrLocalToneRequested(),M3kNrLocalStructureRequested(),M3kNrSkinStructureRequested());}
@@ -262,10 +306,41 @@ $ui=@'
 '@
 $feed=$feed.Substring(0,$start)+$ui+$feed.Substring($end)
 
+$sharpenFnMarker='static void OnRenderTechnique(reshade::api::effect_runtime *rt, reshade::api::effect_technique technique,'
+$sharpenFnAt=$feed.IndexOf($sharpenFnMarker,[StringComparison]::Ordinal)
+if($sharpenFnAt -lt 0){throw 'sharpen OnRenderTechnique marker missing'}
+$sharpenHelpers=@'
+static reshade::api::effect_runtime *g_m3kSharpenRuntime=nullptr;
+static reshade::api::effect_technique g_m3kSharpenTechnique={};
+static reshade::api::effect_uniform_variable g_m3kSharpenUniform={};
+static ULONGLONG g_m3kSharpenNextResolve=0;
+
+static void M3kResolveSharpen(reshade::api::effect_runtime *rt)
+{
+    const ULONGLONG now=GetTickCount64();
+    if(rt==g_m3kSharpenRuntime && now<g_m3kSharpenNextResolve)return;
+    g_m3kSharpenRuntime=rt;g_m3kSharpenNextResolve=now+1000;
+    g_m3kSharpenTechnique=rt->find_technique("M3K_Sharpen.fx","M3K_Sharpen");
+    g_m3kSharpenUniform=rt->find_uniform_variable("M3K_Sharpen.fx","M3K_Sharpness");
+}
+
+static void M3kRunSharpen(reshade::api::effect_runtime *rt,reshade::api::command_list *cl,reshade::api::resource_view rtv,reshade::api::resource_view rtv_srgb)
+{
+    const float strength=M3kSharpnessRequested();if(strength<=0.0f)return;
+    M3kResolveSharpen(rt);if(g_m3kSharpenTechnique.handle==0||g_m3kSharpenUniform.handle==0)return;
+    rt->set_uniform_value_float(g_m3kSharpenUniform,strength);
+    rt->render_technique(g_m3kSharpenTechnique,cl,rtv,rtv_srgb);
+}
+
+'@
+$feed=$feed.Substring(0,$sharpenFnAt)+$sharpenHelpers+$feed.Substring($sharpenFnAt)
+$feed=Once $feed '                              reshade::api::resource_view /*rtv_srgb*/)' '                              reshade::api::resource_view rtv_srgb)' 'sharpen rtv_srgb'
+$feed=Once $feed '    FeedFrame(rt, cl, rtv);' ('    FeedFrame(rt, cl, rtv);' + [Environment]::NewLine + '    M3kRunSharpen(rt, cl, rtv, rtv_srgb);') 'post-DLSS sharpen invocation'
+
 [IO.File]::WriteAllText($nrPath,$nr,[Text.UTF8Encoding]::new($false))
 [IO.File]::WriteAllText($vkPath,$vk,[Text.UTF8Encoding]::new($false))
 [IO.File]::WriteAllText($FeederSource,$feed,[Text.UTF8Encoding]::new($false))
 $verify=$nr+$vk+$feed
-foreach($m in @('case 6: return "Custom Render Scale";','M3K-CUSTOM-SCALE:','Apply##M3KCustomScaleApply','NR Style##M3KNrStyle','Default\0Natural\0Cinematic','DLSSNR.Intensity','DLSSNR.LocalToneStrength','DLSSNR.LocalStructureStrength','DLSSNR.SkinStructureStrength','DLSSNR.UseAutoMask','DLSSNR.UICorrection')){if($verify.IndexOf($m,[StringComparison]::Ordinal)-lt 0){throw "Missing verification marker: $m"}}
+foreach($m in @('case 6: return "Custom Render Scale";','M3K-CUSTOM-SCALE:','Apply##M3KCustomScaleApply','NR Style##M3KNrStyle','Default\0Natural\0Cinematic','DLSSNR.Intensity','DLSSNR.LocalToneStrength','DLSSNR.LocalStructureStrength','DLSSNR.SkinStructureStrength','DLSSNR.UseAutoMask','DLSSNR.UICorrection','M3K_Sharpen.fx','M3kRunSharpen','Reset NR Advanced##M3KNrReset','Quality (67%)','FORCED %ux%u')){if($verify.IndexOf($m,[StringComparison]::Ordinal)-lt 0){throw "Missing verification marker: $m"}}
 foreach($bad in @('if (profile > 5) profile = 2;','g_m3kMasterSavedProfile <= 5 ? g_m3kMasterSavedProfile : 2','savedProfileRaw <= 5 ? savedProfileRaw : 2','requestedSrProfile <= 5 ? requestedSrProfile : 2','g_m3kStartupPrimeInitialProfile <= 5','g_m3kSrProfileRequested > 5','if (profile < 1 || profile > 5) return false;')){if($verify.IndexOf($bad,[StringComparison]::Ordinal)-ge 0){throw "Stale SR bound remains: $bad"}}
 Write-Host 'Next controls ready: Apply-only custom DLSS scale + NR style/tuning.'
