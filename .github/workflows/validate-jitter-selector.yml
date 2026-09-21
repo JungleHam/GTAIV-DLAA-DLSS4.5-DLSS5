@@ -1,0 +1,91 @@
+name: Validate jitter selector
+
+on:
+  push:
+    branches: [ feature/dlss-custom-scale-nr-controls ]
+    paths:
+      - '.github/workflows/validate-jitter-selector.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout frozen project core
+        shell: pwsh
+        run: |
+          git clone --filter=blob:none https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5.git _project
+          git -C _project checkout 57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f
+
+      - name: Build jitter-selector x86 bridge client
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          git clone --filter=blob:none https://github.com/gutbash/b-bridge.git _bbridge
+          git -C _bbridge checkout 1dad5e6d4dcf8647e354aa9a87f611256fb61142
+          git -C _bbridge submodule update --init --recursive
+
+          python .\_project\tools\m3k-nr\a2-s21-bbridge-ui.py .\_bbridge
+          python .\_project\tools\m3k-nr\a3-s2-bbridge-coherent-draw-jitter.py .\_bbridge
+          python .\install\Public-BBridge-Jitter-Viewport-Tolerance.py .\_bbridge
+          git -C _bbridge diff --check
+
+          python -m pip install --disable-pip-version-check meson==0.64.1 ninja==1.11.1.1
+          Push-Location _bbridge
+          . .\build_common.ps1
+          SetupVS -Platform x86
+          meson setup --buildtype release --backend ninja _build32 --debug
+          Copy-Item .\Directory.Build.Props .\_build32 -Force
+          meson compile -C _build32 d3d9
+          if ($LASTEXITCODE -ne 0) { throw "x86 bridge build failed: $LASTEXITCODE" }
+          $client=(Resolve-Path '.\_build32\src\client\d3d9.dll').Path
+          Pop-Location
+
+          New-Item -ItemType Directory -Path .\candidate -Force | Out-Null
+          Copy-Item $client .\candidate\d3d9.dll -Force
+
+      - name: Attach production feeder stages
+        shell: pwsh
+        run: |
+          $tool = '.\_project\tools\m3k-nr'
+          Copy-Item .\install\Public-ReShade-Controls-Stage.ps1 "$tool\public-reshade-controls-stage.ps1" -Force
+          Copy-Item .\install\Public-Startup-Prime-Fix-Stage.ps1 "$tool\public-startup-prime-fix-stage.ps1" -Force
+          Copy-Item .\install\Public-ReShade-UX-Master-Stage.ps1 "$tool\public-reshade-ux-master-stage.ps1" -Force
+          Copy-Item .\install\Public-ReShade-UX-Master-Fixup.ps1 "$tool\public-reshade-ux-master-fixup.ps1" -Force
+          Copy-Item .\install\Public-ReShade-UX-Master-V2-Fixup.ps1 "$tool\public-reshade-ux-master-v2-fixup.ps1" -Force
+          Copy-Item .\install\Public-DLSS-CustomScale-NR-Tuning-Stage.ps1 "$tool\public-dlss-customscale-nr-tuning-stage.ps1" -Force
+
+          $build = "$tool\build-a3-s5.ps1"
+          $text = [IO.File]::ReadAllText($build)
+          $anchor = "& (Join-Path `$toolRoot 'a3-s5-startup-prime-stage.ps1') -GeneratedRoot `$generated"
+          $replacement = @(
+            $anchor,
+            "& (Join-Path `$toolRoot 'public-reshade-controls-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-startup-prime-fix-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-reshade-ux-master-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-reshade-ux-master-fixup.ps1') -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-reshade-ux-master-v2-fixup.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-dlss-customscale-nr-tuning-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')"
+          ) -join "`r`n"
+          if (($text.Split($anchor).Count - 1) -ne 1) { throw 'Could not attach production stages exactly once' }
+          [IO.File]::WriteAllText($build,$text.Replace($anchor,$replacement),[Text.UTF8Encoding]::new($false))
+
+      - name: Build jitter-selector feeder
+        shell: pwsh
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\_project\tools\m3k-nr\build-a3-s5.ps1
+          if ($LASTEXITCODE -ne 0) { throw "Feeder build failed: $LASTEXITCODE" }
+          Copy-Item .\_project\tools\m3k-nr\out-m3k-a3-s5\dlss5-feed.addon64 .\candidate\dlss5-feed.addon64 -Force
+          Copy-Item .\install\M3K_Sharpen.fx .\candidate\M3K_Sharpen.fx -Force
+          Get-FileHash -Algorithm SHA256 .\candidate\* | Format-Table -AutoSize
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jitter-selector-candidate
+          path: candidate/**
