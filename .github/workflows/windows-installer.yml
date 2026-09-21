@@ -24,6 +24,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Validate embedded PowerShell tokenization
+        shell: pwsh
+        run: |
+          $paths = @(
+            '.\install\Install-DLSS-Full.bat',
+            '.\install\core\Install-DLAA-Core.bat',
+            '.\install\Install-DLAA.bat',
+            '.\install\core\Install-DLSS-Full-Core.bat'
+          )
+          foreach ($path in $paths) {
+            $text = [IO.File]::ReadAllText($path)
+            if ($text -match 'return\[') {
+              throw "Invalid PowerShell tokenization found in $path : return["
+            }
+          }
+
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup --no-progress -y
