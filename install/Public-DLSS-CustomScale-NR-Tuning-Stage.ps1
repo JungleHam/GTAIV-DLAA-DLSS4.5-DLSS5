@@ -416,6 +416,22 @@ static void M3kSyncSharpenUniform(reshade::api::effect_runtime *rt)
 
 '@
 $feed=$feed.Substring(0,$sharpenFnAt)+$sharpenHelpers+$feed.Substring($sharpenFnAt)
+$renderOld=@'
+    g_bound_last_render = GetTickCount64();
+    FeedFrame(rt, cl, rtv);
+'@
+$renderNew=@'
+    g_bound_last_render = GetTickCount64();
+    if(M3kRuntimeChurnHeld())
+    {
+        static ULONGLONG lastHoldLog=0;
+        const ULONGLONG now=GetTickCount64();
+        if(now-lastHoldLog>=500){lastHoldLog=now;Log("M3K-SAFE-RESIZE: DLSS submission skipped while ReShade runtime churn settles");}
+        return;
+    }
+    FeedFrame(rt, cl, rtv);
+'@
+$feed=Once $feed $renderOld $renderNew 'quarantine FeedFrame during runtime churn'
 $feed=Once $feed '    FeedFrame(rt, cl, rtv);' ('    FeedFrame(rt, cl, rtv);' + [Environment]::NewLine + '    M3kSyncSharpenUniform(rt);') 'post-DLSS sharpen uniform sync'
 
 # ---- Vulkan resize/runtime-churn safety: never ReleaseFeature from inside ReShade runtime destruction. ----
@@ -434,6 +450,20 @@ $deferAt=$feed.IndexOf($deferAnchor,[StringComparison]::Ordinal)
 if($deferAt -lt 0){throw 'runtime-destroy safety anchor missing'}
 $deferHelpers=@'
 static NVSDK_NGX_Handle *g_m3kDeferredRuntimeChurnFeature=nullptr;
+static volatile LONG64 g_m3kRuntimeChurnHoldUntil=0;
+
+static void M3kArmRuntimeChurnHold()
+{
+    const LONG64 until=static_cast<LONG64>(GetTickCount64()+1800ull);
+    InterlockedExchange64(&g_m3kRuntimeChurnHoldUntil,until);
+    Log("M3K-SAFE-RESIZE: runtime churn quarantine armed for 1800 ms; DLSS submissions paused");
+}
+
+static bool M3kRuntimeChurnHeld()
+{
+    const LONG64 until=InterlockedCompareExchange64(&g_m3kRuntimeChurnHoldUntil,0,0);
+    return until>0 && static_cast<LONG64>(GetTickCount64())<until;
+}
 
 static void M3kDeferRuntimeChurnFeatureRelease()
 {
@@ -475,6 +505,7 @@ $destroyNew=@'
     }
 '@
 $feed=Once $feed $destroyOld $destroyNew 'defer feature release during Vulkan runtime destruction'
+$feed=Once $feed '    if (!was_bound) return;' ('    if (!was_bound) return;' + [Environment]::NewLine + '    M3kArmRuntimeChurnHold();') 'arm runtime churn quarantine'
 
 $vkBuildOld=@'
     if (ok && needs_build_vk)
@@ -495,6 +526,6 @@ $feed=Once $feed $vkBuildOld $vkBuildNew 'release deferred feature only after fr
 [IO.File]::WriteAllText($vkPath,$vk,[Text.UTF8Encoding]::new($false))
 [IO.File]::WriteAllText($FeederSource,$feed,[Text.UTF8Encoding]::new($false))
 $verify=$nr+$vk+$feed
-foreach($m in @('case 6: return "Custom Render Scale";','M3K-CUSTOM-SCALE:','Apply##M3KCustomScaleApply','NR Style##M3KNrStyle','Default\0Natural\0Cinematic','DLSSNR.Intensity','DLSSNR.LocalToneStrength','DLSSNR.LocalStructureStrength','DLSSNR.SkinStructureStrength','DLSSNR.UseAutoMask','DLSSNR.UICorrection','M3K_Sharpen.fx','M3kSyncSharpenUniform','Sharpening##M3KSharpness','M3K-DLAA-JITTER:','dlaa.InJitterOffsetX','M3K-SAFE-RESIZE:','M3kReleaseDeferredRuntimeChurnFeature','Jitter Sequence##M3KJitterPhases','M3kComputeAutoJitterPhases','Reset NR Advanced##M3KNrReset','Quality (67%)','FORCED %ux%u')){if($verify.IndexOf($m,[StringComparison]::Ordinal)-lt 0){throw "Missing verification marker: $m"}}
+foreach($m in @('case 6: return "Custom Render Scale";','M3K-CUSTOM-SCALE:','Apply##M3KCustomScaleApply','NR Style##M3KNrStyle','Default\0Natural\0Cinematic','DLSSNR.Intensity','DLSSNR.LocalToneStrength','DLSSNR.LocalStructureStrength','DLSSNR.SkinStructureStrength','DLSSNR.UseAutoMask','DLSSNR.UICorrection','M3K_Sharpen.fx','M3kSyncSharpenUniform','Sharpening##M3KSharpness','M3K-DLAA-JITTER:','dlaa.InJitterOffsetX','M3K-SAFE-RESIZE:','M3kReleaseDeferredRuntimeChurnFeature','M3kRuntimeChurnHeld','runtime churn quarantine armed','Jitter Sequence##M3KJitterPhases','M3kComputeAutoJitterPhases','Reset NR Advanced##M3KNrReset','Quality (67%)','FORCED %ux%u')){if($verify.IndexOf($m,[StringComparison]::Ordinal)-lt 0){throw "Missing verification marker: $m"}}
 foreach($bad in @('if (profile > 5) profile = 2;','g_m3kMasterSavedProfile <= 5 ? g_m3kMasterSavedProfile : 2','savedProfileRaw <= 5 ? savedProfileRaw : 2','requestedSrProfile <= 5 ? requestedSrProfile : 2','g_m3kStartupPrimeInitialProfile <= 5','g_m3kSrProfileRequested > 5','if (profile < 1 || profile > 5) return false;')){if($verify.IndexOf($bad,[StringComparison]::Ordinal)-ge 0){throw "Stale SR bound remains: $bad"}}
 Write-Host 'Next controls ready: Apply-only custom DLSS scale + NR style/tuning.'
