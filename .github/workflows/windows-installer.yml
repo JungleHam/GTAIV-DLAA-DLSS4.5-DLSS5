@@ -3,7 +3,7 @@ name: Build GTA IV DLSS Windows installer
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: [ main, hotfix/v1.0.0-installer-return-space ]
     paths:
       - 'installer/**'
       - 'install/core/Install-DLAA-Core.bat'
@@ -23,6 +23,23 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+
+      - name: Validate embedded PowerShell tokenization
+        shell: pwsh
+        run: |
+          $paths = @(
+            '.\install\Install-DLSS-Full.bat',
+            '.\install\core\Install-DLAA-Core.bat',
+            '.\install\Install-DLAA.bat',
+            '.\install\core\Install-DLSS-Full-Core.bat'
+          )
+          foreach ($path in $paths) {
+            $text = [IO.File]::ReadAllText($path)
+            if ($text -match 'return\[') {
+              throw "Invalid PowerShell tokenization found in $path : return["
+            }
+          }
+          Write-Host 'Embedded PowerShell return casts look valid.'
 
       - name: Install Inno Setup
         shell: pwsh
