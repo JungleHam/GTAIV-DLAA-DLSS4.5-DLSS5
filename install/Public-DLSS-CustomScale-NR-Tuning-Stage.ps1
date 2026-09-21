@@ -278,7 +278,6 @@ $ui=@'
         static float sharpDraft=-1.0f; if(sharpDraft<0.0f)sharpDraft=M3kSharpnessRequested();
         ImGui::BeginDisabled(!master); ImGui::SliderFloat("Sharpness##M3KSharpness",&sharpDraft,0.0f,1.0f,"%.2f"); if(ImGui::IsItemDeactivatedAfterEdit())M3kRequestSharpnessLive(sharpDraft); ImGui::EndDisabled();
         ImGui::TextDisabled("Post-reconstruction sharpening; 0.00 = off.");
-        if(!g_m3kSharpenTechniqueReady||!g_m3kSharpenUniformReady)ImGui::TextColored(ImVec4(1.0f,0.45f,0.35f,1.0f),"Sharpen pass: NOT LOADED"); else if(!g_m3kSharpenTechniqueEnabled)ImGui::TextColored(ImVec4(1.0f,0.78f,0.25f,1.0f),"Sharpen pass: DISABLED IN PRESET"); else ImGui::TextDisabled("Sharpen pass: ACTIVE (%.2f)",g_m3kSharpenPushed);
 
         ImGui::Separator(); ImGui::TextUnformatted("Neural Rendering"); bool nr=M3kNrEnabledRequested(); ImGui::BeginDisabled(!master); if(ImGui::Checkbox("Enable Neural Rendering##M3KNrEnabled",&nr))M3kRequestNrEnabledLive(nr); ImGui::EndDisabled();
         if(ImGui::CollapsingHeader("Advanced##M3KAdvanced")){
@@ -305,46 +304,37 @@ $sharpenFnMarker='static void OnRenderTechnique(reshade::api::effect_runtime *rt
 $sharpenFnAt=$feed.IndexOf($sharpenFnMarker,[StringComparison]::Ordinal)
 if($sharpenFnAt -lt 0){throw 'sharpen OnRenderTechnique marker missing'}
 $sharpenHelpers=@'
-static bool g_m3kSharpenTechniqueReady=false;
-static bool g_m3kSharpenUniformReady=false;
-static bool g_m3kSharpenTechniqueEnabled=false;
-static float g_m3kSharpenPushed=-1.0f;
 static reshade::api::effect_runtime *g_m3kSharpenRuntime=nullptr;
 static reshade::api::effect_technique g_m3kSharpenTechnique={};
 static reshade::api::effect_uniform_variable g_m3kSharpenUniform={};
 static ULONGLONG g_m3kSharpenNextResolve=0;
 
-static void M3kSyncSharpen(reshade::api::effect_runtime *rt)
+static void M3kResolveSharpen(reshade::api::effect_runtime *rt)
 {
     const ULONGLONG now=GetTickCount64();
-    if(rt!=g_m3kSharpenRuntime || now>=g_m3kSharpenNextResolve)
-    {
-        g_m3kSharpenRuntime=rt;g_m3kSharpenNextResolve=now+1000;
-        g_m3kSharpenTechnique=rt->find_technique("M3K_Sharpen.fx","M3K_Sharpen");
-        g_m3kSharpenUniform=rt->find_uniform_variable("M3K_Sharpen.fx","M3K_Sharpness");
-        g_m3kSharpenTechniqueReady=g_m3kSharpenTechnique.handle!=0;
-        g_m3kSharpenUniformReady=g_m3kSharpenUniform.handle!=0;
-        g_m3kSharpenTechniqueEnabled=g_m3kSharpenTechniqueReady && rt->get_technique_state(g_m3kSharpenTechnique);
-        if(!g_m3kSharpenTechniqueReady||!g_m3kSharpenUniformReady)
-            Log("M3K-SHARPEN: effect unresolved technique=%u uniform=%u",g_m3kSharpenTechniqueReady?1u:0u,g_m3kSharpenUniformReady?1u:0u);
-        else if(!g_m3kSharpenTechniqueEnabled)
-            Log("M3K-SHARPEN: effect is loaded but disabled in preset; enable M3K_Sharpen after DLSS5_Feed");
-    }
-    if(g_m3kSharpenUniformReady)
-    {
-        const float strength=M3kSharpnessRequested();
-        if(strength!=g_m3kSharpenPushed){rt->set_uniform_value_float(g_m3kSharpenUniform,strength);g_m3kSharpenPushed=strength;Log("M3K-SHARPEN: strength %.2f",strength);}
-    }
+    if(rt==g_m3kSharpenRuntime && now<g_m3kSharpenNextResolve)return;
+    g_m3kSharpenRuntime=rt;g_m3kSharpenNextResolve=now+1000;
+    g_m3kSharpenTechnique=rt->find_technique("M3K_Sharpen.fx","M3K_Sharpen");
+    g_m3kSharpenUniform=rt->find_uniform_variable("M3K_Sharpen.fx","M3K_Sharpness");
+}
+
+static void M3kRunSharpen(reshade::api::effect_runtime *rt,reshade::api::command_list *cl,reshade::api::resource_view rtv,reshade::api::resource_view rtv_srgb)
+{
+    const float strength=M3kSharpnessRequested();if(strength<=0.0f)return;
+    M3kResolveSharpen(rt);if(g_m3kSharpenTechnique.handle==0||g_m3kSharpenUniform.handle==0)return;
+    rt->set_uniform_value_float(g_m3kSharpenUniform,strength);
+    rt->render_technique(g_m3kSharpenTechnique,cl,rtv,rtv_srgb);
 }
 
 '@
 $feed=$feed.Substring(0,$sharpenFnAt)+$sharpenHelpers+$feed.Substring($sharpenFnAt)
-$feed=Once $feed '    FeedFrame(rt, cl, rtv);' ('    FeedFrame(rt, cl, rtv);' + [Environment]::NewLine + '    M3kSyncSharpen(rt);') 'post-DLSS sharpen control sync'
+$feed=Once $feed '                              reshade::api::resource_view /*rtv_srgb*/)' '                              reshade::api::resource_view rtv_srgb)' 'sharpen rtv_srgb'
+$feed=Once $feed '    FeedFrame(rt, cl, rtv);' ('    FeedFrame(rt, cl, rtv);' + [Environment]::NewLine + '    M3kRunSharpen(rt, cl, rtv, rtv_srgb);') 'post-DLSS sharpen invocation'
 
 [IO.File]::WriteAllText($nrPath,$nr,[Text.UTF8Encoding]::new($false))
 [IO.File]::WriteAllText($vkPath,$vk,[Text.UTF8Encoding]::new($false))
 [IO.File]::WriteAllText($FeederSource,$feed,[Text.UTF8Encoding]::new($false))
 $verify=$nr+$vk+$feed
-foreach($m in @('case 6: return "Custom Render Scale";','M3K-CUSTOM-SCALE:','Apply##M3KCustomScaleApply','NR Style##M3KNrStyle','Default\0Natural\0Cinematic','DLSSNR.Intensity','DLSSNR.LocalToneStrength','DLSSNR.LocalStructureStrength','DLSSNR.SkinStructureStrength','DLSSNR.UseAutoMask','DLSSNR.UICorrection','M3K_Sharpen.fx','M3kSyncSharpen','Sharpen pass: ACTIVE','Reset NR Advanced##M3KNrReset','Quality (67%)','FORCED %ux%u')){if($verify.IndexOf($m,[StringComparison]::Ordinal)-lt 0){throw "Missing verification marker: $m"}}
+foreach($m in @('case 6: return "Custom Render Scale";','M3K-CUSTOM-SCALE:','Apply##M3KCustomScaleApply','NR Style##M3KNrStyle','Default\0Natural\0Cinematic','DLSSNR.Intensity','DLSSNR.LocalToneStrength','DLSSNR.LocalStructureStrength','DLSSNR.SkinStructureStrength','DLSSNR.UseAutoMask','DLSSNR.UICorrection','M3K_Sharpen.fx','M3kRunSharpen','Reset NR Advanced##M3KNrReset','Quality (67%)','FORCED %ux%u')){if($verify.IndexOf($m,[StringComparison]::Ordinal)-lt 0){throw "Missing verification marker: $m"}}
 foreach($bad in @('if (profile > 5) profile = 2;','g_m3kMasterSavedProfile <= 5 ? g_m3kMasterSavedProfile : 2','savedProfileRaw <= 5 ? savedProfileRaw : 2','requestedSrProfile <= 5 ? requestedSrProfile : 2','g_m3kStartupPrimeInitialProfile <= 5','g_m3kSrProfileRequested > 5','if (profile < 1 || profile > 5) return false;')){if($verify.IndexOf($bad,[StringComparison]::Ordinal)-ge 0){throw "Stale SR bound remains: $bad"}}
 Write-Host 'Next controls ready: Apply-only custom DLSS scale + NR style/tuning.'
