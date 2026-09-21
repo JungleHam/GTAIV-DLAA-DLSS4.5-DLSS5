@@ -178,16 +178,14 @@ static bool M3kFindCustomContract(UINT rw,UINT rh,UINT tw,UINT th,M3kCustomContr
 
 '@
 $vk=$vk.Substring(0,$findAt)+$finder+$vk.Substring($findAt)
-$queryHead=@'
-static bool M3kQueryProfileRenderSize(UINT profile, UINT targetW, UINT targetH, UINT *renderW, UINT *renderH)
-{
-    if (!renderW || !renderH || !targetW || !targetH) return false;
-    UINT manualW = 0, manualH = 0;
-'@
-$queryHeadNew=@'
-static bool M3kQueryProfileRenderSize(UINT profile, UINT targetW, UINT targetH, UINT *renderW, UINT *renderH)
-{
-    if (!renderW || !renderH || !targetW || !targetH) return false;
+$queryFn = 'static bool M3kQueryProfileRenderSize(UINT profile, UINT targetW, UINT targetH, UINT *renderW, UINT *renderH)'
+$queryAt = $vk.IndexOf($queryFn,[StringComparison]::Ordinal)
+if($queryAt -lt 0){throw 'custom size query function missing'}
+$queryBodyAt = $vk.IndexOf('    if (!renderW || !renderH || !targetW || !targetH) return false;',$queryAt,[StringComparison]::Ordinal)
+if($queryBodyAt -lt 0){throw 'custom size query validity line missing'}
+$queryBodyEnd = $queryBodyAt + '    if (!renderW || !renderH || !targetW || !targetH) return false;'.Length
+$customQueryInsert = @'
+
     if(profile==6){
         const UINT p=g_m3kCustomScalePercent<10?10:(g_m3kCustomScalePercent>100?100:g_m3kCustomScalePercent);
         if(p>=100){*renderW=targetW;*renderH=targetH;return true;}
@@ -195,9 +193,8 @@ static bool M3kQueryProfileRenderSize(UINT profile, UINT targetW, UINT targetH, 
         if(!M3kFindCustomContract(rw,rh,targetW,targetH,nullptr))return false;
         *renderW=rw;*renderH=rh;Log("M3K-CUSTOM-SCALE: %u%% -> %ux%u",p,rw,rh);return true;
     }
-    UINT manualW = 0, manualH = 0;
 '@
-$vk=Once $vk $queryHead $queryHeadNew 'custom size query'
+$vk = $vk.Substring(0,$queryBodyEnd) + $customQueryInsert + $vk.Substring($queryBodyEnd)
 $select='    if (profile < 1 || profile > 5) return false;'
 $selectNew=@'
     if (profile < 1 || profile > 6) return false;
