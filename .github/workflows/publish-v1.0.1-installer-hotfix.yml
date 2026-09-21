@@ -1,0 +1,92 @@
+name: Publish v1.0.1 installer hotfix
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/publish-v1.0.1-installer-hotfix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate hotfix source
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          foreach ($path in @(
+            '.\install\Install-DLSS-Full.bat',
+            '.\install\core\Install-DLAA-Core.bat',
+            '.\install\Install-DLAA.bat',
+            '.\install\core\Install-DLSS-Full-Core.bat'
+          )) {
+            $text = [IO.File]::ReadAllText($path)
+            if ($text -match 'return\[') { throw "Invalid PowerShell tokenization remains in $path" }
+          }
+          if (([IO.File]::ReadAllText('.\install\Install-DLSS-Full.bat')) -notmatch 'return \[string\]\$asset\.browser_download_url') { throw 'Corrected DLSS Full return cast was not found.' }
+          if (([IO.File]::ReadAllText('.\install\core\Install-DLAA-Core.bat')) -notmatch 'return \[string\]\$asset\.browser_download_url') { throw 'Corrected DLAA Core return cast was not found.' }
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Compile corrected setup
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) { throw 'ISCC.exe was not found.' }
+          & $iscc .\installer\GTAIV-DLSS-Setup.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup compile failed: $LASTEXITCODE" }
+          $exe = '.\installer\out\GTAIV-DLSS-Setup.exe'
+          if (-not (Test-Path $exe)) { throw 'Compiled installer is missing.' }
+          $hash = (Get-FileHash -Algorithm SHA256 $exe).Hash.ToUpperInvariant()
+          Write-Host "Corrected installer SHA256: $hash" -ForegroundColor Green
+          $hash | Set-Content .\installer\out\GTAIV-DLSS-Setup.sha256 -Encoding ASCII
+
+      - name: Fetch frozen v1.0.0 runtime assets
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Path .\release-assets -Force | Out-Null
+          gh release download v1.0.0 --repo "$env:GITHUB_REPOSITORY" --pattern "GTAIV-DLSS-Full-Runtime.zip" --pattern "ReShade64-bbridge.dll" --dir .\release-assets
+          $runtime = '.\release-assets\GTAIV-DLSS-Full-Runtime.zip'
+          $reshade = '.\release-assets\ReShade64-bbridge.dll'
+          if ((Get-FileHash -Algorithm SHA256 $runtime).Hash.ToUpperInvariant() -ne '7560102921FFD2FFFEBB7A76763F87B4F0A7DD994B27B49C6BCBC3FBD9F06BA4') { throw 'Frozen v1.0.0 runtime hash mismatch.' }
+          if ((Get-FileHash -Algorithm SHA256 $reshade).Hash.ToUpperInvariant() -ne 'D5BD8CB2B6E935506888EA71711361B9AFCD72ED7C70926C0F52E8F8E47C7510') { throw 'Frozen v1.0.0 ReShade patch hash mismatch.' }
+
+      - name: Publish v1.0.1
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          gh release view v1.0.1 --repo "$env:GITHUB_REPOSITORY" *> $null
+          if ($LASTEXITCODE -eq 0) { throw 'v1.0.1 already exists; refusing to overwrite it.' }
+          @'
+          # v1.0.1 — Installer hotfix
+
+          Fixes the public setup failure caused by invalid embedded PowerShell tokenization.
+
+          Broken: return[string]$asset.browser_download_url
+          Fixed:  return [string]$asset.browser_download_url
+
+          The rendering/runtime payload is unchanged from v1.0.0. The v1.0.0 runtime ZIP and ReShade input patch are copied byte-for-byte and SHA256-verified before publishing.
+
+          No DLSS, DLAA, Neural Rendering, bridge, presenter, or ReShade runtime behavior changed in this hotfix.
+          '@ | Set-Content .\release-notes.md -Encoding UTF8
+          $files = @(
+            '.\installer\out\GTAIV-DLSS-Setup.exe',
+            '.\installer\out\GTAIV-DLSS-Setup.sha256',
+            '.\release-assets\GTAIV-DLSS-Full-Runtime.zip',
+            '.\release-assets\ReShade64-bbridge.dll'
+          )
+          gh release create v1.0.1 $files --repo "$env:GITHUB_REPOSITORY" --target "$env:GITHUB_SHA" --title "v1.0.1 — Installer hotfix" --notes-file .\release-notes.md --latest
