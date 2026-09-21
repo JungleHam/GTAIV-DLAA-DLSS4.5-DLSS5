@@ -252,18 +252,6 @@ static UINT M3kRequestedNrPasses() { return g_m3kNrPasses; }
 $vk=Once $vk $api $apiNew 'public API'
 
 # ---- Replace the final compact panel. Slider edits are staged; only Apply changes render size. ----
-$sharpenUiStateMarker='static void DrawOverlay(reshade::api::effect_runtime *rt)'
-$sharpenUiStateAt=$feed.IndexOf($sharpenUiStateMarker,[StringComparison]::Ordinal)
-if($sharpenUiStateAt -lt 0){throw 'sharpen UI state marker missing'}
-$sharpenUiState=@'
-static bool g_m3kSharpenTechniqueReady=false;
-static bool g_m3kSharpenUniformReady=false;
-static bool g_m3kSharpenTechniqueEnabled=false;
-static float g_m3kSharpenPushed=-1.0f;
-
-'@
-$feed=$feed.Substring(0,$sharpenUiStateAt)+$sharpenUiState+$feed.Substring($sharpenUiStateAt)
-
 $mark='    if (ImGui::CollapsingHeader("GTA IV DLSS", ImGuiTreeNodeFlags_DefaultOpen))'
 $start=$feed.IndexOf($mark,[StringComparison]::Ordinal);if($start -lt 0){throw 'final UI marker missing'}
 $open=$feed.IndexOf('{',$start);$depth=0;$end=-1
@@ -317,6 +305,10 @@ $sharpenFnMarker='static void OnRenderTechnique(reshade::api::effect_runtime *rt
 $sharpenFnAt=$feed.IndexOf($sharpenFnMarker,[StringComparison]::Ordinal)
 if($sharpenFnAt -lt 0){throw 'sharpen OnRenderTechnique marker missing'}
 $sharpenHelpers=@'
+static bool g_m3kSharpenTechniqueReady=false;
+static bool g_m3kSharpenUniformReady=false;
+static bool g_m3kSharpenTechniqueEnabled=false;
+static float g_m3kSharpenPushed=-1.0f;
 static reshade::api::effect_runtime *g_m3kSharpenRuntime=nullptr;
 static reshade::api::effect_technique g_m3kSharpenTechnique={};
 static reshade::api::effect_uniform_variable g_m3kSharpenUniform={};
