@@ -56,7 +56,7 @@ new_struct = """struct M3kJitterConfig {
   bool enabled = false;
   uint32_t width = 0;
   uint32_t height = 0;
-  uint32_t phases = kM3kJitterDefaultPhases;
+  uint32_t phases = 16u;
 };
 """
 if text.count(old_struct) != 1:
