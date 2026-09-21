@@ -152,8 +152,8 @@ $vk=All $vk 'case 3: return "Balanced";' 'case 3: return "Balanced (58%)";' 'Bal
 $vk=All $vk 'case 4: return "Performance";' 'case 4: return "Performance (50%)";' 'Performance percent label'
 $vk=All $vk 'case 5: return "Ultra Performance";' 'case 5: return "Ultra Performance (33%)";' 'Ultra Performance percent label'
 
-$profileNameNew = '        case 5: return "Ultra Performance";' + [Environment]::NewLine + '        case 6: return "Custom Render Scale";'
-$vk = Once $vk '        case 5: return "Ultra Performance";' $profileNameNew 'profile name'
+$profileNameNew = '        case 5: return "Ultra Performance (33%)";' + [Environment]::NewLine + '        case 6: return "Custom Render Scale";'
+$vk = Once $vk '        case 5: return "Ultra Performance (33%)";' $profileNameNew 'profile name'
 $vk=All $vk 'if (profile > 5) profile = 2;' 'if (profile > 6) profile = 2;' 'profile bounds'
 $vk=All $vk 'g_m3kMasterSavedProfile <= 5 ? g_m3kMasterSavedProfile : 2' 'g_m3kMasterSavedProfile <= 6 ? g_m3kMasterSavedProfile : 2' 'master restore bounds'
 $vk=All $vk 'savedProfileRaw <= 5 ? savedProfileRaw : 2' 'savedProfileRaw <= 6 ? savedProfileRaw : 2' 'master INI bounds'
