@@ -144,6 +144,57 @@ $pollNew=@'
 $vk=Once $vk $poll $pollNew 'INI poll'
 $vk=Once $vk 'g_m3k.Prepare(g_self, g.dev12, g.queue, g_m3kSrW, g_m3kSrH, g.create_flags, g_m3kNrPasses);' 'g_m3k.Prepare(g_self,g.dev12,g.queue,g_m3kSrW,g_m3kSrH,g.create_flags,g_m3kNrPasses,g_m3kNrStyle,g_m3kNrIntensity,g_m3kNrLocalTone,g_m3kNrLocalStructure,g_m3kNrSkinStructure,g_m3kNrAutoMask,g_m3kNrUiCorrection);' 'SR NR handoff'
 $vk=Once $vk 'g_m3k.Prepare(g_self, g.dev12, g.queue, g.width, g.height, g.create_flags, g_m3kNrPasses);' 'g_m3k.Prepare(g_self,g.dev12,g.queue,g.width,g.height,g.create_flags,g_m3kNrPasses,g_m3kNrStyle,g_m3kNrIntensity,g_m3kNrLocalTone,g_m3kNrLocalStructure,g_m3kNrSkinStructure,g_m3kNrAutoMask,g_m3kNrUiCorrection);' 'native NR handoff'
+$nativeDlaaOld=@'
+    // Existing A1 path: copy the whole baseline contract. Only Color/reset at the
+    // A/B boundary may differ; temporal guides/exposure/scale/mask stay identical.
+    auto dlaa = *ep;
+'@
+$nativeDlaaNew=@'
+    // Native DLAA must receive the SAME temporal sample that was applied to GTA's
+    // raster by the 32-bit bridge. A3-S1 originally synchronized only the SR branch;
+    // leaving native DLAA at jitter=(0,0) while GTA was jittered made DLAA look like
+    // native/no-AA and broke temporal accumulation.
+    auto dlaa = *ep;
+    M3kBridgeJitterSnapshot dlaaBridgeJitter;
+    const bool dlaaBridgeJitterReadable = M3kReadBridgeJitter(&dlaaBridgeJitter);
+    const bool dlaaBridgeJitterActive = dlaaBridgeJitterReadable && dlaaBridgeJitter.valid &&
+        dlaaBridgeJitter.active && dlaaBridgeJitter.renderWidth == g.width &&
+        dlaaBridgeJitter.renderHeight == g.height;
+    const bool dlaaBridgeJitterTransition = !g_m3kJitterStateKnown
+        ? dlaaBridgeJitterActive
+        : (dlaaBridgeJitterActive != g_m3kJitterLastActive) ||
+          (dlaaBridgeJitterActive && dlaaBridgeJitter.epoch != g_m3kJitterLastEpoch);
+    // A3-S1.1 hardware testing established NGX sign=-1 relative to the raster shift.
+    dlaa.InJitterOffsetX = dlaaBridgeJitterActive ? -dlaaBridgeJitter.jitterX : 0.0f;
+    dlaa.InJitterOffsetY = dlaaBridgeJitterActive ? -dlaaBridgeJitter.jitterY : 0.0f;
+    if(dlaaBridgeJitterTransition) dlaa.InReset = 1;
+'@
+$vk=Once $vk $nativeDlaaOld $nativeDlaaNew 'native DLAA synchronized jitter'
+
+$nativeDlaaResultOld=@'
+    const NVSDK_NGX_Result result = SafeEvaluateDLSS(&dlaa, code);
+    if (used && *code == 0) g_m3k.Finish(g.list);
+'@
+$nativeDlaaResultNew=@'
+    const NVSDK_NGX_Result result = SafeEvaluateDLSS(&dlaa, code);
+    if(*code==0 && NVSDK_NGX_SUCCEED(result)){
+        g_m3kJitterStateKnown=true;
+        g_m3kJitterLastActive=dlaaBridgeJitterActive;
+        g_m3kJitterLastEpoch=dlaaBridgeJitterActive?dlaaBridgeJitter.epoch:-1;
+        g_m3kJitterLastFrame=dlaaBridgeJitterActive?dlaaBridgeJitter.frame:-1;
+        static UINT64 dlaaJitterFrames=0;
+        ++dlaaJitterFrames;
+        if(dlaaJitterFrames==1 || (dlaaJitterFrames%300)==0 || dlaaBridgeJitterTransition)
+            Log("M3K-DLAA-JITTER: active=%d bridgeFrame=%ld epoch=%ld native=%ux%u ngxPx=(%+.4f,%+.4f) reset=%d",
+                dlaaBridgeJitterActive?1:0,
+                dlaaBridgeJitterActive?dlaaBridgeJitter.frame:-1,
+                dlaaBridgeJitterActive?dlaaBridgeJitter.epoch:-1,
+                g.width,g.height,dlaa.InJitterOffsetX,dlaa.InJitterOffsetY,dlaa.InReset);
+    }
+    if (used && *code == 0) g_m3k.Finish(g.list);
+'@
+$vk=Once $vk $nativeDlaaResultOld $nativeDlaaResultNew 'native DLAA jitter state commit'
+
 
 # ---- Profile 6 = custom percentage. Existing named profiles 0..5 are unchanged. ----
 $profileNameNew = '        case 5: return "Ultra Performance";' + [Environment]::NewLine + '        case 6: return "Custom Render Scale";'
@@ -332,6 +383,6 @@ $feed=Once $feed '    FeedFrame(rt, cl, rtv);' ('    FeedFrame(rt, cl, rtv);' + 
 [IO.File]::WriteAllText($vkPath,$vk,[Text.UTF8Encoding]::new($false))
 [IO.File]::WriteAllText($FeederSource,$feed,[Text.UTF8Encoding]::new($false))
 $verify=$nr+$vk+$feed
-foreach($m in @('case 6: return "Custom Render Scale";','M3K-CUSTOM-SCALE:','Apply##M3KCustomScaleApply','NR Style##M3KNrStyle','Default\0Natural\0Cinematic','DLSSNR.Intensity','DLSSNR.LocalToneStrength','DLSSNR.LocalStructureStrength','DLSSNR.SkinStructureStrength','DLSSNR.UseAutoMask','DLSSNR.UICorrection','M3K_Sharpen.fx','M3kSyncSharpenUniform','Sharpening##M3KSharpness','Reset NR Advanced##M3KNrReset','Quality (67%)','FORCED %ux%u')){if($verify.IndexOf($m,[StringComparison]::Ordinal)-lt 0){throw "Missing verification marker: $m"}}
+foreach($m in @('case 6: return "Custom Render Scale";','M3K-CUSTOM-SCALE:','Apply##M3KCustomScaleApply','NR Style##M3KNrStyle','Default\0Natural\0Cinematic','DLSSNR.Intensity','DLSSNR.LocalToneStrength','DLSSNR.LocalStructureStrength','DLSSNR.SkinStructureStrength','DLSSNR.UseAutoMask','DLSSNR.UICorrection','M3K_Sharpen.fx','M3kSyncSharpenUniform','Sharpening##M3KSharpness','M3K-DLAA-JITTER:','dlaa.InJitterOffsetX','Reset NR Advanced##M3KNrReset','Quality (67%)','FORCED %ux%u')){if($verify.IndexOf($m,[StringComparison]::Ordinal)-lt 0){throw "Missing verification marker: $m"}}
 foreach($bad in @('if (profile > 5) profile = 2;','g_m3kMasterSavedProfile <= 5 ? g_m3kMasterSavedProfile : 2','savedProfileRaw <= 5 ? savedProfileRaw : 2','requestedSrProfile <= 5 ? requestedSrProfile : 2','g_m3kStartupPrimeInitialProfile <= 5','g_m3kSrProfileRequested > 5','if (profile < 1 || profile > 5) return false;')){if($verify.IndexOf($bad,[StringComparison]::Ordinal)-ge 0){throw "Stale SR bound remains: $bad"}}
 Write-Host 'Next controls ready: Apply-only custom DLSS scale + NR style/tuning.'
