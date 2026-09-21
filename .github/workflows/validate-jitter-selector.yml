@@ -1,4 +1,5 @@
 name: Validate jitter selector
+# rerun after bridge declaration-order fix
 
 on:
   push:
