@@ -1,0 +1,33 @@
+name: Validate feature controls stage
+
+on:
+  push:
+    branches: [ feature/dlss-custom-scale-nr-controls ]
+    paths:
+      - 'install/Public-DLSS-CustomScale-NR-Tuning-Stage.ps1'
+      - '.github/workflows/feature-controls-syntax.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  parse-powershell:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell stage
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path '.\install\Public-DLSS-CustomScale-NR-Tuning-Stage.ps1'),
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            throw "PowerShell parser found $($errors.Count) error(s)."
+          }
+          Write-Host 'PowerShell stage parsed successfully.'
