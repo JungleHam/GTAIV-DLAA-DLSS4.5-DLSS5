@@ -3,7 +3,7 @@ name: Build cleaned prebuilt runtime artifacts
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: [ main, feature/dlss-custom-scale-nr-controls ]
     paths:
       - '.github/workflows/prebuilt-runtime-release.yml'
 
