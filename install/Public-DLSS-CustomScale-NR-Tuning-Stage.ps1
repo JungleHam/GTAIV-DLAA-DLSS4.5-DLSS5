@@ -97,6 +97,7 @@ static bool g_m3kCustomScaleRejected=false;
 static float g_m3kSharpness=0.0f;
 static UINT g_m3kJitterMode=0; // 0=Auto, otherwise explicit phase count (8/16/32)
 static UINT g_m3kJitterEffectivePhases=0;
+static UINT g_m3kJitterCompMode=0; // 0=current -1/-1; diagnostic NGX-only compensation selector
 '@
 $vk = Once $vk 'static UINT g_m3kNrPasses = 1;' $publicState 'public state'
 
@@ -111,6 +112,22 @@ static float M3kReadPublicFloat(const wchar_t *path,const wchar_t *key,float fal
     wchar_t *end=nullptr; const float v=wcstof(text,&end); return end==text?fallback:v;
 }
 static float M3kClampPublicNr(float v){return v<0.0f?0.0f:(v>2.0f?2.0f:v);}
+static float M3kJitterCompX()
+{
+    switch(g_m3kJitterCompMode){
+        case 1:return 1.0f; case 2:return 1.0f; case 3:return -1.0f;
+        case 4:return -0.5f; case 5:return -2.0f; case 6:return 0.0f;
+        default:return -1.0f;
+    }
+}
+static float M3kJitterCompY()
+{
+    switch(g_m3kJitterCompMode){
+        case 1:return 1.0f; case 2:return -1.0f; case 3:return 1.0f;
+        case 4:return -0.5f; case 5:return -2.0f; case 6:return 0.0f;
+        default:return -1.0f;
+    }
+}
 
 '@
 $vk=$vk.Substring(0,$prepareAt)+$floatReader+$vk.Substring($prepareAt)
@@ -138,6 +155,8 @@ $pollNew=@'
         g_m3kSharpness=sharpness<0.0f?0.0f:(sharpness>1.5f?1.5f:sharpness);
         const UINT rawJitterMode=GetPrivateProfileIntW(L"M3K",L"JitterMode",0,path);
         g_m3kJitterMode=(rawJitterMode==8||rawJitterMode==16||rawJitterMode==32)?rawJitterMode:0u;
+        const UINT rawJitterComp=GetPrivateProfileIntW(L"M3K",L"JitterCompMode",0,path);
+        g_m3kJitterCompMode=rawJitterComp<=6?rawJitterComp:0u;
         const UINT rawScale=GetPrivateProfileIntW(L"M3K",L"CustomScalePercent",77,path);
         const UINT customScale=rawScale<10?10:(rawScale>100?100:rawScale);
         if(customScale!=g_m3kCustomScalePercent){
@@ -146,6 +165,8 @@ $pollNew=@'
         }
 '@
 $vk=Once $vk $poll $pollNew 'INI poll'
+$vk=Once $vk '        sr.InJitterOffsetX = bridgeJitterActive ? -bridgeJitter.jitterX : 0.0f;' '        sr.InJitterOffsetX = bridgeJitterActive ? bridgeJitter.jitterX*M3kJitterCompX() : 0.0f;' 'SR jitter compensation X'
+$vk=Once $vk '        sr.InJitterOffsetY = bridgeJitterActive ? -bridgeJitter.jitterY : 0.0f;' '        sr.InJitterOffsetY = bridgeJitterActive ? bridgeJitter.jitterY*M3kJitterCompY() : 0.0f;' 'SR jitter compensation Y'
 $vk=Once $vk 'g_m3k.Prepare(g_self, g.dev12, g.queue, g_m3kSrW, g_m3kSrH, g.create_flags, g_m3kNrPasses);' 'g_m3k.Prepare(g_self,g.dev12,g.queue,g_m3kSrW,g_m3kSrH,g.create_flags,g_m3kNrPasses,g_m3kNrStyle,g_m3kNrIntensity,g_m3kNrLocalTone,g_m3kNrLocalStructure,g_m3kNrSkinStructure,g_m3kNrAutoMask,g_m3kNrUiCorrection);' 'SR NR handoff'
 $vk=Once $vk 'g_m3k.Prepare(g_self, g.dev12, g.queue, g.width, g.height, g.create_flags, g_m3kNrPasses);' 'g_m3k.Prepare(g_self,g.dev12,g.queue,g.width,g.height,g.create_flags,g_m3kNrPasses,g_m3kNrStyle,g_m3kNrIntensity,g_m3kNrLocalTone,g_m3kNrLocalStructure,g_m3kNrSkinStructure,g_m3kNrAutoMask,g_m3kNrUiCorrection);' 'native NR handoff'
 $nativeDlaaOld=@'
@@ -168,9 +189,9 @@ $nativeDlaaNew=@'
         ? dlaaBridgeJitterActive
         : (dlaaBridgeJitterActive != g_m3kJitterLastActive) ||
           (dlaaBridgeJitterActive && dlaaBridgeJitter.epoch != g_m3kJitterLastEpoch);
-    // A3-S1.1 hardware testing established NGX sign=-1 relative to the raster shift.
-    dlaa.InJitterOffsetX = dlaaBridgeJitterActive ? -dlaaBridgeJitter.jitterX : 0.0f;
-    dlaa.InJitterOffsetY = dlaaBridgeJitterActive ? -dlaaBridgeJitter.jitterY : 0.0f;
+    // NGX-only diagnostic compensation; raster jitter itself is unchanged.
+    dlaa.InJitterOffsetX = dlaaBridgeJitterActive ? dlaaBridgeJitter.jitterX*M3kJitterCompX() : 0.0f;
+    dlaa.InJitterOffsetY = dlaaBridgeJitterActive ? dlaaBridgeJitter.jitterY*M3kJitterCompY() : 0.0f;
     if(dlaaBridgeJitterTransition) dlaa.InReset = 1;
 '@
 $vk=Once $vk $nativeDlaaOld $nativeDlaaNew 'native DLAA synchronized jitter'
@@ -328,6 +349,14 @@ static void M3kRequestJitterModeLive(UINT mode){
     g_m3kJitterMode=mode;M3kWritePublicUInt(L"JitterMode",mode);g_m3kJitterEffectivePhases=0;
     M3kSyncJitterPhasesLive();g_m3k.ResetHistory();g_m3kSrNeedsReset=true;
 }
+static UINT M3kJitterCompModeRequested(){return g_m3kJitterCompMode;}
+static void M3kRequestJitterCompModeLive(UINT mode){
+    if(mode>6u)mode=0u;
+    if(mode==g_m3kJitterCompMode)return;
+    g_m3kJitterCompMode=mode;M3kWritePublicUInt(L"JitterCompMode",mode);
+    g_m3k.ResetHistory();g_m3kSrNeedsReset=true;
+    Log("M3K-JITTER-CAL: NGX compensation mode=%u multiplier=(%+.2f,%+.2f)",mode,M3kJitterCompX(),M3kJitterCompY());
+}
 static UINT M3kNrStyleRequested(){return g_m3kNrStyle;} static float M3kNrIntensityRequested(){return g_m3kNrIntensity;} static float M3kNrLocalToneRequested(){return g_m3kNrLocalTone;} static float M3kNrLocalStructureRequested(){return g_m3kNrLocalStructure;} static float M3kNrSkinStructureRequested(){return g_m3kNrSkinStructure;} static bool M3kNrAutoMaskRequested(){return g_m3kNrAutoMask!=0;} static bool M3kNrUiCorrectionRequested(){return g_m3kNrUiCorrection!=0;}
 static void M3kRequestNrTuningLive(UINT style,float intensity,float tone,float structure,float skin,bool mask,bool ui){style=style>2?0:style;intensity=intensity<0.0f?0.0f:(intensity>2.0f?2.0f:intensity);tone=tone<0.0f?0.0f:(tone>2.0f?2.0f:tone);structure=structure<0.0f?0.0f:(structure>2.0f?2.0f:structure);skin=skin<0.0f?0.0f:(skin>2.0f?2.0f:skin);g_m3kNrStyle=style;g_m3kNrIntensity=intensity;g_m3kNrLocalTone=tone;g_m3kNrLocalStructure=structure;g_m3kNrSkinStructure=skin;g_m3kNrAutoMask=mask?1u:0u;g_m3kNrUiCorrection=ui?1u:0u;M3kWritePublicUInt(L"NRStyle",style);M3kWritePublicFloat(L"NRIntensity",intensity);M3kWritePublicFloat(L"NRLocalTone",tone);M3kWritePublicFloat(L"NRLocalStructure",structure);M3kWritePublicFloat(L"NRSkinStructure",skin);M3kWritePublicUInt(L"NRAutoMask",g_m3kNrAutoMask);M3kWritePublicUInt(L"NRUICorrection",g_m3kNrUiCorrection);g_m3k.ResetHistory();g_m3kSrNeedsReset=true;}
 static UINT M3kRequestedNrPasses() { return g_m3kNrPasses; }
@@ -367,6 +396,11 @@ $ui=@'
         ImGui::BeginDisabled(!master);if(ImGui::Combo("Jitter Sequence##M3KJitterPhases",&jitterChoice,jitterItems)){const UINT modes[4]={0u,8u,16u,32u};M3kRequestJitterModeLive(modes[jitterChoice]);}ImGui::EndDisabled();
         ImGui::TextDisabled("Effective: %u phases%s",M3kJitterEffectivePhases(),M3kJitterModeRequested()==0?" (Auto)":"");
 
+        int jitterComp=static_cast<int>(M3kJitterCompModeRequested());
+        const char *jitterCompItems="Current -1/-1\0" "Same sign +1/+1\0" "Flip X +1/-1\0" "Flip Y -1/+1\0" "Half -0.5/-0.5\0" "Double -2/-2\0" "Off 0/0\0\0";
+        ImGui::BeginDisabled(!master);if(ImGui::Combo("NGX Jitter Compensation##M3KJitterComp",&jitterComp,jitterCompItems))M3kRequestJitterCompModeLive(static_cast<UINT>(jitterComp));ImGui::EndDisabled();
+        ImGui::TextDisabled("Diagnostic: changes NGX offset only; raster jitter stays identical.");
+
         ImGui::Text("Current: %s",M3kSrProfileName(M3kAppliedSrProfile())); if(master&&M3kAppliedSrProfile()!=M3kRequestedSrProfile())ImGui::TextColored(ImVec4(1.0f,0.78f,0.25f,1.0f),"Applying %s...",M3kSrProfileName(M3kRequestedSrProfile()));
 
         ImGui::Separator(); ImGui::TextUnformatted("Neural Rendering"); bool nr=M3kNrEnabledRequested(); ImGui::BeginDisabled(!master); if(ImGui::Checkbox("Enable Neural Rendering##M3KNrEnabled",&nr))M3kRequestNrEnabledLive(nr); ImGui::EndDisabled();
@@ -384,7 +418,7 @@ $ui=@'
             ImGui::SameLine();ImGui::TextDisabled("Default style, 1.00 strengths, Auto Mask on, UI Correction off");
             ImGui::Spacing(); const UINT requested=M3kRequestedNrPasses(); ImGui::TextUnformatted("Neural Rendering passes");
             for(UINT p=1;p<=5;++p){if(p>1)ImGui::SameLine();char label[24]={};_snprintf_s(label,sizeof(label),_TRUNCATE,"%u##M3KPass",p);if(ImGui::RadioButton(label,requested==p))M3kRequestNrPassesLive(p);} ImGui::Text("Active passes: %u",M3kActiveNrPasses()); ImGui::EndDisabled();}
-        if(ImGui::CollapsingHeader("Diagnostics##M3KDiagnostics")){ImGui::Text("Requested render: %u x %u",M3kDesiredRenderWidth(),M3kDesiredRenderHeight());ImGui::Text("DXVK source: %u x %u",M3kCurrentSourceWidth(),M3kCurrentSourceHeight());ImGui::Text("Output: %u x %u",g.width,g.height);ImGui::Text("Saved custom scale: %u%%",M3kCustomScalePercent());ImGui::Text("Jitter: mode=%s effective=%u phases",M3kJitterModeRequested()==0?"Auto":"Manual",M3kJitterEffectivePhases());ImGui::Text("NR style=%u intensity=%.2f tone=%.2f structure=%.2f skin=%.2f",M3kNrStyleRequested(),M3kNrIntensityRequested(),M3kNrLocalToneRequested(),M3kNrLocalStructureRequested(),M3kNrSkinStructureRequested());}
+        if(ImGui::CollapsingHeader("Diagnostics##M3KDiagnostics")){ImGui::Text("Requested render: %u x %u",M3kDesiredRenderWidth(),M3kDesiredRenderHeight());ImGui::Text("DXVK source: %u x %u",M3kCurrentSourceWidth(),M3kCurrentSourceHeight());ImGui::Text("Output: %u x %u",g.width,g.height);ImGui::Text("Saved custom scale: %u%%",M3kCustomScalePercent());ImGui::Text("Jitter: mode=%s effective=%u phases comp=%u (%+.2f,%+.2f)",M3kJitterModeRequested()==0?"Auto":"Manual",M3kJitterEffectivePhases(),M3kJitterCompModeRequested(),M3kJitterCompX(),M3kJitterCompY());ImGui::Text("NR style=%u intensity=%.2f tone=%.2f structure=%.2f skin=%.2f",M3kNrStyleRequested(),M3kNrIntensityRequested(),M3kNrLocalToneRequested(),M3kNrLocalStructureRequested(),M3kNrSkinStructureRequested());}
         ImGui::Separator();
     }
 '@
@@ -526,6 +560,6 @@ $feed=Once $feed $vkBuildOld $vkBuildNew 'release deferred feature only after fr
 [IO.File]::WriteAllText($vkPath,$vk,[Text.UTF8Encoding]::new($false))
 [IO.File]::WriteAllText($FeederSource,$feed,[Text.UTF8Encoding]::new($false))
 $verify=$nr+$vk+$feed
-foreach($m in @('case 6: return "Custom Render Scale";','M3K-CUSTOM-SCALE:','Apply##M3KCustomScaleApply','NR Style##M3KNrStyle','Default\0Natural\0Cinematic','DLSSNR.Intensity','DLSSNR.LocalToneStrength','DLSSNR.LocalStructureStrength','DLSSNR.SkinStructureStrength','DLSSNR.UseAutoMask','DLSSNR.UICorrection','M3K_Sharpen.fx','M3kSyncSharpenUniform','Sharpening##M3KSharpness','M3K-DLAA-JITTER:','dlaa.InJitterOffsetX','M3K-SAFE-RESIZE:','M3kReleaseDeferredRuntimeChurnFeature','M3kRuntimeChurnHeld','runtime churn quarantine armed','Jitter Sequence##M3KJitterPhases','M3kComputeAutoJitterPhases','Reset NR Advanced##M3KNrReset','Quality (67%)','FORCED %ux%u')){if($verify.IndexOf($m,[StringComparison]::Ordinal)-lt 0){throw "Missing verification marker: $m"}}
+foreach($m in @('case 6: return "Custom Render Scale";','M3K-CUSTOM-SCALE:','Apply##M3KCustomScaleApply','NR Style##M3KNrStyle','Default\0Natural\0Cinematic','DLSSNR.Intensity','DLSSNR.LocalToneStrength','DLSSNR.LocalStructureStrength','DLSSNR.SkinStructureStrength','DLSSNR.UseAutoMask','DLSSNR.UICorrection','M3K_Sharpen.fx','M3kSyncSharpenUniform','Sharpening##M3KSharpness','M3K-DLAA-JITTER:','dlaa.InJitterOffsetX','M3K-SAFE-RESIZE:','M3kReleaseDeferredRuntimeChurnFeature','M3kRuntimeChurnHeld','runtime churn quarantine armed','Jitter Sequence##M3KJitterPhases','M3kComputeAutoJitterPhases','NGX Jitter Compensation##M3KJitterComp','M3K-JITTER-CAL:','Reset NR Advanced##M3KNrReset','Quality (67%)','FORCED %ux%u')){if($verify.IndexOf($m,[StringComparison]::Ordinal)-lt 0){throw "Missing verification marker: $m"}}
 foreach($bad in @('if (profile > 5) profile = 2;','g_m3kMasterSavedProfile <= 5 ? g_m3kMasterSavedProfile : 2','savedProfileRaw <= 5 ? savedProfileRaw : 2','requestedSrProfile <= 5 ? requestedSrProfile : 2','g_m3kStartupPrimeInitialProfile <= 5','g_m3kSrProfileRequested > 5','if (profile < 1 || profile > 5) return false;')){if($verify.IndexOf($bad,[StringComparison]::Ordinal)-ge 0){throw "Stale SR bound remains: $bad"}}
 Write-Host 'Next controls ready: Apply-only custom DLSS scale + NR style/tuning.'
