@@ -1,4 +1,5 @@
 name: Validate jitter selector plus resize fix
+# rerun after combo-string fix
 
 on:
   push:
