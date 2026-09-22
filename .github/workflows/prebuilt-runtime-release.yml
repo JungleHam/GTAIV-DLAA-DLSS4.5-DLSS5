@@ -1,4 +1,5 @@
 name: Build cleaned prebuilt runtime artifacts
+
 on:
   workflow_dispatch:
   push:
@@ -211,95 +212,11 @@ jobs:
           Copy-Item $dxvkConf.FullName .\_bbridge-configs\dxvk.conf -Force
           $confPath='.\_bbridge-configs\dxvk.conf'
           $confText=[IO.File]::ReadAllText($confPath)
-          $pat='(?m)^\s*d3d9\.samplerLodBias\s*=\s*.*
-
-      - name: Checkout redistributable runtime sources
-        shell: pwsh
-        run: |
-          git clone --depth 1 --branch v0.15.1 https://github.com/jlrouzies-fr/DLSS5-Feeder.git _feeder-release
-          git clone https://github.com/crosire/reshade-shaders.git _reshade-shaders
-          git -C _reshade-shaders checkout 6db142b4b1a05c764222e5b0bd9a644b7ccfe1dc
-          git lfs install
-          git clone --depth 1 --branch v310.9.1 https://github.com/NVIDIA/DLSS.git _nvidia-dlss
-
-      - name: Collect cleaned runtime
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          function AssertHash([string]$Path,[string]$Expected) {
-            if (-not (Test-Path -LiteralPath $Path)) { throw "Missing runtime input: $Path" }
-            $actual=(Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash.ToUpperInvariant()
-            if ($actual -ne $Expected.ToUpperInvariant()) { throw "Hash mismatch for $Path`nExpected $Expected`nActual   $actual" }
+          $pat='(?m)^\s*d3d9\.samplerLodBias\s*=\s*.*$'
+          if($confText -match $pat){$confText=[regex]::Replace($confText,$pat,'d3d9.samplerLodBias = 0.0')}else{
+            if($confText.Length -gt 0 -and -not $confText.EndsWith("`n")){$confText+="`r`n"}
+            $confText+="d3d9.samplerLodBias = 0.0`r`n"
           }
-
-          New-Item -ItemType Directory -Path .\out-runtime\m3k -Force | Out-Null
-          New-Item -ItemType Directory -Path .\out-runtime\licenses -Force | Out-Null
-          Copy-Item .\_bbridge\_prebuilt32\src\client\d3d9.dll .\out-runtime\d3d9.dll -Force
-          Copy-Item .\_bbridge\_prebuilt64\src\server\NvRemixBridge.exe .\out-runtime\NvRemixBridge.exe -Force
-          Copy-Item .\_project\tools\m3k-nr\out-m3k-a3-s5\dlss5-feed.addon64 .\out-runtime\dlss5-feed.addon64 -Force
-          Copy-Item .\_project\tools\m3k-nr\out-m3k-s27\m3k\m3k-nvngx.dll .\out-runtime\m3k\m3k-nvngx.dll -Force
-
-          # Use the presenter built and verified earlier in this same workflow run.
-          Copy-Item .\_presenter-artifact\d3d9vk_x64.dll .\out-runtime\d3d9vk_x64.dll -Force
-
-          Copy-Item .\_bbridge-configs\bridge.conf .\out-runtime\bridge.conf -Force
-          Copy-Item .\_bbridge-configs\dxvk.conf .\out-runtime\dxvk.conf -Force
-
-          $feedFx = Get-ChildItem .\_feeder-release -Recurse -File -Filter 'DLSS5_Feed.fx' | Select-Object -First 1
-          if (-not $feedFx) { throw 'DLSS5_Feed.fx not found in pinned Feeder source.' }
-          Copy-Item $feedFx.FullName .\out-runtime\DLSS5_Feed.fx -Force
-          Copy-Item .\install\M3K_Sharpen.fx .\out-runtime\M3K_Sharpen.fx -Force
-
-          foreach ($name in @('ReShade.fxh','ReShadeUI.fxh','DrawText.fxh')) {
-            $src = Get-ChildItem .\_reshade-shaders -Recurse -File -Filter $name | Select-Object -First 1
-            if (-not $src) { throw "$name not found in pinned reshade-shaders source." }
-            Copy-Item $src.FullName (Join-Path .\out-runtime $name) -Force
-          }
-
-          $ngx = '.\_nvidia-dlss\lib\Windows_x86_64\rel\nvngx_dlss.dll'
-          Copy-Item $ngx .\out-runtime\nvngx_dlss.dll -Force
-
-          AssertHash .\out-runtime\DLSS5_Feed.fx 'CDAC08A721B14B97187DD86C5B5BEAD157C9063D7EE859A0F131A8EE791695F1'
-          AssertHash .\out-runtime\nvngx_dlss.dll '3975567B8943C53ACCE397F2B72380092F84F162D00B0D2C7D08A1025C563983'
-          AssertHash .\out-runtime\bridge.conf '161557ED3B3DEE86D9B9BEA3D3323924EE1F9F7FF47A139E3075B787B752EC8C'
-          AssertHash .\out-runtime\dxvk.conf 'A317EDB736464EF90037B9F8A9267CDCB00905D485E7FE0E1E30F3C456F842EE'
-
-          $expectedVersion = 'remix-main+1dad5e6d'
-          foreach ($p in @('.\out-runtime\d3d9.dll','.\out-runtime\NvRemixBridge.exe')) {
-            $ascii = [Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($p))
-            if (-not $ascii.Contains($expectedVersion)) { throw "$p does not embed $expectedVersion" }
-          }
-
-          foreach ($candidate in @(
-            '.\_bbridge\LICENSE-MIT',
-            '.\_bbridge\ThirdPartyLicenses.txt',
-            '.\_feeder-release\LICENSE',
-            '.\_feeder-release\LICENSE.md',
-            '.\_reshade-shaders\LICENSE.md',
-            '.\_nvidia-dlss\LICENSE.txt'
-          )) {
-            if (Test-Path -LiteralPath $candidate) { Copy-Item $candidate .\out-runtime\licenses\ -Force }
-          }
-
-          Get-ChildItem .\out-runtime -Recurse -File | ForEach-Object {
-            $h=Get-FileHash -Algorithm SHA256 $_.FullName
-            '{0}  {1}' -f $h.Hash,$_.FullName.Substring((Resolve-Path .\out-runtime).Path.Length+1)
-          } | Set-Content .\out-runtime\SHA256SUMS.txt -Encoding ASCII
-
-          Compress-Archive -Path .\out-runtime\* -DestinationPath .\GTAIV-DLSS-Full-Runtime.zip -CompressionLevel Optimal -Force
-          $zipHash=(Get-FileHash -Algorithm SHA256 .\GTAIV-DLSS-Full-Runtime.zip).Hash.ToUpperInvariant()
-          Write-Host "Clean runtime ZIP SHA256: $zipHash" -ForegroundColor Green
-          $zipHash | Set-Content .\GTAIV-DLSS-Full-Runtime.sha256 -Encoding ASCII
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: cleaned-prebuilt-runtime
-          path: |
-            GTAIV-DLSS-Full-Runtime.zip
-            GTAIV-DLSS-Full-Runtime.sha256
-            out-runtime/**
-
-          if($confText -match $pat){$confText=[regex]::Replace($confText,$pat,'d3d9.samplerLodBias = 0.0')}else{$confText+="`r`nd3d9.samplerLodBias = 0.0`r`n"}
           [IO.File]::WriteAllText($confPath,$confText,[Text.UTF8Encoding]::new($false))
 
       - name: Checkout redistributable runtime sources
@@ -351,7 +268,7 @@ jobs:
           AssertHash .\out-runtime\DLSS5_Feed.fx 'CDAC08A721B14B97187DD86C5B5BEAD157C9063D7EE859A0F131A8EE791695F1'
           AssertHash .\out-runtime\nvngx_dlss.dll '3975567B8943C53ACCE397F2B72380092F84F162D00B0D2C7D08A1025C563983'
           AssertHash .\out-runtime\bridge.conf '161557ED3B3DEE86D9B9BEA3D3323924EE1F9F7FF47A139E3075B787B752EC8C'
-          AssertHash .\out-runtime\dxvk.conf '509713876C2C9EFBC70D242C4474E76554C59D2A0B162695085A31B8FE772247'
+          AssertHash .\out-runtime\dxvk.conf 'A317EDB736464EF90037B9F8A9267CDCB00905D485E7FE0E1E30F3C456F842EE'
 
           $expectedVersion = 'remix-main+1dad5e6d'
           foreach ($p in @('.\out-runtime\d3d9.dll','.\out-runtime\NvRemixBridge.exe')) {
