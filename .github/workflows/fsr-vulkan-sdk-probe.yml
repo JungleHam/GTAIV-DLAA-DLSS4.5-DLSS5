@@ -1,0 +1,91 @@
+name: FSR Vulkan SDK probe
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/fsr-3-1-5
+    paths:
+      - '.github/workflows/fsr-vulkan-sdk-probe.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-fidelityfx-vulkan:
+    runs-on: windows-2022
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Vulkan SDK
+        uses: humbletim/install-vulkan-sdk@v1.2
+        with:
+          version: 1.3.290.0
+          cache: true
+
+      - name: Clone pinned FidelityFX SDK 1.1.4
+        shell: pwsh
+        run: |
+          git clone --filter=blob:none --branch v1.1.4 https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK.git _ffx
+          $sha=(git -C _ffx rev-parse HEAD).Trim()
+          if ($sha -ne 'c6efa6bf7f2027b3ec94f28578bb5965eabb9e55') {
+            throw "Wrong FidelityFX SDK commit: $sha"
+          }
+          $header=Get-Content .\_ffx\sdk\include\FidelityFX\host\ffx_fsr3upscaler.h -Raw
+          foreach($marker in @(
+            '#define FFX_FSR3UPSCALER_VERSION_MAJOR      (3)',
+            '#define FFX_FSR3UPSCALER_VERSION_MINOR      (1)',
+            '#define FFX_FSR3UPSCALER_VERSION_PATCH      (4)'
+          )) {
+            if (-not $header.Contains($marker)) { throw "FSR 3.1.4 marker missing: $marker" }
+          }
+
+      - name: Configure minimal Vulkan FSR3 Upscaler build
+        shell: pwsh
+        run: |
+          cmake -S .\_ffx\sdk -B .\_ffx\sdk\build-gtaiv-fsr -G "Visual Studio 17 2022" -A x64 `
+            -DFFX_API_BACKEND=VK_X64 `
+            -DFFX_FSR3UPSCALER=ON `
+            -DFFX_AUTO_COMPILE_SHADERS=1
+          if ($LASTEXITCODE -ne 0) { throw "FidelityFX configure failed: $LASTEXITCODE" }
+
+      - name: Build Vulkan backend and FSR3 Upscaler
+        shell: pwsh
+        run: |
+          cmake --build .\_ffx\sdk\build-gtaiv-fsr --config Release --target ffx_fsr3upscaler_x64 ffx_backend_vk_x64 --parallel 4
+          if ($LASTEXITCODE -ne 0) { throw "FidelityFX build failed: $LASTEXITCODE" }
+
+      - name: Collect and verify probe artifacts
+        shell: pwsh
+        run: |
+          $out='.\out-fsr-sdk'
+          New-Item -ItemType Directory -Path $out -Force | Out-Null
+          $libs=Get-ChildItem .\_ffx\sdk\bin\ffx_sdk -File -Filter '*.lib'
+          $needed=@('ffx_fsr3upscaler_x64','ffx_backend_vk_x64')
+          foreach($n in $needed) {
+            $hit=$libs | Where-Object { $_.BaseName -like "$n*" } | Select-Object -First 1
+            if (-not $hit) { throw "Expected FidelityFX library missing: $n" }
+            Copy-Item $hit.FullName $out -Force
+          }
+          Copy-Item .\_ffx\sdk\LICENSE.txt $out -Force -ErrorAction SilentlyContinue
+          @(
+            'GTA IV FSR Vulkan SDK build probe',
+            'FidelityFX-SDK tag=v1.1.4',
+            'FidelityFX-SDK commit=c6efa6bf7f2027b3ec94f28578bb5965eabb9e55',
+            'FSR3 Upscaler=3.1.4',
+            'Backend=Vulkan',
+            'Purpose=compile-only dependency probe; NOT a GTA IV runtime candidate'
+          ) | Set-Content (Join-Path $out 'BUILD-INFO.txt') -Encoding UTF8
+          Get-ChildItem $out -File | ForEach-Object {
+            $h=Get-FileHash -Algorithm SHA256 $_.FullName
+            "$($h.Hash)  $($_.Name)"
+          } | Set-Content (Join-Path $out 'SHA256SUMS.txt') -Encoding ASCII
+          Get-ChildItem $out | Format-Table Name,Length
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fsr-vulkan-sdk-probe
+          path: out-fsr-sdk/*
+          if-no-files-found: error
