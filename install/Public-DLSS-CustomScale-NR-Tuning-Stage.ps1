@@ -165,6 +165,7 @@ $pollNew=@'
         }
 '@
 $vk=Once $vk $poll $pollNew 'INI poll'
+$vk=Once $vk 'struct M3kBridgeJitterSnapshot {' ('static float M3kJitterCompX();' + [Environment]::NewLine + 'static float M3kJitterCompY();' + [Environment]::NewLine + [Environment]::NewLine + 'struct M3kBridgeJitterSnapshot {') 'jitter compensation forward declarations'
 $vk=Once $vk '        sr.InJitterOffsetX = bridgeJitterActive ? -bridgeJitter.jitterX : 0.0f;' '        sr.InJitterOffsetX = bridgeJitterActive ? bridgeJitter.jitterX*M3kJitterCompX() : 0.0f;' 'SR jitter compensation X'
 $vk=Once $vk '        sr.InJitterOffsetY = bridgeJitterActive ? -bridgeJitter.jitterY : 0.0f;' '        sr.InJitterOffsetY = bridgeJitterActive ? bridgeJitter.jitterY*M3kJitterCompY() : 0.0f;' 'SR jitter compensation Y'
 $vk=Once $vk 'g_m3k.Prepare(g_self, g.dev12, g.queue, g_m3kSrW, g_m3kSrH, g.create_flags, g_m3kNrPasses);' 'g_m3k.Prepare(g_self,g.dev12,g.queue,g_m3kSrW,g_m3kSrH,g.create_flags,g_m3kNrPasses,g_m3kNrStyle,g_m3kNrIntensity,g_m3kNrLocalTone,g_m3kNrLocalStructure,g_m3kNrSkinStructure,g_m3kNrAutoMask,g_m3kNrUiCorrection);' 'SR NR handoff'
