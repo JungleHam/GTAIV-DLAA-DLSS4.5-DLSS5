@@ -1,0 +1,66 @@
+name: Validate v1.1.0 release source
+
+on:
+  push:
+    branches: [ feature/dlss-custom-scale-nr-controls ]
+    paths:
+      - '.github/workflows/validate-v1.1.0-release-source.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse embedded PowerShell
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          foreach($path in @(
+            '.\install\Install-DLSS-Full.bat',
+            '.\install\core\Install-DLAA-Core.bat',
+            '.\install\Install-DLAA.bat'
+          )){
+            $raw=[IO.File]::ReadAllText($path)
+            $marker='#==POWERSHELL==#'
+            $i=$raw.IndexOf($marker,[StringComparison]::Ordinal)
+            if($i -lt 0){throw "PowerShell marker missing: $path"}
+            $ps=$raw.Substring($i+$marker.Length)
+            $tokens=$null;$errors=$null
+            [System.Management.Automation.Language.Parser]::ParseInput($ps,[ref]$tokens,[ref]$errors) | Out-Null
+            if($errors.Count){
+              $errors | ForEach-Object { Write-Host ("$path :: "+$_.Message) -ForegroundColor Red }
+              throw "PowerShell parser found $($errors.Count) error(s) in $path"
+            }
+            Write-Host "Parsed: $path" -ForegroundColor Green
+          }
+
+      - name: Verify release defaults
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $full=[IO.File]::ReadAllText('.\install\Install-DLSS-Full.bat')
+          foreach($s in @(
+            "\$RuntimeTag='v1.1.0'",
+            "\$RuntimeZipHash='A0796FA04DFACEC7997B08BEFE1933EFBB17D2BC62478CB41B8C89750674CEE3'",
+            "'LastSRProfile=0'","'LastNRMode=0'","'Mode=0'","'Sharpness=0.000'","'SRProfile=0'",
+            "'JitterPhases=8'","'JitterMode=8'",
+            "Set-KeyEquals (Join-Path \$Game 'dxvk.conf') 'd3d9.samplerLodBias' '0.0'",
+            "M3K_Sharpen@M3K_Sharpen.fx"
+          )){
+            if(-not $full.Contains($s)){throw "Missing release marker: $s"}
+          }
+
+      - name: Compile installer
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          $iscc=Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          & $iscc .\installer\GTAIV-DLSS-Setup.iss
+          if($LASTEXITCODE -ne 0){throw "Inno Setup compile failed: $LASTEXITCODE"}
+          if(-not(Test-Path .\installer\out\GTAIV-DLSS-Setup.exe)){throw 'Compiled setup missing.'}
