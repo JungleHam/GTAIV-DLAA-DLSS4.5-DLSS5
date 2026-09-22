@@ -6,7 +6,7 @@ on:
     branches:
       - feature/fsr-3-1-5
     paths:
-      - '.github/workflows/fsr-runtime-proof-build.yml'
+      - '.github/workflows/fsr-p2-independent-planner.yml'
       - 'tools/fsr-vulkan/**'
       - 'install/Public-FSR-Vulkan-Proof-Stage.ps1'
       - 'install/Public-FSR-Vulkan-P2-Standalone-Stage.ps1'
@@ -19,7 +19,7 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - '.github/workflows/fsr-runtime-proof-build.yml'
+      - '.github/workflows/fsr-p2-independent-planner.yml'
       - 'tools/fsr-vulkan/**'
       - 'install/Public-FSR-Vulkan-Proof-Stage.ps1'
       - 'install/Public-FSR-Vulkan-P2-Standalone-Stage.ps1'
@@ -83,7 +83,7 @@ jobs:
             "& (Join-Path `$toolRoot 'public-fsr-vulkan-proof-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
             "& (Join-Path `$toolRoot 'public-fsr-vulkan-p2-standalone-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')"
           ) -join "`r`n"
-          if (($text.Split($anchor).Count - 1) -ne 1) { throw 'Could not attach P1 stage chain exactly once' }
+          if (($text.Split($anchor).Count - 1) -ne 1) { throw 'Could not attach P2 stage chain exactly once' }
           [IO.File]::WriteAllText($build,$text.Replace($anchor,$replacement),[Text.UTF8Encoding]::new($false))
 
       - name: Build pinned FidelityFX FSR 3.1.4 Vulkan
@@ -170,5 +170,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: fsr-p2-independent-planner
-          path: out-fsr-p1/*
+          path: out-fsr-p2/*
           if-no-files-found: error
