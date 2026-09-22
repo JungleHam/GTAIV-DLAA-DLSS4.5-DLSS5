@@ -7,6 +7,14 @@ on:
       - feature/fsr-3-1-5
     paths:
       - '.github/workflows/fsr-vulkan-sdk-probe.yml'
+      - 'tools/fsr-vulkan/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/fsr-vulkan-sdk-probe.yml'
+      - 'tools/fsr-vulkan/**'
+      - 'docs/FSR_ARCHITECTURE.md'
 
 permissions:
   contents: read
@@ -24,6 +32,11 @@ jobs:
         with:
           version: 1.3.290.0
           cache: true
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
 
       - name: Clone pinned FidelityFX SDK 1.1.4
         shell: pwsh
@@ -57,6 +70,25 @@ jobs:
           cmake --build .\_ffx\sdk\build-gtaiv-fsr --config Release --target ffx_fsr3upscaler_x64 ffx_backend_vk_x64 --parallel 4
           if ($LASTEXITCODE -ne 0) { throw "FidelityFX build failed: $LASTEXITCODE" }
 
+      - name: Prove feeder-compatible consumer compile and link
+        shell: pwsh
+        run: |
+          $libs=Get-ChildItem .\_ffx\sdk\bin\ffx_sdk -File -Filter '*.lib'
+          $fsr=$libs | Where-Object { $_.BaseName -like 'ffx_fsr3upscaler_x64*' } | Select-Object -First 1
+          $vk =$libs | Where-Object { $_.BaseName -like 'ffx_backend_vk_x64*' } | Select-Object -First 1
+          if (-not $fsr -or -not $vk) { throw 'Pinned FidelityFX libraries were not produced.' }
+
+          New-Item -ItemType Directory -Path .\out-fsr-sdk -Force | Out-Null
+          cl /nologo /EHsc /O2 /MD /std:c++20 `
+            /I".\_ffx\sdk\include" /I"$env:VULKAN_SDK\Include" `
+            .\tools\fsr-vulkan\ffx-link-probe.cpp `
+            "$($fsr.FullName)" "$($vk.FullName)" vulkan-1.lib `
+            /link /OUT:.\out-fsr-sdk\ffx-link-probe.exe
+          if ($LASTEXITCODE -ne 0) { throw "FidelityFX consumer link failed: $LASTEXITCODE" }
+
+          .\out-fsr-sdk\ffx-link-probe.exe
+          if ($LASTEXITCODE -ne 0) { throw "FidelityFX consumer probe failed: $LASTEXITCODE" }
+
       - name: Collect and verify probe artifacts
         shell: pwsh
         run: |
@@ -76,7 +108,8 @@ jobs:
             'FidelityFX-SDK commit=c6efa6bf7f2027b3ec94f28578bb5965eabb9e55',
             'FSR3 Upscaler=3.1.4',
             'Backend=Vulkan',
-            'Purpose=compile-only dependency probe; NOT a GTA IV runtime candidate'
+            'ConsumerProbe=MSVC x64 compile+static-link+launch passed',
+            'Purpose=dependency/toolchain gate; NOT a GTA IV runtime candidate'
           ) | Set-Content (Join-Path $out 'BUILD-INFO.txt') -Encoding UTF8
           Get-ChildItem $out -File | ForEach-Object {
             $h=Get-FileHash -Algorithm SHA256 $_.FullName
