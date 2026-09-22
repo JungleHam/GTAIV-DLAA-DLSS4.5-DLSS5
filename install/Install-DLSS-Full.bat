@@ -9,12 +9,12 @@ $ErrorActionPreference='Stop';$ProgressPreference='SilentlyContinue'
 $Self=$env:GTAIV_SETUP_SELF;$Repo='JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5';$RuntimeTag='v1.1.0'
 $ReleaseApi='https://api.github.com/repos/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/tags/v1.1.0'
 $RuntimeAsset='GTAIV-DLSS-Full-Runtime.zip'
-$RuntimeZipHash='7560102921FFD2FFFEBB7A76763F87B4F0A7DD994B27B49C6BCBC3FBD9F06BA4'
+$RuntimeZipHash='A0796FA04DFACEC7997B08BEFE1933EFBB17D2BC62478CB41B8C89750674CEE3'
 $RuntimeHashes=@{
- 'd3d9.dll'='783EEB29A6ED72E241AC26D64753DEA23F89AE9D850EA7398D479A008324451B';
+ 'd3d9.dll'='45717A8F8C9F3A7E38A8187CC965B3219545FD4D331F61DA28908433AD8CA20B';
  'NvRemixBridge.exe'='E4D5C00B622825E73373E489D5E47E8319DC6043999D2B062FF4A8031F916F32';
  'd3d9vk_x64.dll'='370BE394DE7BFC612D227CBE4B2A57A4AB5C23A420BE00AA839876DEF653DF97';
- 'dlss5-feed.addon64'='45D6932BAD5492F2B2DA8FE4214D1273D086AB60F9346C209F3D7B2BB47BF778';
+ 'dlss5-feed.addon64'='B6D7D9B050C4F32642A528E7700F38A0510795C7D61D30665DC96AF270B9ED27';
  'm3k\m3k-nvngx.dll'='E96B15E97028E2F3BA44854BE85A76BCD7C47B2062EE96CE05F7B8FFD4CE28D6';
  'M3K_Sharpen.fx'='20E2F9C918B2AAEC1B1C19CF732038506DC604B3455FAEEAD3147A11F0275429'
 }
@@ -59,20 +59,30 @@ try{
  $InstallStarted=$true;Copy-Item -LiteralPath (Join-Path $runtimeDir 'd3d9.dll') -Destination (Join-Path $Game 'd3d9.dll') -Force;Copy-Item -LiteralPath (Join-Path $runtimeDir 'NvRemixBridge.exe') -Destination (Join-Path $Trex 'NvRemixBridge.exe') -Force;Copy-Item -LiteralPath (Join-Path $runtimeDir 'd3d9vk_x64.dll') -Destination (Join-Path $Trex 'd3d9vk_x64.dll') -Force;Copy-Item -LiteralPath (Join-Path $runtimeDir 'dlss5-feed.addon64') -Destination (Join-Path $Trex 'dlss5-feed.addon64') -Force;$shaderDir=Join-Path $Trex 'reshade-shaders\Shaders';New-Item -ItemType Directory -Path $shaderDir -Force|Out-Null;Copy-Item -LiteralPath (Join-Path $runtimeDir 'M3K_Sharpen.fx') -Destination (Join-Path $shaderDir 'M3K_Sharpen.fx') -Force;$presetPath=Join-Path $Trex 'ReShadePreset.ini';Ensure-ReShadeTechnique $presetPath 'M3K_Sharpen@M3K_Sharpen.fx';New-Item -ItemType Directory -Path (Join-Path $Trex 'm3k') -Force|Out-Null;Copy-Item -LiteralPath (Join-Path $runtimeDir 'm3k\m3k-nvngx.dll') -Destination (Join-Path $Trex 'm3k\m3k-nvngx.dll') -Force;Copy-Item -LiteralPath $NrDllInput -Destination (Join-Path $Trex 'm3k\nvngx_dlssnr.dll') -Force
  foreach($rel in $RuntimeHashes.Keys){if($rel -eq 'm3k\m3k-nvngx.dll'){Assert-SHA256 (Join-Path $Trex $rel) $RuntimeHashes[$rel]}elseif($rel -in @('d3d9.dll')){Assert-SHA256 (Join-Path $Game $rel) $RuntimeHashes[$rel]}elseif($rel -in @('NvRemixBridge.exe','d3d9vk_x64.dll','dlss5-feed.addon64')){Assert-SHA256 (Join-Path $Trex $rel) $RuntimeHashes[$rel]}}
  Assert-SHA256 (Join-Path $Trex 'm3k\nvngx_dlssnr.dll') $nrDll
- Write-NoBom (Join-Path $Trex 'm3k-nr.ini') @('[M3K]','; GTA IV DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering','MasterEnabled=1','LastSRProfile=0','LastNRMode=0','Mode=0','SourceProof=0','SRProof=1','RenderWidth=1485','RenderHeight=835','OutputWidth=0','OutputHeight=0','AutoResizeWindow=1','VirtualizeGameClient=1','NRPasses=1','NRStyle=0','NRIntensity=1.000','NRLocalTone=1.000','NRLocalStructure=1.000','NRSkinStructure=1.000','NRAutoMask=1','NRUICorrection=0','Sharpness=0.000','CustomScalePercent=77','SRProfile=0','ProjectionProbe=0','TemporalJitter=1','JitterPhases=8','JitterMode=8','BalancedProbe=0','ManualRender=0','ManualRenderWidth=0','ManualRenderHeight=0','StartupPrime=1','StartupPrimeWidth=1485','StartupPrimeHeight=835','StartupPrimeFrames=180')
+ Write-NoBom (Join-Path $Trex 'm3k-nr.ini') @('[M3K]','; GTA IV DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering','MasterEnabled=1','LastSRProfile=0','LastNRMode=0','Mode=0','SourceProof=0','SRProof=1','RenderWidth=1485','RenderHeight=835','OutputWidth=0','OutputHeight=0','AutoResizeWindow=1','VirtualizeGameClient=1','NRPasses=1','SRProfile=0','ProjectionProbe=0','TemporalJitter=1','JitterPhases=8','JitterMode=8','BalancedProbe=0','ManualRender=0','ManualRenderWidth=0','ManualRenderHeight=0','StartupPrime=1','StartupPrimeWidth=1485','StartupPrimeHeight=835','StartupPrimeFrames=180')
  $feedCfg=Join-Path $Trex 'dlss5-feed.cfg';Set-KeyEquals $feedCfg 'enabled' '1';Set-KeyEquals $feedCfg 'mode' '2';Set-KeyEquals $feedCfg 'work_resolution' '100'
  Copy-Item -LiteralPath (Resolve-LocalSupportFile 'DLSS-Full-Control.bat') -Destination (Join-Path $Game 'DLSS-Full-Control.bat') -Force;Copy-Item -LiteralPath (Resolve-LocalSupportFile 'Uninstall-DLSS-Full.bat') -Destination (Join-Path $Game 'Uninstall-DLSS-Full.bat') -Force
  Write-NoBom (Join-Path $Game 'DLSS_FULL_INSTALLED.txt') @('GTA IV DLSS Full clean installation receipt',"Installed=$(Get-Date -Format o)",'DefaultDLSSQuality=DLAA Native','NeuralRendering=installed-off-by-default',"NRRuntimeFlavor=$flavor", "NRRuntimeLabel=$nrLabel", "NRRuntimeSHA256=$nrDll", "DlaaBaseline=$baseline", "Backup=$Backup")
  Write-Host '';Write-Host 'DONE - DLSS Full installed.' -ForegroundColor Green;Write-Host 'Initial DLSS profile: DLAA Native' -ForegroundColor White;Write-Host 'Neural Rendering: INSTALLED, but OFF for the first launch.' -ForegroundColor Yellow;Write-Host 'After verifying DLSS 4.5, enable NR from Home -> Add-ons -> DLSS 5 Feed -> GTA IV DLSS if wanted.' -ForegroundColor White;Start-Sleep -Seconds 3;exit 0
 }catch{Write-Host '';Write-Host ('INSTALL FAILED: '+$_.Exception.Message) -ForegroundColor Red;if($InstallStarted -and $Backup -and(Test-Path -LiteralPath $Backup)){try{Restore-Snapshot $Game $Backup;Write-Host 'Rollback completed.' -ForegroundColor Green}catch{Write-Host ('Rollback error: '+$_.Exception.Message) -ForegroundColor Red}};Read-Host 'Press Enter to close';exit 1}
 finally{if(Test-Path -LiteralPath $Temp){Remove-Item -LiteralPath $Temp -Recurse -Force -ErrorAction SilentlyContinue}}
-;$m=[regex]::Match($text,$pat)
+
+  $m=[regex]::Match($text,$pat)
   if($m.Success){
    $items=@($m.Groups[1].Value.Split(',')|ForEach-Object{$_.Trim()}|Where-Object{$_ -and $_ -ne $Technique})
-   $feed='DLSS5_Feed@DLSS5_Feed.fx';$idx=[Array]::IndexOf($items,$feed)
-   if($idx -ge 0){$before=@($items[0..$idx]);$after=@();if(($idx+1)-lt $items.Count){$after=@($items[($idx+1)..($items.Count-1)])};$items=@($before+$Technique+$after)}else{$items=@($items+$Technique)}
-   $line=$key+'='+($items -join ',');$text=$text.Substring(0,$m.Index)+$line+$text.Substring($m.Index+$m.Length)
-  }else{if($text.Length -gt 0 -and -not $text.EndsWith("`n")){$text+="`r`n"};$text+=$key+'='+$Technique+"`r`n"}
+   $feed='DLSS5_Feed@DLSS5_Feed.fx'
+   $idx=[Array]::IndexOf($items,$feed)
+   if($idx -ge 0){
+    $before=@($items[0..$idx]);$after=@()
+    if(($idx+1)-lt $items.Count){$after=@($items[($idx+1)..($items.Count-1)])}
+    $items=@($before+$Technique+$after)
+   }else{$items=@($items+$Technique)}
+   $line=$key+'='+($items -join ',')
+   $text=$text.Substring(0,$m.Index)+$line+$text.Substring($m.Index+$m.Length)
+  }else{
+   if($text.Length -gt 0 -and -not $text.EndsWith("`n")){$text+="`r`n"}
+   $text+=$key+'='+$Technique+"`r`n"
+  }
  }
  [IO.File]::WriteAllText($Path,$text,[Text.UTF8Encoding]::new($false))
 }
@@ -98,10 +108,10 @@ try{
  New-Item -ItemType Directory -Path $Temp -Force|Out-Null;$runtimeZip=Join-Path $Temp 'runtime.zip';$runtimeDir=Join-Path $Temp 'runtime'
  if($env:GTAIV_SETUP_PROJECT_RUNTIME -and (Test-Path -LiteralPath $env:GTAIV_SETUP_PROJECT_RUNTIME -PathType Leaf)){Write-Host 'Using local project runtime beside setup EXE.' -ForegroundColor DarkGray;Copy-Item -LiteralPath $env:GTAIV_SETUP_PROJECT_RUNTIME -Destination $runtimeZip -Force}else{$runtimeUrl=Resolve-ProjectAssetUrl $RuntimeAsset;Download $runtimeUrl $runtimeZip};Assert-SHA256 $runtimeZip $RuntimeZipHash;Expand-Archive -LiteralPath $runtimeZip -DestinationPath $runtimeDir -Force;foreach($rel in $RuntimeHashes.Keys){$p=Join-Path $runtimeDir $rel;if(-not(Test-Path -LiteralPath $p)){Fail "Runtime archive is missing $rel"};Assert-SHA256 $p $RuntimeHashes[$rel]}
  $baseline=Save-DlaaBaseline $Game $Trex;$stamp=Get-Date -Format 'yyyyMMdd_HHmmss';$Backup=Join-Path $Game ("_DLSS_FULL_PREINSTALL_BACKUP_"+$stamp);Snapshot-Current $Game $Backup
- $InstallStarted=$true;Copy-Item -LiteralPath (Join-Path $runtimeDir 'd3d9.dll') -Destination (Join-Path $Game 'd3d9.dll') -Force;Copy-Item -LiteralPath (Join-Path $runtimeDir 'NvRemixBridge.exe') -Destination (Join-Path $Trex 'NvRemixBridge.exe') -Force;Copy-Item -LiteralPath (Join-Path $runtimeDir 'd3d9vk_x64.dll') -Destination (Join-Path $Trex 'd3d9vk_x64.dll') -Force;Copy-Item -LiteralPath (Join-Path $runtimeDir 'dlss5-feed.addon64') -Destination (Join-Path $Trex 'dlss5-feed.addon64') -Force;$shaderDir=Join-Path $Trex 'reshade-shaders\Shaders';New-Item -ItemType Directory -Path $shaderDir -Force|Out-Null;Copy-Item -LiteralPath (Join-Path $runtimeDir 'M3K_Sharpen.fx') -Destination (Join-Path $shaderDir 'M3K_Sharpen.fx') -Force;New-Item -ItemType Directory -Path (Join-Path $Trex 'm3k') -Force|Out-Null;Copy-Item -LiteralPath (Join-Path $runtimeDir 'm3k\m3k-nvngx.dll') -Destination (Join-Path $Trex 'm3k\m3k-nvngx.dll') -Force;Copy-Item -LiteralPath $NrDllInput -Destination (Join-Path $Trex 'm3k\nvngx_dlssnr.dll') -Force
+ $InstallStarted=$true;Copy-Item -LiteralPath (Join-Path $runtimeDir 'd3d9.dll') -Destination (Join-Path $Game 'd3d9.dll') -Force;Copy-Item -LiteralPath (Join-Path $runtimeDir 'NvRemixBridge.exe') -Destination (Join-Path $Trex 'NvRemixBridge.exe') -Force;Copy-Item -LiteralPath (Join-Path $runtimeDir 'd3d9vk_x64.dll') -Destination (Join-Path $Trex 'd3d9vk_x64.dll') -Force;Copy-Item -LiteralPath (Join-Path $runtimeDir 'dlss5-feed.addon64') -Destination (Join-Path $Trex 'dlss5-feed.addon64') -Force;New-Item -ItemType Directory -Path (Join-Path $Trex 'm3k') -Force|Out-Null;Copy-Item -LiteralPath (Join-Path $runtimeDir 'm3k\m3k-nvngx.dll') -Destination (Join-Path $Trex 'm3k\m3k-nvngx.dll') -Force;Copy-Item -LiteralPath $NrDllInput -Destination (Join-Path $Trex 'm3k\nvngx_dlssnr.dll') -Force
  foreach($rel in $RuntimeHashes.Keys){if($rel -eq 'm3k\m3k-nvngx.dll'){Assert-SHA256 (Join-Path $Trex $rel) $RuntimeHashes[$rel]}elseif($rel -in @('d3d9.dll')){Assert-SHA256 (Join-Path $Game $rel) $RuntimeHashes[$rel]}elseif($rel -in @('NvRemixBridge.exe','d3d9vk_x64.dll','dlss5-feed.addon64')){Assert-SHA256 (Join-Path $Trex $rel) $RuntimeHashes[$rel]}}
  Assert-SHA256 (Join-Path $Trex 'm3k\nvngx_dlssnr.dll') $nrDll
- Write-NoBom (Join-Path $Trex 'm3k-nr.ini') @('[M3K]','; GTA IV DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering','MasterEnabled=1','LastSRProfile=2','LastNRMode=0','Mode=0','SourceProof=0','SRProof=1','RenderWidth=1485','RenderHeight=835','OutputWidth=0','OutputHeight=0','AutoResizeWindow=1','VirtualizeGameClient=1','NRPasses=1','NRStyle=0','NRIntensity=1.000','NRLocalTone=1.000','NRLocalStructure=1.000','NRSkinStructure=1.000','NRAutoMask=1','NRUICorrection=0','Sharpness=0.000','CustomScalePercent=77','SRProfile=2','ProjectionProbe=0','TemporalJitter=1','BalancedProbe=0','ManualRender=0','ManualRenderWidth=0','ManualRenderHeight=0','StartupPrime=1','StartupPrimeWidth=1485','StartupPrimeHeight=835','StartupPrimeFrames=180')
+ Write-NoBom (Join-Path $Trex 'm3k-nr.ini') @('[M3K]','; GTA IV DLSS 4.5 Super Resolution + DLSS 5 Neural Rendering','MasterEnabled=1','LastSRProfile=2','LastNRMode=0','Mode=0','SourceProof=0','SRProof=1','RenderWidth=1485','RenderHeight=835','OutputWidth=0','OutputHeight=0','AutoResizeWindow=1','VirtualizeGameClient=1','NRPasses=1','SRProfile=2','ProjectionProbe=0','TemporalJitter=1','BalancedProbe=0','ManualRender=0','ManualRenderWidth=0','ManualRenderHeight=0','StartupPrime=1','StartupPrimeWidth=1485','StartupPrimeHeight=835','StartupPrimeFrames=180')
  $feedCfg=Join-Path $Trex 'dlss5-feed.cfg';Set-KeyEquals $feedCfg 'enabled' '1';Set-KeyEquals $feedCfg 'mode' '2';Set-KeyEquals $feedCfg 'work_resolution' '100'
  Copy-Item -LiteralPath (Resolve-LocalSupportFile 'DLSS-Full-Control.bat') -Destination (Join-Path $Game 'DLSS-Full-Control.bat') -Force;Copy-Item -LiteralPath (Resolve-LocalSupportFile 'Uninstall-DLSS-Full.bat') -Destination (Join-Path $Game 'Uninstall-DLSS-Full.bat') -Force
  Write-NoBom (Join-Path $Game 'DLSS_FULL_INSTALLED.txt') @('GTA IV DLSS Full clean installation receipt',"Installed=$(Get-Date -Format o)",'DefaultDLSSQuality=Quality','NeuralRendering=installed-off-by-default',"NRRuntimeFlavor=$flavor", "NRRuntimeLabel=$nrLabel", "NRRuntimeSHA256=$nrDll", "DlaaBaseline=$baseline", "Backup=$Backup")
