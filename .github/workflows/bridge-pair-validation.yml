@@ -23,9 +23,9 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $installer = Get-Content install/Install-DLSS-Full.bat -Raw
           foreach ($marker in @(
-            'v1.0.0',
+            'v1.1.0',
             'GTAIV-DLSS-Full-Runtime.zip',
-            "'d3d9.dll'='783EEB29A6ED72E241AC26D64753DEA23F89AE9D850EA7398D479A008324451B'",
+            "'d3d9.dll'='45717A8F8C9F3A7E38A8187CC965B3219545FD4D331F61DA28908433AD8CA20B'",
             "'NvRemixBridge.exe'='E4D5C00B622825E73373E489D5E47E8319DC6043999D2B062FF4A8031F916F32'",
             "Copy-Item -LiteralPath (Join-Path `$runtimeDir 'd3d9.dll') -Destination (Join-Path `$Game 'd3d9.dll') -Force",
             "Copy-Item -LiteralPath (Join-Path `$runtimeDir 'NvRemixBridge.exe') -Destination (Join-Path `$Trex 'NvRemixBridge.exe') -Force")) {
@@ -42,18 +42,18 @@ jobs:
           $downloadDir=Join-Path $env:RUNNER_TEMP 'published-runtime'
           $dir=Join-Path $env:RUNNER_TEMP 'runtime'
           New-Item -ItemType Directory -Path $downloadDir -Force | Out-Null
-          gh release view v1.0.0 --repo $env:GITHUB_REPOSITORY *> $null
+          gh release view v1.1.0 --repo $env:GITHUB_REPOSITORY *> $null
           if ($LASTEXITCODE -ne 0) {
-            Write-Host 'No public v1.0.0 release exists yet; skipping published bridge-pair verification during pre-release rebuild.' -ForegroundColor Yellow
+            Write-Host 'No public v1.1.0 release exists yet; skipping published bridge-pair verification during pre-release rebuild.' -ForegroundColor Yellow
             exit 0
           }
-          gh release download v1.0.0 --repo $env:GITHUB_REPOSITORY --pattern 'GTAIV-DLSS-Full-Runtime.zip' --dir $downloadDir --clobber
+          gh release download v1.1.0 --repo $env:GITHUB_REPOSITORY --pattern 'GTAIV-DLSS-Full-Runtime.zip' --dir $downloadDir --clobber
           if ($LASTEXITCODE -ne 0) { throw "gh release download failed: $LASTEXITCODE" }
           $zip=Join-Path $downloadDir 'GTAIV-DLSS-Full-Runtime.zip'
           Expand-Archive -LiteralPath $zip -DestinationPath $dir -Force
           $client=Join-Path $dir 'd3d9.dll'
           $server=Join-Path $dir 'NvRemixBridge.exe'
-          if ((Get-FileHash -Algorithm SHA256 $client).Hash.ToUpperInvariant() -ne '783EEB29A6ED72E241AC26D64753DEA23F89AE9D850EA7398D479A008324451B') { throw 'Published x86 client hash mismatch' }
+          if ((Get-FileHash -Algorithm SHA256 $client).Hash.ToUpperInvariant() -ne '45717A8F8C9F3A7E38A8187CC965B3219545FD4D331F61DA28908433AD8CA20B') { throw 'Published x86 client hash mismatch' }
           if ((Get-FileHash -Algorithm SHA256 $server).Hash.ToUpperInvariant() -ne 'E4D5C00B622825E73373E489D5E47E8319DC6043999D2B062FF4A8031F916F32') { throw 'Published x64 server hash mismatch' }
           $expectedVersion='remix-main+1dad5e6d'
           foreach ($p in @($client,$server)) {
@@ -73,6 +73,7 @@ jobs:
           git -C _verify_bbridge submodule update --init --recursive
           python .\_verify_project\tools\m3k-nr\a2-s21-bbridge-ui.py .\_verify_bbridge
           python .\_verify_project\tools\m3k-nr\a3-s2-bbridge-coherent-draw-jitter.py .\_verify_bbridge
+          python .\install\Public-BBridge-Jitter-Viewport-Tolerance.py .\_verify_bbridge
           git -C _verify_bbridge diff --check
           python -m pip install --disable-pip-version-check meson==0.64.1 ninja==1.11.1.1
           Push-Location _verify_bbridge
