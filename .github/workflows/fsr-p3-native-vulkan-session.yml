@@ -87,7 +87,7 @@ jobs:
             "& (Join-Path `$toolRoot 'public-fsr-vulkan-p2-standalone-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
             "& (Join-Path `$toolRoot 'public-fsr-vulkan-p3-native-session-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')"
           ) -join "`r`n"
-          if (($text.Split($anchor).Count - 1) -ne 1) { throw 'Could not attach P2 stage chain exactly once' }
+          if (($text.Split($anchor).Count - 1) -ne 1) { throw 'Could not attach P3 stage chain exactly once' }
           [IO.File]::WriteAllText($build,$text.Replace($anchor,$replacement),[Text.UTF8Encoding]::new($false))
 
       - name: Build pinned FidelityFX FSR 3.1.4 Vulkan
@@ -149,8 +149,8 @@ jobs:
             'P3 goal=prove FSR can run without D3D12/NGX bootstrap before exposing the public backend selector',
             "SHA256=$hash"
           )|Set-Content .\out-fsr-p3\TEST-NOTES.txt -Encoding UTF8
-          Copy-Item .\_project\tools\m3k-nr\_generated\m3k_vk.h .\out-fsr-p3\generated-m3k_vk.h -Force -ErrorAction SilentlyContinue
-          Copy-Item .\_project\tools\m3k-nr\_work\DLSS5-Feeder\src\dlss5-feed.cpp .\out-fsr-p3\generated-dlss5-feed.cpp -Force -ErrorAction SilentlyContinue
+          Copy-Item .\_project\tools\m3k-nr\_work\m3k-src-a3-s5\m3k_vk.h .\out-fsr-p3\generated-m3k_vk.h -Force -ErrorAction SilentlyContinue
+          Copy-Item .\_project\tools\m3k-nr\_work\feeder\src\dlss5-feed.cpp .\out-fsr-p3\generated-dlss5-feed.cpp -Force -ErrorAction SilentlyContinue
           Copy-Item .\tools\fsr-vulkan\FSR-P3-Apply.ps1 .\out-fsr-p3\FSR-P3-Apply.ps1 -Force
           Copy-Item .\tools\fsr-vulkan\FSR-P3-Restore.ps1 .\out-fsr-p3\FSR-P3-Restore.ps1 -Force
           Copy-Item .\tools\fsr-vulkan\1-APPLY-FSR-P3-TEST.bat .\out-fsr-p3\1-APPLY-FSR-P3-TEST.bat -Force
