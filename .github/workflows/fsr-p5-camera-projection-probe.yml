@@ -214,7 +214,7 @@ jobs:
             "BridgeSHA256=$bh"
           )|Set-Content .\out-fsr-p5\HOW-TO-TEST.txt -Encoding UTF8
 
-            - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: fsr-p5-camera-projection-probe
           path: out-fsr-p5/*
