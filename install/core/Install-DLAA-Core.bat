@@ -13,7 +13,7 @@ $Trex=Join-Path $Game '.trex'; $Temp=Join-Path $env:TEMP ("GTAIV_DLAA_AIO_"+$PID
 $ReshadeSetup=$env:GTAIV_SETUP_RESHADE; $LumenitePackage=$env:GTAIV_SETUP_LUMENITE
 $ReShadeSetupHash='AFE4C8F13048306307983B8B3D41D5BF00A86820440B0E57DEA10950E1176445'
 $LumenitePackageHash='572FEFB20D466AFE50998E16996B4833BEC675264485C99FE768A2337636E756'
-$ReleaseApi='https://api.github.com/repos/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/tags/v1.0.0'
+$ReleaseApi='https://api.github.com/repos/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/tags/v1.1.0'
 $RuntimeAsset='GTAIV-DLSS-Full-Runtime.zip'
 $RuntimeZipHash='7560102921FFD2FFFEBB7A76763F87B4F0A7DD994B27B49C6BCBC3FBD9F06BA4'
 $RuntimeHashes=@{
