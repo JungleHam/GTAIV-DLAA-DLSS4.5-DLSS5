@@ -248,13 +248,38 @@ $shutdownTailNew=@'
 '@
 $feed=Once $feed $shutdownTail $shutdownTailNew 'native session reset'
 
+
+# The baseline Vulkan feeder assumes mode 2 always needs an NGX feature and waits
+# for cross-API present ordering before even opening its session. Native FSR needs
+# neither. Without these gates P3 would repeatedly invalidate frame_ready because
+# g.feature is intentionally null.
+$presentGateOld='    if (g_cfg.mode >= 2 && g_cfg.vk_present_sync && !g_vk_present_sync_off && !FeedVkOrderPresent(rt, cl))'
+$presentGateNew='    if (!M3kFsrSelectedAtSessionOpen() && g_cfg.mode >= 2 && g_cfg.vk_present_sync && !g_vk_present_sync_off && !FeedVkOrderPresent(rt, cl))'
+$feed=Once $feed $presentGateOld $presentGateNew 'skip DLSS present-order gate for native FSR'
+
+$needsOld=@'
+    const bool needs_build_vk = !g.frame_ready || w != g.width || h != g.height || bbf != g.bb_fmt ||
+                                FeatureMissingForMode();
+'@
+$needsNew=@'
+    const bool needs_build_vk = !g.frame_ready || w != g.width || h != g.height || bbf != g.bb_fmt ||
+                                (!g_m3kFsrNativeSession && FeatureMissingForMode());
+'@
+$feed=Once $feed $needsOld $needsNew 'ignore missing NGX feature for native FSR'
+
+$graceOld='    if (ok && needs_build_vk && g.create_grace < g_cfg.create_delay)'
+$graceNew='    if (ok && needs_build_vk && !g_m3kFsrNativeSession && g.create_grace < g_cfg.create_delay)'
+$feed=Once $feed $graceOld $graceNew 'skip DLSS hook grace for native FSR'
+
 foreach($marker in @(
     'M3K-FSR-P3: NATIVE VULKAN SESSION READY; D3D12 NOT CREATED; NGX NOT INITIALIZED',
     'M3K-FSR-P3: native Vulkan frame resources READY',
     'M3kFsrLoadNativeVk',
     'M3kFsrAllocNativeImage',
     'if(g_m3kFsrNativeSession)',
-    'g_m3kFsrBackend.Shutdown()'
+    'g_m3kFsrBackend.Shutdown()',
+    '!g_m3kFsrNativeSession && FeatureMissingForMode()',
+    '!g_m3kFsrNativeSession && g.create_grace < g_cfg.create_delay'
 )){
     if($feed.IndexOf($marker,[StringComparison]::Ordinal)-lt 0){throw "FSR P3 verification marker missing: $marker"}
 }
