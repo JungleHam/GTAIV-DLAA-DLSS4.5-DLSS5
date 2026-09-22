@@ -63,6 +63,29 @@ Treat Neural Rendering as a higher-level optional stage, not as proof that FSR a
 - Do not make FSR depend on NVIDIA's `nvngx_dlssnr.dll`.
 - Do not silently install or load an unofficial AMD compatibility runtime. It must be explicit and independently testable.
 
+## Hardware checkpoint: FSR-P1 passed (2026-09-22)
+
+RTX 4070 Ti SUPER / 2560x1440 hardware log proved:
+
+- FSR 3.1.4 Vulkan context created successfully.
+- Direct FSR Vulkan dispatch began at 1485x835 -> 2560x1440.
+- More than 33,000 FSR frames were dispatched in one run.
+- No FSR debug error, dispatch failure, crash, or NGX fallback occurred after initialization.
+- NGX evaluate time remained 0.00 ms on the direct FSR path.
+- Clean shutdown reached Vulkan-hook removal.
+
+P1 also exposed a design bug rather than an FSR failure: the run remained pinned to the existing 1485x835 DLSS startup-prime size for the whole session. Because FSR bypassed the DLSS evaluation observer that completes startup prime, the prime never released to the intended quality size.
+
+Therefore P2 must:
+
+1. bypass DLSS startup-prime whenever FSR is selected;
+2. give FSR its own render-size plan;
+3. disable DLSS SR feature creation (SRProof=0) during the FSR test;
+4. keep no-cross-backend-fallback behavior;
+5. use the FidelityFX jitter phase-count helper for the FSR render/output ratio.
+
+P2 still reuses the Feeder's existing shared Vulkan resource allocation/bootstrap. Full AMD independence requires removing that remaining NGX/D3D12 bootstrap in a later step.
+
 ## Version decision
 
 The final target remains **FSR 3.1.5**, but AMD's current FidelityFX SDK 2.3 package does not currently provide a Vulkan backend.
