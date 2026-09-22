@@ -1,5 +1,5 @@
 #define MyAppName "GTA IV DLSS Setup & Maintenance"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.1.0"
 #define MyPublisher "JungleHam"
 #define MyRepo "https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5"
 

@@ -144,6 +144,7 @@ jobs:
           Copy-Item .\install\Public-ReShade-UX-Master-Stage.ps1 "$tool\public-reshade-ux-master-stage.ps1" -Force
           Copy-Item .\install\Public-ReShade-UX-Master-Fixup.ps1 "$tool\public-reshade-ux-master-fixup.ps1" -Force
           Copy-Item .\install\Public-ReShade-UX-Master-V2-Fixup.ps1 "$tool\public-reshade-ux-master-v2-fixup.ps1" -Force
+          Copy-Item .\install\Public-DLSS-CustomScale-NR-Tuning-Stage.ps1 "$tool\public-dlss-customscale-nr-tuning-stage.ps1" -Force
           $build = "$tool\build-a3-s5.ps1"
           $text = [IO.File]::ReadAllText($build)
           $anchor = "& (Join-Path `$toolRoot 'a3-s5-startup-prime-stage.ps1') -GeneratedRoot `$generated"
@@ -153,7 +154,8 @@ jobs:
             "& (Join-Path `$toolRoot 'public-startup-prime-fix-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
             "& (Join-Path `$toolRoot 'public-reshade-ux-master-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
             "& (Join-Path `$toolRoot 'public-reshade-ux-master-fixup.ps1') -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
-            "& (Join-Path `$toolRoot 'public-reshade-ux-master-v2-fixup.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')"
+            "& (Join-Path `$toolRoot 'public-reshade-ux-master-v2-fixup.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-dlss-customscale-nr-tuning-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')"
           ) -join "`r`n"
           if (($text.Split($anchor).Count - 1) -ne 1) { throw 'Could not attach production stages exactly once' }
           [IO.File]::WriteAllText($build,$text.Replace($anchor,$replacement),[Text.UTF8Encoding]::new($false))
@@ -174,6 +176,7 @@ jobs:
           git -C _bbridge submodule update --init --recursive
           python .\_project\tools\m3k-nr\a2-s21-bbridge-ui.py .\_bbridge
           python .\_project\tools\m3k-nr\a3-s2-bbridge-coherent-draw-jitter.py .\_bbridge
+          python .\install\Public-BBridge-Jitter-Viewport-Tolerance.py .\_bbridge
           git -C _bbridge diff --check
           python -m pip install --disable-pip-version-check meson==0.64.1 ninja==1.11.1.1
           Push-Location _bbridge
@@ -207,6 +210,14 @@ jobs:
           New-Item -ItemType Directory -Path .\_bbridge-configs -Force | Out-Null
           Copy-Item $bridgeConf.FullName .\_bbridge-configs\bridge.conf -Force
           Copy-Item $dxvkConf.FullName .\_bbridge-configs\dxvk.conf -Force
+          $confPath='.\_bbridge-configs\dxvk.conf'
+          $confText=[IO.File]::ReadAllText($confPath)
+          $pat='(?m)^\s*d3d9\.samplerLodBias\s*=\s*.*$'
+          if($confText -match $pat){$confText=[regex]::Replace($confText,$pat,'d3d9.samplerLodBias = 0.0')}else{
+            if($confText.Length -gt 0 -and -not $confText.EndsWith("`n")){$confText+="`r`n"}
+            $confText+="d3d9.samplerLodBias = 0.0`r`n"
+          }
+          [IO.File]::WriteAllText($confPath,$confText,[Text.UTF8Encoding]::new($false))
 
       - name: Checkout redistributable runtime sources
         shell: pwsh
@@ -243,6 +254,7 @@ jobs:
           $feedFx = Get-ChildItem .\_feeder-release -Recurse -File -Filter 'DLSS5_Feed.fx' | Select-Object -First 1
           if (-not $feedFx) { throw 'DLSS5_Feed.fx not found in pinned Feeder source.' }
           Copy-Item $feedFx.FullName .\out-runtime\DLSS5_Feed.fx -Force
+          Copy-Item .\install\M3K_Sharpen.fx .\out-runtime\M3K_Sharpen.fx -Force
 
           foreach ($name in @('ReShade.fxh','ReShadeUI.fxh','DrawText.fxh')) {
             $src = Get-ChildItem .\_reshade-shaders -Recurse -File -Filter $name | Select-Object -First 1
@@ -256,7 +268,7 @@ jobs:
           AssertHash .\out-runtime\DLSS5_Feed.fx 'CDAC08A721B14B97187DD86C5B5BEAD157C9063D7EE859A0F131A8EE791695F1'
           AssertHash .\out-runtime\nvngx_dlss.dll '3975567B8943C53ACCE397F2B72380092F84F162D00B0D2C7D08A1025C563983'
           AssertHash .\out-runtime\bridge.conf '161557ED3B3DEE86D9B9BEA3D3323924EE1F9F7FF47A139E3075B787B752EC8C'
-          AssertHash .\out-runtime\dxvk.conf '509713876C2C9EFBC70D242C4474E76554C59D2A0B162695085A31B8FE772247'
+          AssertHash .\out-runtime\dxvk.conf 'A317EDB736464EF90037B9F8A9267CDCB00905D485E7FE0E1E30F3C456F842EE'
 
           $expectedVersion = 'remix-main+1dad5e6d'
           foreach ($p in @('.\out-runtime\d3d9.dll','.\out-runtime\NvRemixBridge.exe')) {

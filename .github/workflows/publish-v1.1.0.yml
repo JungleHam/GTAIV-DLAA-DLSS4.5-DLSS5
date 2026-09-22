@@ -1,0 +1,125 @@
+name: Publish v1.1.0
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/publish-v1.1.0.yml'
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate release source and defaults
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          foreach($path in @('.\install\Install-DLSS-Full.bat','.\install\core\Install-DLAA-Core.bat')){
+            $text=[IO.File]::ReadAllText($path)
+            if($text -match 'return\['){throw "Invalid PowerShell tokenization remains in $path"}
+            if($text -notmatch 'return \[string\]\$asset\.browser_download_url'){throw "Correct release cast missing in $path"}
+          }
+          $full=[IO.File]::ReadAllText('.\install\Install-DLSS-Full.bat')
+          foreach($marker in @(
+            "RuntimeTag='v1.1.0'",
+            "RuntimeZipHash='A0796FA04DFACEC7997B08BEFE1933EFBB17D2BC62478CB41B8C89750674CEE3'",
+            "'LastSRProfile=0'",
+            "'LastNRMode=0'",
+            "'Mode=0'",
+            "'Sharpness=0.000'",
+            "'SRProfile=0'",
+            "'JitterPhases=8'",
+            "'JitterMode=8'",
+            "Ensure-ReShadeTechnique \$presetPath 'M3K_Sharpen@M3K_Sharpen.fx'"
+          )){if($full -notmatch [regex]::Escape($marker)){throw "Full installer release marker missing: $marker"}}
+          $iss=[IO.File]::ReadAllText('.\installer\GTAIV-DLSS-Setup.iss')
+          if($iss -notmatch '#define MyAppVersion "1\.1\.0"'){throw 'Installer version is not 1.1.0.'}
+
+      - name: Download frozen v1.1.0 runtime candidate
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          New-Item -ItemType Directory -Path .\release-assets -Force | Out-Null
+          gh run download 35744601357 --repo "$env:GITHUB_REPOSITORY" --name 'v1.1.0-frozen-runtime-candidate' --dir .\_candidate
+          if($LASTEXITCODE -ne 0){throw 'Could not download frozen v1.1.0 runtime candidate.'}
+          $src=Get-ChildItem .\_candidate -Recurse -File -Filter 'GTAIV-DLSS-Full-Runtime-v1.1.0.zip' | Select-Object -First 1
+          if(-not $src){throw 'Frozen runtime ZIP missing from candidate artifact.'}
+          $hash=(Get-FileHash -Algorithm SHA256 $src.FullName).Hash.ToUpperInvariant()
+          if($hash -ne 'A0796FA04DFACEC7997B08BEFE1933EFBB17D2BC62478CB41B8C89750674CEE3'){throw "Frozen runtime hash mismatch: $hash"}
+          Copy-Item $src.FullName .\release-assets\GTAIV-DLSS-Full-Runtime.zip -Force
+          $hash | Set-Content .\release-assets\GTAIV-DLSS-Full-Runtime.sha256 -Encoding ASCII
+
+      - name: Fetch unchanged ReShade b-bridge patch
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          gh release download v1.0.1 --repo "$env:GITHUB_REPOSITORY" --pattern 'ReShade64-bbridge.dll' --dir .\release-assets
+          if($LASTEXITCODE -ne 0){throw 'Could not download frozen ReShade patch.'}
+          $p='.\release-assets\ReShade64-bbridge.dll'
+          $hash=(Get-FileHash -Algorithm SHA256 $p).Hash.ToUpperInvariant()
+          if($hash -ne 'D5BD8CB2B6E935506888EA71711361B9AFCD72ED7C70926C0F52E8F8E47C7510'){throw "ReShade patch hash mismatch: $hash"}
+
+      - name: Compile v1.1.0 setup
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          choco install innosetup --no-progress -y
+          $iscc=Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if(-not(Test-Path $iscc)){throw 'ISCC.exe was not found.'}
+          & $iscc .\installer\GTAIV-DLSS-Setup.iss
+          if($LASTEXITCODE -ne 0){throw "Inno Setup compile failed: $LASTEXITCODE"}
+          $exe='.\installer\out\GTAIV-DLSS-Setup.exe'
+          if(-not(Test-Path $exe)){throw 'Compiled installer is missing.'}
+          $hash=(Get-FileHash -Algorithm SHA256 $exe).Hash.ToUpperInvariant()
+          $hash | Set-Content .\installer\out\GTAIV-DLSS-Setup.sha256 -Encoding ASCII
+          Write-Host "v1.1.0 installer SHA256: $hash" -ForegroundColor Green
+
+      - name: Publish immutable v1.1.0
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          gh release view v1.1.0 --repo "$env:GITHUB_REPOSITORY" *> $null
+          if($LASTEXITCODE -eq 0){throw 'v1.1.0 already exists; refusing to overwrite it.'}
+
+          @'
+          # v1.1.0 — Custom scaling, NR controls, temporal fixes and sharpening
+
+          This release freezes the hardware-tested GTA IV DLSS/DLAA integration developed after v1.0.1.
+
+          Highlights:
+          - DLAA Native (100%) is now the default reconstruction mode.
+          - Neural Rendering is installed but OFF by default.
+          - Sharpening is available from the GTA IV DLSS panel and defaults to 0.00.
+          - Custom render scale supports 10–100% with staged Apply.
+          - Advanced NR style/tuning controls and 1–5 passes.
+          - Jitter sequence selector moved under Advanced; default is 8 phases.
+          - GTA IV calibrated NGX jitter compensation is +1/+1.
+          - Viewport tolerance fix keeps raster jitter active when GTA reports a viewport a few pixels smaller.
+          - Resolution-switch runtime quarantine fixes the 77% -> DLAA ReShade/Vulkan crash.
+          - M3K sharpening technique is enabled after DLSS in the ReShade preset.
+          - DXVK texture LOD bias default is now 0.0.
+
+          Frozen runtime SHA256:
+          A0796FA04DFACEC7997B08BEFE1933EFBB17D2BC62478CB41B8C89750674CEE3
+
+          The release keeps the existing ReShade b-bridge input patch unchanged from v1.0.1.
+          '@ | Set-Content .\release-notes.md -Encoding UTF8
+
+          $files=@(
+            '.\installer\out\GTAIV-DLSS-Setup.exe',
+            '.\installer\out\GTAIV-DLSS-Setup.sha256',
+            '.\release-assets\GTAIV-DLSS-Full-Runtime.zip',
+            '.\release-assets\GTAIV-DLSS-Full-Runtime.sha256',
+            '.\release-assets\ReShade64-bbridge.dll'
+          )
+          gh release create v1.1.0 $files --repo "$env:GITHUB_REPOSITORY" --target "$env:GITHUB_SHA" --title "v1.1.0 — Custom scaling, NR controls & temporal fixes" --notes-file .\release-notes.md --latest
+          if($LASTEXITCODE -ne 0){throw 'GitHub release creation failed.'}
