@@ -25,8 +25,8 @@ $feed=[IO.File]::ReadAllText($FeederSource)
 $include=@'
 #pragma once
 
-// FSR-P1: hidden, opt-in Vulkan proof backend. The normal DLSS path is unchanged
-// unless M3K/FSRProof=1 is explicitly written to m3k-nr.ini.
+// FSR-P1: hidden, opt-in Vulkan proof backend. When M3K/FSRProof=1 is selected,
+// NGX/DLSS evaluation is forbidden for that frame; failures stay visibly on the FSR test path.
 #include "m3k_fsr_backend.h"
 '@
 $vk=Once $vk '#pragma once' $include 'backend include'
@@ -90,7 +90,7 @@ $assignNew=@'
         g_m3kSrRequested = srProof;
         static bool fsrFirst=true;
         if(fsrFirst||fsrProof!=g_m3kFsrProofRequested){
-            Log("M3K-FSR-P1: FSRProof=%d (hidden Vulkan proof; DLSS remains fallback)",fsrProof?1:0);
+            Log("M3K-FSR-P1: FSRProof=%d (isolated Vulkan proof; NGX/DLSS fallback FORBIDDEN while selected)",fsrProof?1:0);
             if(fsrProof)
                 Log("M3K-FSR-P1: camera inputs are PROVISIONAL near=%.4f far=%.2f fovY=%.2fdeg; do not judge reconstruction quality until projection calibration is wired",
                     fsrCameraNear,fsrCameraFar,fsrCameraFovY*57.29577951308232f);
@@ -148,7 +148,7 @@ static bool M3kFsrTryDispatchVk(VkCommandBuffer cb,VkImage backbuffer,UINT final
         if(!g_m3kFsrBackend.Init(g.vk.dev,g.vk.phys,g.vk.GetDeviceProcAddr,
                                  finalW,finalH,finalW,finalH,inverted,false,M3kFsrMessage)){
             g_m3kFsrLatchedFail=true;
-            Log("M3K-FSR-P1: context creation FAILED; proof latched off, DLSS fallback remains active");
+            Log("M3K-FSR-P1: context creation FAILED; proof latched failed; NGX fallback remains forbidden");
             return false;
         }
         g_m3kFsrNeedsReset=true;
@@ -158,7 +158,7 @@ static bool M3kFsrTryDispatchVk(VkCommandBuffer cb,VkImage backbuffer,UINT final
         // P1 never destroys an FSR context during ReShade/device churn. That lifecycle
         // is intentionally deferred to P2's proven quarantine path.
         g_m3kFsrLatchedFail=true;
-        Log("M3K-FSR-P1: device/output/depth contract changed; refusing unsafe in-flight context rebuild and falling back to DLSS");
+        Log("M3K-FSR-P1: device/output/depth contract changed; refusing unsafe in-flight context rebuild; NGX fallback forbidden");
         return false;
     }
 
@@ -199,7 +199,7 @@ static bool M3kFsrTryDispatchVk(VkCommandBuffer cb,VkImage backbuffer,UINT final
 
     if(!g_m3kFsrBackend.Dispatch(d)){
         g_m3kFsrLatchedFail=true;g_m3kFsrNeedsReset=true;
-        Log("M3K-FSR-P1: dispatch FAILED; proof latched off, DLSS fallback resumes next frame");
+        Log("M3K-FSR-P1: dispatch FAILED; proof latched failed; NGX fallback forbidden");
         return false;
     }
     g_m3kFsrNeedsReset=false;
@@ -237,18 +237,44 @@ if($resetAt-lt 0-or $resetAt-$frameAt-gt 1000){throw 'Vulkan reset marker missin
 $insertAt=$resetAt+$resetMarker.Length
 $direct=@'
 
-            // FSR-P1 bypasses the external D3D12/NGX detour entirely when its Vulkan
-            // dispatch succeeds. Imported images remain owned by Vulkan and the normal
-            // DLSS path is still available as same-frame fallback on a pre-dispatch block.
-            if(M3kFsrTryDispatchVk(cb,bb_img,w,h,reset))
+            // FSR-P1 is an isolated backend selection. Once requested, this frame is
+            // NEVER allowed to fall through into the D3D12/NGX DLSS path.
+            if(g_m3kFsrProofRequested)
             {
+                const bool fsrDelivered=M3kFsrTryDispatchVk(cb,bb_img,w,h,reset);
+                if(!fsrDelivered)
+                {
+                    // Make failure visible without invoking NVIDIA reconstruction:
+                    // nearest-blit the real DXVK source directly to the presenter.
+                    const auto fsrInfo=g_m3kPresentSource;
+                    const VkImage fsrSource=FeedVkHandle<VkImage>(fsrInfo.image);
+                    const VkImageLayout fsrSourceLayout=static_cast<VkImageLayout>(fsrInfo.layout);
+                    if(g_m3kSourceTapReady&&fsrSource!=VK_NULL_HANDLE&&
+                       (fsrSourceLayout==VK_IMAGE_LAYOUT_GENERAL||fsrSourceLayout==VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)&&
+                       fsrInfo.width&&fsrInfo.height)
+                    {
+                        FeedVkBarrier(&g.vk,cb,fsrSource,fsrSourceLayout,fsrSourceLayout);
+                        M3kVkBlitScale(cb,fsrSource,fsrSourceLayout,bb_img,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                       fsrInfo.width,fsrInfo.height,w,h);
+                        static UINT64 fsrFailFrames=0;++fsrFailFrames;
+                        if(fsrFailFrames==1||(fsrFailFrames%300)==0)
+                            Log("M3K-FSR-P1: FSR unavailable/failed; showing raw nearest DXVK source %ux%u -> %ux%u; NGX NOT RUN",
+                                fsrInfo.width,fsrInfo.height,w,h);
+                    }
+                    else
+                    {
+                        static bool fsrNoSourceLogged=false;
+                        if(!fsrNoSourceLogged){fsrNoSourceLogged=true;Log("M3K-FSR-P1: FSR failed and raw DXVK diagnostic source unavailable; NGX NOT RUN");}
+                    }
+                }
+
                 const resource res[1]={bb_res};
                 const resource_usage from[1]={resource_usage::copy_dest};
                 const resource_usage to[1]={resource_usage::render_target};
                 cl->barrier(1,res,from,to);
                 const UINT64 fn=++g.frames_done;
-                g.consecutive_fails=0;
-                if(fn<=static_cast<UINT64>(g_cfg.log_frames)||(fn%1800)==0)
+                g.consecutive_fails=fsrDelivered?0:(g.consecutive_fails+1);
+                if(fsrDelivered&&(fn<=static_cast<UINT64>(g_cfg.log_frames)||(fn%1800)==0))
                     Log("[feed] frame %llu delivered by FSR 3.1.4 DIRECT Vulkan proof (%ux%u)",
                         static_cast<unsigned long long>(fn),w,h);
                 QueryPerformanceCounter(&t1);
