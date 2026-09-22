@@ -34,6 +34,23 @@ There is no automatic cross-backend fallback.
 - **FSR**: an independent FidelityFX path.
 - If the selected backend cannot initialize or dispatch, report that failure explicitly and remain on that backend's diagnostic/passthrough failure path. Never silently run another reconstruction backend.
 
+Public UI contract:
+
+```text
+Scaling Technology
+[ Off ▼ ]
+[ NVIDIA — DLAA / DLSS 4.5 ]
+[ AMD — FSR ]
+```
+
+This is an explicit user choice, not GPU autodetection. NVIDIA hardware may run FSR and AMD hardware may select FSR without any NVIDIA reconstruction dependency. Selecting a backend changes which backend-specific controls are shown:
+
+- NVIDIA: DLAA/DLSS presets, NVIDIA custom render scale, NVIDIA sharpening, NVIDIA-specific NR controls.
+- AMD/FSR: FSR presets/custom render scale, FSR sharpening/RCAS, FSR-specific temporal diagnostics.
+- Off: hide both reconstruction control groups and return to raw/native passthrough.
+
+Each backend keeps its last-used settings independently so switching NVIDIA -> AMD -> NVIDIA restores the NVIDIA settings instead of copying AMD values across.
+
 ### Backend isolation
 
 DLAA/DLSS and FSR own separate configuration/state.
