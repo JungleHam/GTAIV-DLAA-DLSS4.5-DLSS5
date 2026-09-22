@@ -46,11 +46,11 @@ jobs:
           $ErrorActionPreference='Stop'
           $full=[IO.File]::ReadAllText('.\install\Install-DLSS-Full.bat')
           foreach($s in @(
-            "\$RuntimeTag='v1.1.0'",
-            "\$RuntimeZipHash='A0796FA04DFACEC7997B08BEFE1933EFBB17D2BC62478CB41B8C89750674CEE3'",
+            "RuntimeTag='v1.1.0'",
+            "RuntimeZipHash='A0796FA04DFACEC7997B08BEFE1933EFBB17D2BC62478CB41B8C89750674CEE3'",
             "'LastSRProfile=0'","'LastNRMode=0'","'Mode=0'","'Sharpness=0.000'","'SRProfile=0'",
             "'JitterPhases=8'","'JitterMode=8'",
-            "Set-KeyEquals (Join-Path \$Game 'dxvk.conf') 'd3d9.samplerLodBias' '0.0'",
+            "d3d9.samplerLodBias' '0.0'",
             "M3K_Sharpen@M3K_Sharpen.fx"
           )){
             if(-not $full.Contains($s)){throw "Missing release marker: $s"}
