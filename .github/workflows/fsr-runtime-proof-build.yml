@@ -140,6 +140,21 @@ jobs:
           )|Set-Content .\out-fsr-p1\TEST-NOTES.txt -Encoding UTF8
           Copy-Item .\_project\tools\m3k-nr\_generated\m3k_vk.h .\out-fsr-p1\generated-m3k_vk.h -Force -ErrorAction SilentlyContinue
           Copy-Item .\_project\tools\m3k-nr\_work\DLSS5-Feeder\src\dlss5-feed.cpp .\out-fsr-p1\generated-dlss5-feed.cpp -Force -ErrorAction SilentlyContinue
+          Copy-Item .\tools\fsr-vulkan\FSR-P1-Control.ps1 .\out-fsr-p1\FSR-P1-Control.ps1 -Force
+          Copy-Item .\tools\fsr-vulkan\FSR-P1-Control.bat .\out-fsr-p1\FSR-P1-Control.bat -Force
+          @(
+            'FSR P1 QUICK TEST',
+            '',
+            '1. Extract this artifact anywhere.',
+            '2. Run: FSR-P1-Control.bat enable "<GTA IV folder>"',
+            '3. Launch GTA IV normally and reach gameplay.',
+            '4. Close the game, then run: FSR-P1-Control.bat log "<GTA IV folder>"',
+            '5. To fully revert: FSR-P1-Control.bat restore "<GTA IV folder>"',
+            '',
+            'The controller backs up .trex\dlss5-feed.addon64 before replacing it.',
+            'FSRProof=0 remains the normal production DLSS path.',
+            'This is a reconstruction proof, not a quality-final build: camera projection and MV scale are still provisional.'
+          ) | Set-Content .\out-fsr-p1\HOW-TO-TEST.txt -Encoding UTF8
 
       - uses: actions/upload-artifact@v4
         with:
