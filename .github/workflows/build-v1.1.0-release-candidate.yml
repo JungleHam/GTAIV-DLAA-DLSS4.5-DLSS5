@@ -1,0 +1,105 @@
+name: Build v1.1.0 frozen release candidate
+
+on:
+  push:
+    branches: [ feature/dlss-custom-scale-nr-controls ]
+    paths:
+      - '.github/workflows/build-v1.1.0-release-candidate.yml'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  freeze-runtime:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download frozen public baseline runtime
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          New-Item -ItemType Directory -Path .\_base -Force | Out-Null
+          gh release download v1.0.0 --repo "$env:GITHUB_REPOSITORY" --pattern 'GTAIV-DLSS-Full-Runtime.zip' --dir .\_base
+          if ($LASTEXITCODE -ne 0) { throw 'Could not download v1.0.0 runtime.' }
+          $zip='.\_base\GTAIV-DLSS-Full-Runtime.zip'
+          $hash=(Get-FileHash -Algorithm SHA256 $zip).Hash.ToUpperInvariant()
+          if($hash -ne '7560102921FFD2FFFEBB7A76763F87B4F0A7DD994B27B49C6BCBC3FBD9F06BA4'){throw "Unexpected v1.0.0 runtime hash: $hash"}
+          Expand-Archive -LiteralPath $zip -DestinationPath .\out-runtime -Force
+
+      - name: Download exact hardware-tested jitter/feeder artifact
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          New-Item -ItemType Directory -Path .\_tested -Force | Out-Null
+          gh run download 35706994861 --repo "$env:GITHUB_REPOSITORY" --name 'jitter-selector-resize-fix-candidate' --dir .\_tested
+          if ($LASTEXITCODE -ne 0) { throw 'Could not download tested runtime artifact.' }
+          $bridge=Get-ChildItem .\_tested -Recurse -File -Filter d3d9.dll | Select-Object -First 1
+          $feeder=Get-ChildItem .\_tested -Recurse -File -Filter dlss5-feed.addon64 | Select-Object -First 1
+          if(-not $bridge -or -not $feeder){throw 'Tested bridge/feeder missing from artifact.'}
+          $bridgeHash=(Get-FileHash -Algorithm SHA256 $bridge.FullName).Hash.ToUpperInvariant()
+          $feederHash=(Get-FileHash -Algorithm SHA256 $feeder.FullName).Hash.ToUpperInvariant()
+          if($bridgeHash -ne 'F75F226A91123ECFB613BE8C73F3F23874548F93D53C81425FA0151D77B13717'){throw "Tested bridge hash mismatch: $bridgeHash"}
+          if($feederHash -ne 'B6D7D9B050C4F32642A528E7700F38A0510795C7D61D30665DC96AF270B9ED27'){throw "Tested feeder hash mismatch: $feederHash"}
+          Copy-Item $bridge.FullName .\out-runtime\d3d9.dll -Force
+          Copy-Item $feeder.FullName .\out-runtime\dlss5-feed.addon64 -Force
+
+      - name: Apply release quality defaults to runtime payload
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $shader='.\install\M3K_Sharpen.fx'
+          $shaderHash=(Get-FileHash -Algorithm SHA256 $shader).Hash.ToUpperInvariant()
+          if($shaderHash -ne '20E2F9C918B2AAEC1B1C19CF732038506DC604B3455FAEEAD3147A11F0275429'){throw "Sharpen shader hash mismatch: $shaderHash"}
+          Copy-Item $shader .\out-runtime\M3K_Sharpen.fx -Force
+
+          $conf='.\out-runtime\dxvk.conf'
+          $text=[IO.File]::ReadAllText($conf)
+          $pat='(?m)^\s*d3d9\.samplerLodBias\s*=\s*.*$'
+          if($text -match $pat){$text=[regex]::Replace($text,$pat,'d3d9.samplerLodBias = 0.0')}
+          else{
+            if($text.Length -gt 0 -and -not $text.EndsWith("`n")){$text+="`r`n"}
+            $text+="d3d9.samplerLodBias = 0.0`r`n"
+          }
+          [IO.File]::WriteAllText($conf,$text,[Text.UTF8Encoding]::new($false))
+          if(([IO.File]::ReadAllText($conf)) -notmatch '(?m)^d3d9\.samplerLodBias = 0\.0$'){throw 'LOD bias 0.0 was not applied.'}
+
+      - name: Freeze hashes and archive
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          Get-ChildItem .\out-runtime -Recurse -File |
+            Where-Object {$_.Name -ne 'SHA256SUMS.txt'} |
+            Sort-Object FullName |
+            ForEach-Object {
+              $h=(Get-FileHash -Algorithm SHA256 $_.FullName).Hash.ToUpperInvariant()
+              $rel=$_.FullName.Substring((Resolve-Path .\out-runtime).Path.Length+1)
+              "$h  $rel"
+            } | Set-Content .\out-runtime\SHA256SUMS.txt -Encoding ASCII
+
+          Compress-Archive -Path .\out-runtime\* -DestinationPath .\GTAIV-DLSS-Full-Runtime-v1.1.0.zip -CompressionLevel Optimal -Force
+          $zipHash=(Get-FileHash -Algorithm SHA256 .\GTAIV-DLSS-Full-Runtime-v1.1.0.zip).Hash.ToUpperInvariant()
+
+          $lines=@("RuntimeZip=$zipHash")
+          foreach($rel in @('d3d9.dll','NvRemixBridge.exe','d3d9vk_x64.dll','dlss5-feed.addon64','m3k\m3k-nvngx.dll','DLSS5_Feed.fx','nvngx_dlss.dll','ReShade.fxh','ReShadeUI.fxh','DrawText.fxh','bridge.conf','dxvk.conf','M3K_Sharpen.fx')){
+            $p=Join-Path .\out-runtime $rel
+            if(-not(Test-Path -LiteralPath $p)){throw "Missing release file: $rel"}
+            $h=(Get-FileHash -Algorithm SHA256 $p).Hash.ToUpperInvariant()
+            $lines += "$rel=$h"
+          }
+          $lines | Set-Content .\release-manifest.txt -Encoding ASCII
+          Get-Content .\release-manifest.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v1.1.0-frozen-runtime-candidate
+          path: |
+            GTAIV-DLSS-Full-Runtime-v1.1.0.zip
+            release-manifest.txt
+            out-runtime/**
+          if-no-files-found: error
