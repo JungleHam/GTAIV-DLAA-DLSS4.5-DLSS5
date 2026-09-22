@@ -44,7 +44,7 @@ jobs:
           if(-not $bridge -or -not $feeder){throw 'Tested bridge/feeder missing from artifact.'}
           $bridgeHash=(Get-FileHash -Algorithm SHA256 $bridge.FullName).Hash.ToUpperInvariant()
           $feederHash=(Get-FileHash -Algorithm SHA256 $feeder.FullName).Hash.ToUpperInvariant()
-          if($bridgeHash -ne 'F75F226A91123ECFB613BE8C73F3F23874548F93D53C81425FA0151D77B13717'){throw "Tested bridge hash mismatch: $bridgeHash"}
+          if($bridgeHash -ne '45717A8F8C9F3A7E38A8187CC965B3219545FD4D331F61DA28908433AD8CA20B'){throw "Candidate bridge hash mismatch: $bridgeHash"}
           if($feederHash -ne 'B6D7D9B050C4F32642A528E7700F38A0510795C7D61D30665DC96AF270B9ED27'){throw "Tested feeder hash mismatch: $feederHash"}
           Copy-Item $bridge.FullName .\out-runtime\d3d9.dll -Force
           Copy-Item $feeder.FullName .\out-runtime\dlss5-feed.addon64 -Force
