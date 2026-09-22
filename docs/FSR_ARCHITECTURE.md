@@ -4,6 +4,65 @@ Status: **FSR-0 / implementation plan**
 Branch: `feature/fsr-3-1-5`  
 Protected baseline: `main @ ed72c4ab301ed92763732577efa7eeaa8d3a3283`
 
+## Locked product/test rules
+
+These are hard requirements for all work after P1.
+
+### Test packaging
+
+Every test that changes files or settings must ship with two obvious BAT entry points:
+
+1. **APPLY** — refuses to overwrite an existing unrestored test state, backs up every file/settings file it will change, then applies the test.
+2. **RESTORE** — restores the exact saved files/settings and preserves the test log separately before restoring any previous log.
+
+Do not ask the tester to paste PowerShell, edit INI keys manually, rename DLLs manually, or remember the old state.
+
+### Reconstruction backend selector
+
+The public selector is a single three-state backend choice:
+
+```text
+Off
+DLAA / DLSS 4.5
+FSR
+```
+
+There is no automatic cross-backend fallback.
+
+- **Off**: raw/native passthrough.
+- **DLAA / DLSS 4.5**: the existing protected NVIDIA path.
+- **FSR**: an independent FidelityFX path.
+- If the selected backend cannot initialize or dispatch, report that failure explicitly and remain on that backend's diagnostic/passthrough failure path. Never silently run another reconstruction backend.
+
+### Backend isolation
+
+DLAA/DLSS and FSR own separate configuration/state.
+
+DLAA / DLSS owns:
+- NVIDIA reconstruction profile/custom scale
+- NVIDIA/DLSS sharpening value
+- NGX feature/context state
+- NVIDIA-specific capability queries and preset contracts
+
+FSR owns:
+- FSR render scale/quality choice
+- FSR sharpening/RCAS value
+- FidelityFX context/resources
+- FSR-specific depth/MV/jitter conversion and masks
+
+A Radeon FSR path must not require successful NGX initialization, an NGX feature, NVIDIA capability parameters, NVIDIA DLLs, or an NVIDIA GPU. Shared code is limited to backend-neutral GTA/DXVK inputs, resolution signaling, jitter/history metadata, lifecycle safety, and presentation.
+
+P1 is allowed to borrow the already-proven NVIDIA-hosted render-size plumbing only as a temporary hardware proof. That dependency must be removed before the FSR backend is called AMD-ready or exposed in the final three-state selector.
+
+### Neural Rendering
+
+Treat Neural Rendering as a higher-level optional stage, not as proof that FSR and DLSS share a backend.
+
+- NVIDIA hardware may use the current NVIDIA DLSS Neural Rendering path.
+- AMD support, if used, must be a separately detected/tested AMD-compatible runtime/backend.
+- Do not make FSR depend on NVIDIA's `nvngx_dlssnr.dll`.
+- Do not silently install or load an unofficial AMD compatibility runtime. It must be explicit and independently testable.
+
 ## Version decision
 
 The final target remains **FSR 3.1.5**, but AMD's current FidelityFX SDK 2.3 package does not currently provide a Vulkan backend.
@@ -75,11 +134,11 @@ Do not perform a large refactor before the first FSR frame. Initially, the share
 
 ## FSR-1 fixed proof-of-life
 
-The first hardware candidate has exactly one goal: **an FSR reconstructed frame reaches GTA IV's presenter without altering the DLSS baseline**.
+The first hardware candidate has exactly one goal: **an FSR reconstructed frame reaches GTA IV's presenter without altering the DLSS baseline or silently falling back to NGX**.
 
 Initial settings:
 
-- fixed Quality mode
+- fixed Quality mode for P1
 - FSR context on the existing 64-bit Vulkan device
 - sharpening/RCAS: OFF
 - frame generation: OFF
@@ -192,6 +251,7 @@ Lifecycle:
 8. Jitter is logged.
 9. Candidate can be removed/restored cleanly.
 10. Existing v1.1.0 DLSS path is byte-for-byte untouched by the candidate.
+11. With FSR selected, a failed FSR dispatch never evaluates DLSS/NGX for that frame.
 
 ## Next implementation step
 
