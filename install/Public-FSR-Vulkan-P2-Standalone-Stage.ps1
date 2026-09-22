@@ -100,6 +100,23 @@ $queryInsert=@'
         *renderW=(targetW*p+500u)/1000u;
         *renderH=(targetH*p+500u)/1000u;
         if(!*renderW||!*renderH)return false;
+
+        const int32_t phaseRaw=ffxFsr3UpscalerGetJitterPhaseCount(
+            static_cast<int32_t>(*renderW),static_cast<int32_t>(targetW));
+        const UINT phaseCount=phaseRaw<2?2u:static_cast<UINT>(phaseRaw);
+        if(g_m3kJitterEffectivePhases!=phaseCount){
+            g_m3kJitterEffectivePhases=phaseCount;
+            wchar_t fsrPath[MAX_PATH]={};
+            if(GetModuleFileNameW(g_self,fsrPath,MAX_PATH)){
+                if(wchar_t *s=wcsrchr(fsrPath,L'\\')){
+                    *(s+1)=0;wcscat_s(fsrPath,L"m3k-nr.ini");
+                    wchar_t phaseText[16]={};_snwprintf_s(phaseText,_TRUNCATE,L"%u",phaseCount);
+                    WritePrivateProfileStringW(L"M3K",L"JitterPhases",phaseText,fsrPath);
+                }
+            }
+            Log("M3K-FSR-P2: AMD jitter phase count=%u for %ux%u -> %ux%u; bridge config updated",
+                phaseCount,*renderW,*renderH,targetW,targetH);
+        }
         if(!g_m3kFsrPlannerLogged){
             g_m3kFsrPlannerLogged=true;
             Log("M3K-FSR-P2: independent FSR render planner %.1f%% -> %ux%u for output %ux%u (no NGX size query)",
