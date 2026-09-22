@@ -30,8 +30,8 @@ jobs:
           }
           $full=[IO.File]::ReadAllText('.\install\Install-DLSS-Full.bat')
           foreach($marker in @(
-            "\$RuntimeTag='v1.1.0'",
-            "\$RuntimeZipHash='A0796FA04DFACEC7997B08BEFE1933EFBB17D2BC62478CB41B8C89750674CEE3'",
+            "RuntimeTag='v1.1.0'",
+            "RuntimeZipHash='A0796FA04DFACEC7997B08BEFE1933EFBB17D2BC62478CB41B8C89750674CEE3'",
             "'LastSRProfile=0'",
             "'LastNRMode=0'",
             "'Mode=0'",
