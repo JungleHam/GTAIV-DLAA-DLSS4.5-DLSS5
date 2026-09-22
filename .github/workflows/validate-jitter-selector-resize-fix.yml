@@ -1,5 +1,5 @@
 name: Validate jitter selector plus resize fix
-# rerun after NGX jitter compensation selector
+# rerun after compensation declaration-order fix
 
 on:
   push:
