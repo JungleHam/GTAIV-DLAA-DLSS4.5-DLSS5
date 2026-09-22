@@ -1,5 +1,5 @@
 name: Validate jitter selector plus resize fix
-# rerun after compensation declaration-order fix
+# rerun after Advanced-menu cleanup
 
 on:
   push:
