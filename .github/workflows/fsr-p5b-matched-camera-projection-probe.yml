@@ -139,7 +139,7 @@ jobs:
           New-Item -ItemType Directory .\out-fsr-p5b -Force|Out-Null
           Copy-Item $addon .\out-fsr-p5b\dlss5-feed-fsr-p5b.addon64 -Force
 
-      - name: Build read-only P5 x86 camera-probe bridge
+      - name: Build matched P5B camera-probe bridge pair
         shell: pwsh
         run: |
           git clone --filter=blob:none https://github.com/gutbash/b-bridge.git _bbridge
@@ -168,7 +168,7 @@ jobs:
           Copy-Item .\Directory.Build.Props .\_p5bridge32 -Force
           meson compile -C _p5bridge32 d3d9
           if($LASTEXITCODE-ne 0){throw "P5B b-bridge build failed: $LASTEXITCODE"}
-          $bridge='.\_p5bridge32\src\client\d3d9.dll'
+          $bridge=(Resolve-Path '.\_p5bridge32\src\client\d3d9.dll').Path
           if(-not(Test-Path $bridge)){throw 'P5B d3d9.dll missing'}
 
           SetupVS -Platform x64
@@ -177,13 +177,14 @@ jobs:
           Copy-Item .\Directory.Build.Props .\_p5bridge64 -Force
           meson compile -C _p5bridge64 NvRemixBridge
           if($LASTEXITCODE-ne 0){throw "P5B x64 bridge build failed: $LASTEXITCODE"}
+          $server=(Resolve-Path '.\_p5bridge64\src\server\NvRemixBridge.exe').Path
+          $deviceSource=(Resolve-Path '.\src\client\d3d9_device.cpp').Path
           Pop-Location
 
-          $server='.\_p5bridge64\src\server\NvRemixBridge.exe'
           if(-not(Test-Path $server)){throw 'P5B NvRemixBridge.exe missing'}
           Copy-Item $bridge .\out-fsr-p5b\d3d9-fsr-p5b-camera-probe.dll -Force
           Copy-Item $server .\out-fsr-p5b\NvRemixBridge-fsr-p5b.exe -Force
-          Copy-Item .\src\client\d3d9_device.cpp .\out-fsr-p5b\generated-d3d9_device.cpp -Force
+          Copy-Item $deviceSource .\out-fsr-p5b\generated-d3d9_device.cpp -Force
 
       - name: Verify and package P5B camera probe
         shell: pwsh
@@ -199,7 +200,7 @@ jobs:
           $serverAscii=[Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($server))
           if(-not $serverAscii.Contains('remix-main+1dad5e6d')){throw 'P5B server version marker missing'}
           foreach($marker in @('M3K-CAMERA-P5','M3K-JITTER2] DRAW','M3K_GTAIV_Jitter_v1','M3K-UI')){
-            if(-not $bridgeAscii.Contains($marker)){throw "P5 bridge marker missing: $marker"}
+            if(-not $bridgeAscii.Contains($marker)){throw "P5B bridge marker missing: $marker"}
           }
 
           Copy-Item .\tools\fsr-vulkan\FSR-P5B-Apply.ps1 .\out-fsr-p5b\FSR-P5B-Apply.ps1 -Force
@@ -222,7 +223,7 @@ jobs:
             '2. Reach normal outdoor gameplay, pan and drive for 20-30 seconds.',
             '3. Close GTA IV.',
             '4. Run 2-RESTORE-BEFORE-FSR-P5B.bat.',
-            '5. Send BOTH FSR-P5-D3D9-LOG.txt and FSR-P5-FEEDER-LOG.txt.',
+            '5. Send BOTH FSR-P5B-D3D9-LOG.txt and FSR-P5B-FEEDER-LOG.txt.',
             '',
             "FeederSHA256=$fh",
             "BridgeSHA256=$bh",
