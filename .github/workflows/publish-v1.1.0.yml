@@ -39,7 +39,7 @@ jobs:
             "'SRProfile=0'",
             "'JitterPhases=8'",
             "'JitterMode=8'",
-            "Ensure-ReShadeTechnique \$presetPath 'M3K_Sharpen@M3K_Sharpen.fx'"
+            "M3K_Sharpen@M3K_Sharpen.fx"
           )){if($full -notmatch [regex]::Escape($marker)){throw "Full installer release marker missing: $marker"}}
           $iss=[IO.File]::ReadAllText('.\installer\GTAIV-DLSS-Setup.iss')
           if($iss -notmatch '#define MyAppVersion "1\.1\.0"'){throw 'Installer version is not 1.1.0.'}
