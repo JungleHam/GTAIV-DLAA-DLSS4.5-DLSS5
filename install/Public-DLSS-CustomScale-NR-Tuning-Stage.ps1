@@ -363,7 +363,7 @@ $ui=@'
 
         M3kSyncJitterPhasesLive();
         int jitterChoice=0;const UINT jitterMode=M3kJitterModeRequested();if(jitterMode==8)jitterChoice=1;else if(jitterMode==16)jitterChoice=2;else if(jitterMode==32)jitterChoice=3;
-        const char *jitterItems="Auto\08 phases\016 phases\032 phases\0\0";
+        const char *jitterItems="Auto\0" "8 phases\0" "16 phases\0" "32 phases\0\0";
         ImGui::BeginDisabled(!master);if(ImGui::Combo("Jitter Sequence##M3KJitterPhases",&jitterChoice,jitterItems)){const UINT modes[4]={0u,8u,16u,32u};M3kRequestJitterModeLive(modes[jitterChoice]);}ImGui::EndDisabled();
         ImGui::TextDisabled("Effective: %u phases%s",M3kJitterEffectivePhases(),M3kJitterModeRequested()==0?" (Auto)":"");
 
