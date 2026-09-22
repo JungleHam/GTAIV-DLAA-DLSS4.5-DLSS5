@@ -16,7 +16,10 @@ function Assert-Stopped {
     if(Get-Process NvRemixBridge -ErrorAction SilentlyContinue){throw 'Close NvRemixBridge.exe first.'}
 }
 function Set-Ini([string]$Path,[string]$Section,[string]$Key,[string]$Value){
-    $lines=if(Test-Path -LiteralPath $Path){[Collections.Generic.List[string]](Get-Content -LiteralPath $Path)}else{[Collections.Generic.List[string]]::new()}
+    $lines=[Collections.Generic.List[string]]::new()
+    if(Test-Path -LiteralPath $Path){
+        foreach($line in [IO.File]::ReadAllLines($Path)){[void]$lines.Add($line)}
+    }
     $s=-1;$next=$lines.Count
     for($i=0;$i -lt $lines.Count;$i++){
         if($lines[$i].Trim() -ieq "[$Section]"){$s=$i;continue}
@@ -63,6 +66,7 @@ if(Test-Path -LiteralPath $Log){
     "IniSHA256=$((Get-FileHash -Algorithm SHA256 $Ini).Hash)"
 ) | Set-Content -LiteralPath (Join-Path $State 'STATE.txt') -Encoding UTF8
 
+try {
 Copy-Item -LiteralPath $Candidate -Destination $Live -Force
 
 # P1 uses the already-proven Quality render split only as temporary plumbing on this NVIDIA-hosted test.
@@ -83,3 +87,24 @@ Write-Host ''
 Write-Host 'Now launch GTA IV normally and play for 30-60 seconds with camera movement.'
 Write-Host 'Then CLOSE GTA IV and run 2-RESTORE-BEFORE-FSR-P1.bat.'
 Write-Host 'The restore BAT will also save the test log next to these BAT files.'
+}
+catch {
+    Write-Host ''
+    Write-Host 'APPLY encountered an error. Restoring the exact pre-test state automatically...'
+    try {
+        Copy-Item -LiteralPath (Join-Path $State 'dlss5-feed.addon64') -Destination $Live -Force
+        Copy-Item -LiteralPath (Join-Path $State 'm3k-nr.ini') -Destination $Ini -Force
+        $SavedLog=Join-Path $State 'dlss5-feed.log'
+        if(Test-Path -LiteralPath $SavedLog){
+            Copy-Item -LiteralPath $SavedLog -Destination $Log -Force
+        }elseif(Test-Path -LiteralPath (Join-Path $State 'LOG_WAS_MISSING')){
+            Remove-Item -LiteralPath $Log -Force -ErrorAction SilentlyContinue
+        }
+        Remove-Item -LiteralPath $State -Recurse -Force
+        Write-Host 'Automatic rollback completed.'
+    } catch {
+        Write-Host 'Automatic rollback could not complete. DO NOT delete the saved state folder:'
+        Write-Host "  $State"
+    }
+    throw
+}
