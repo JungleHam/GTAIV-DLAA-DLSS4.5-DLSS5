@@ -200,8 +200,8 @@ try {
     $Git = Need-Command 'git.exe' 'Git for Windows is required for the reproducible combined-module build.'
     $Python = Need-Command 'python.exe' 'Python 3 in PATH is required for the reproducible combined-module build.'
 
-    $profile = '2'
-    Write-Host 'Default DLSS Super Resolution quality: Quality.' -ForegroundColor Yellow
+    $profile = '0'
+    Write-Host 'Default reconstruction: DLAA Native (100%).' -ForegroundColor Yellow
     Write-Host 'After installation, change processing, reconstruction and Neural Rendering directly inside the ReShade menu.' -ForegroundColor Yellow
 
     Remove-TemporaryInstallerFiles
@@ -441,9 +441,20 @@ try {
         'AutoResizeWindow=1',
         'VirtualizeGameClient=1',
         'NRPasses=1',
+        'NRStyle=0',
+        'NRIntensity=1.000',
+        'NRLocalTone=1.000',
+        'NRLocalStructure=1.000',
+        'NRSkinStructure=1.000',
+        'NRAutoMask=1',
+        'NRUICorrection=0',
+        'Sharpness=0.000',
+        'CustomScalePercent=77',
         "SRProfile=$profile",
         'ProjectionProbe=0',
         'TemporalJitter=1',
+        'JitterPhases=8',
+        'JitterMode=8',
         'BalancedProbe=0',
         'ManualRender=0',
         'ManualRenderWidth=0',
@@ -477,7 +488,7 @@ try {
         "Installed=$(Get-Date -Format o)",
         "ProjectCheckpoint=$Checkpoint",
         "BBridgeCommit=$BBridgeCommit",
-        'DefaultDLSSQuality=Quality',
+        'DefaultDLSSQuality=DLAA Native',
         'MasterProcessing=ON-by-default; OFF-session-only; staged-native-bypass-v2',
         'NeuralRendering=installed-off-by-default',
         'NRPasses=1',
@@ -514,7 +525,7 @@ try {
     Write-Host ' DLSS 4.5 SUPER RESOLUTION + DLSS 5 NEURAL RENDERING INSTALLED' -ForegroundColor Green
     Write-Host '====================================================================' -ForegroundColor Green
     Write-Host 'DLSS / DLAA processing: ON by default (OFF is session-only)'
-    Write-Host 'Default reconstruction: Quality'
+    Write-Host 'Default reconstruction: DLAA Native'
     Write-Host 'Neural Rendering runtime: INSTALLED'
     Write-Host 'Neural Rendering: OFF by default'
     Write-Host 'Neural Rendering passes: 1 (tested public default)'
