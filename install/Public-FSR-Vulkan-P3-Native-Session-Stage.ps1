@@ -12,7 +12,10 @@ function Once([string]$Text,[string]$Old,[string]$New,[string]$Label){
     return $Text.Replace($Old,$New)
 }
 
+$vkPath=Join-Path $GeneratedRoot 'm3k_vk.h'
+if(-not(Test-Path -LiteralPath $vkPath)){throw "Missing generated source: $vkPath"}
 if(-not(Test-Path -LiteralPath $FeederSource)){throw "Missing feeder source: $FeederSource"}
+$vk=[IO.File]::ReadAllText($vkPath)
 $feed=[IO.File]::ReadAllText($FeederSource)
 
 # P3's purpose is strict: when FSR is selected before the Vulkan session opens,
@@ -20,13 +23,23 @@ $feed=[IO.File]::ReadAllText($FeederSource)
 # Allocate the feeder's temporary color/depth/MV/output surfaces directly on the
 # game's VkDevice instead. The NVIDIA session path remains byte-for-byte reachable
 # whenever FSR is not selected.
+# Native-session state is needed by ShutdownSession(), which appears before m3k_vk.h
+# is included in the Feeder translation unit. Keep the flag here and forward-declare
+# a teardown wrapper; its definition is injected into m3k_vk.h where the FidelityFX
+# backend object is visible.
+$shutdownForward='static void ShutdownSession();   // defined below; every InitSession* unwinds through it'
+$shutdownForwardNew=@'
+static bool g_m3kFsrNativeSession=false;
+static void M3kFsrNativeShutdownAfterQueueIdle();
+static void ShutdownSession();   // defined below; every InitSession* unwinds through it
+'@
+$feed=Once $feed $shutdownForward $shutdownForwardNew 'early native-session declarations'
+
 $initMarker='static bool InitSessionVk(reshade::api::effect_runtime *rt)'
 $initAt=$feed.IndexOf($initMarker,[StringComparison]::Ordinal)
 if($initAt-lt 0){throw 'FSR P3: InitSessionVk marker missing'}
 
 $helpers=@'
-static bool g_m3kFsrNativeSession=false;
-
 static bool M3kFsrSelectedAtSessionOpen()
 {
     wchar_t path[MAX_PATH]={};
@@ -225,12 +238,8 @@ $shutdownAnchor=@'
 '@
 $shutdownNew=@'
     ReleaseFrameResources();
-    if(g_m3kFsrNativeSession&&g_m3kFsrBackend.IsReady()){
-        // ReleaseFrameResources waited for the Vulkan queue, so FidelityFX shared
-        // resources can now be destroyed without racing in-flight work.
-        g_m3kFsrBackend.Shutdown();
-        Log("M3K-FSR-P3: FidelityFX context shut down after Vulkan queue idle");
-    }
+    if(g_m3kFsrNativeSession)
+        M3kFsrNativeShutdownAfterQueueIdle();
     if (g.params != nullptr) { if (!g_ngx_dying) NVSDK_NGX_D3D12_DestroyParameters(g.params); g.params = nullptr; }
 '@
 $feed=Once $feed $shutdownAnchor $shutdownNew 'safe FSR shutdown'
@@ -271,18 +280,34 @@ $graceOld='    if (ok && needs_build_vk && g.create_grace < g_cfg.create_delay)'
 $graceNew='    if (ok && needs_build_vk && !g_m3kFsrNativeSession && g.create_grace < g_cfg.create_delay)'
 $feed=Once $feed $graceOld $graceNew 'skip DLSS hook grace for native FSR'
 
+
+$vkStateAnchor='static bool g_m3kFsrPlannerLogged=false;'
+$vkStateNew=@'
+static bool g_m3kFsrPlannerLogged=false;
+
+static void M3kFsrNativeShutdownAfterQueueIdle()
+{
+    if(g_m3kFsrBackend.IsReady()){
+        g_m3kFsrBackend.Shutdown();
+        Log("M3K-FSR-P3: FidelityFX context shut down after Vulkan queue idle");
+    }
+}
+'@
+$vk=Once $vk $vkStateAnchor $vkStateNew 'late FidelityFX shutdown wrapper'
+
 foreach($marker in @(
     'M3K-FSR-P3: NATIVE VULKAN SESSION READY; D3D12 NOT CREATED; NGX NOT INITIALIZED',
     'M3K-FSR-P3: native Vulkan frame resources READY',
     'M3kFsrLoadNativeVk',
     'M3kFsrAllocNativeImage',
     'if(g_m3kFsrNativeSession)',
-    'g_m3kFsrBackend.Shutdown()',
+    'M3kFsrNativeShutdownAfterQueueIdle()',
     '!g_m3kFsrNativeSession && FeatureMissingForMode()',
     '!g_m3kFsrNativeSession && g.create_grace < g_cfg.create_delay'
 )){
     if($feed.IndexOf($marker,[StringComparison]::Ordinal)-lt 0){throw "FSR P3 verification marker missing: $marker"}
 }
 
+[IO.File]::WriteAllText($vkPath,$vk,[Text.UTF8Encoding]::new($false))
 [IO.File]::WriteAllText($FeederSource,$feed,[Text.UTF8Encoding]::new($false))
 Write-Host 'FSR-P3 native Vulkan session stage applied: FSR no longer opens D3D12/NGX.'
