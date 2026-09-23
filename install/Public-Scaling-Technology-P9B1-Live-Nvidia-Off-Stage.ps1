@@ -688,7 +688,7 @@ foreach($marker in @(
     'M3K-P9B1: LIVE switch COMMITTED',
     'M3K-P9B1: ROLLBACK COMMITTED',
     'M3K-P9B1: ROLLBACK FAILED',
-    'M3K-P9B1: Off backend active - Vulkan frame passes untouched',
+    'M3K-P9B1: Off backend READY - true native/raw passthrough',
     'M3kSessionBackendSelectionAtOpen',
     'g_m3kScalingTransitionNativeOverride?1000u',
     'M3kScalingTechnologyTransitionPending',
