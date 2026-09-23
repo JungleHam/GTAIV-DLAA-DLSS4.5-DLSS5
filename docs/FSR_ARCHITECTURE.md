@@ -348,3 +348,29 @@ Next lifecycle target:
 - must reuse queue-idle / runtime-churn quarantine
 - must never silently fall back across vendors
 - requested and active backend remain separate until a transition commits successfully
+
+
+## P9A.1 hardware validation — PASSED
+
+P9A.1 validated live AMD FSR <-> Off switching while retaining the native Vulkan session.
+
+Observed:
+- AMD -> Off returned GTA to true native 2560x1440 before commit.
+- Master-OFF completed its 30-frame native stability gate and 400 ms jitter drain.
+- AMD -> Off then committed to raw/native passthrough and stopped FSR dispatch while retaining the native Vulkan session.
+- Off -> AMD resumed FSR in the existing native Vulkan session without restart.
+- The saved AMD render scale was restored correctly across Off.
+- A second full AMD -> Off -> AMD cycle also passed.
+- Live FSR scale changes at 66.7%, 77%, and 100% were confirmed, including the 1971x1109 source for 77%.
+- Exact raster jitter resumed after AMD re-enable and matched FSR jitter.
+- FidelityFX shut down only after Vulkan queue idle and the session exited cleanly.
+
+P9A.1 is the frozen hardware baseline for AMD/native lifecycle work.
+
+Next lifecycle target:
+- P9B: isolate and prove live Off <-> NVIDIA session creation/teardown.
+- Start P9B from sessionless Off.
+- Keep AMD live crossing disabled/restart-gated in P9B so the new NVIDIA boundary can be tested independently.
+- NVIDIA -> Off must use the proven DLAA Native drain, 30 stable frames, 400 ms jitter drain, then queue-idle session teardown.
+- Off -> NVIDIA must not report the transition committed until the replacement D3D12/NGX session actually opens successfully.
+- A failed NVIDIA open must roll back explicitly to Off/raw; never silently fall back to AMD.
