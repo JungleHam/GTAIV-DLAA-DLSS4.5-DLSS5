@@ -16,6 +16,10 @@ on:
       - 'install/Public-Scaling-Technology-P7-Stage.ps1'
       - 'install/p7/**'
 
+concurrency:
+  group: fsr-p7-selector-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
