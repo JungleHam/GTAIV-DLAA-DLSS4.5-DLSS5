@@ -374,3 +374,29 @@ Next lifecycle target:
 - NVIDIA -> Off must use the proven DLAA Native drain, 30 stable frames, 400 ms jitter drain, then queue-idle session teardown.
 - Off -> NVIDIA must not report the transition committed until the replacement D3D12/NGX session actually opens successfully.
 - A failed NVIDIA open must roll back explicitly to Off/raw; never silently fall back to AMD.
+
+
+## P9B.3 hardware validation — PASSED
+
+P9B.3 validated the live sessionless Off <-> NVIDIA lifecycle after fixing the
+NVIDIA reconstruction-finalizer race found by P9B.2 hardware testing.
+
+Observed:
+- startup Off reached true native 2560x1440 raw passthrough without opening D3D12/NGX/FSR
+- Off -> NVIDIA succeeded three times
+- each NVIDIA enable created real DLSS Quality reconstruction at 1707x960 -> 2560x1440 before the transition finalized
+- NVIDIA -> Off was requested three times
+- each request hit the explicit target guard: the NVIDIA reconstruction finalizer was blocked while the pending target was Off
+- each Off request then completed the 30-frame native stability gate, jitter-off drain, queue-idle teardown, and committed sessionless Off on the first selection
+- the former erroneous NVIDIA -> NVIDIA finalization did not recur
+- final shutdown was clean
+
+P9B.3 is the frozen hardware baseline for the NVIDIA/native lifecycle boundary.
+
+Next lifecycle target:
+- P9C: compose the independently proven AMD <-> Off and NVIDIA <-> Off boundaries
+- direct NVIDIA <-> AMD user requests must serialize through an explicit Off/raw midpoint
+- preserve P9A.1's retained native Vulkan session when AMD -> Off is the only requested boundary
+- when leaving retained-Off for NVIDIA, retire the retained FSR session at queue idle before NGX opens
+- sessionless Off -> AMD must open a native Vulkan FSR session and must not finalize until a real FSR dispatch succeeds
+- no cross-vendor silent fallback; a target-open failure contains to Off/raw
