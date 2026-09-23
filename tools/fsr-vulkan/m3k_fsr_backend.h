@@ -46,6 +46,11 @@ struct M3kFsrDispatchInputs
     float frameTimeMs = 16.6667f;
     float preExposure = 1.0f;
 
+    // AMD FSR RCAS. This is deliberately independent from the NVIDIA/ReShade
+    // sharpening control used by the DLSS backend.
+    bool enableSharpening = false;
+    float sharpness = 0.0f;
+
     // These are intentionally supplied by the integration layer rather than guessed
     // here. FSR's depth reconstruction needs the game's actual projection convention.
     float cameraNear = 0.1f;
@@ -194,9 +199,8 @@ public:
         dispatch.renderSize = { in.renderWidth, in.renderHeight };
         dispatch.upscaleSize = { in.outputWidth, in.outputHeight };
 
-        // FSR-A/B proof keeps RCAS completely out of the equation.
-        dispatch.enableSharpening = false;
-        dispatch.sharpness = 0.0f;
+        dispatch.enableSharpening = in.enableSharpening;
+        dispatch.sharpness = in.sharpness < 0.0f ? 0.0f : (in.sharpness > 1.0f ? 1.0f : in.sharpness);
 
         dispatch.frameTimeDelta = in.frameTimeMs > 0.0f ? in.frameTimeMs : 16.6667f;
         dispatch.preExposure = in.preExposure;
