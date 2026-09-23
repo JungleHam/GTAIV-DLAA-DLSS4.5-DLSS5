@@ -171,7 +171,7 @@ jobs:
 
           $hash=(Get-FileHash -Algorithm SHA256 $addon).Hash.ToUpperInvariant()
           @(
-            'P9C.1 feeder-only AMD post-switch jitter re-arm/diagnostic candidate',
+            'P9C.2 FSR fixed/default exposure A/B candidate',
             'Baseline=P9C backend lifecycle is hardware-proven; P9C1 remains diagnostic; this checkpoint changes only FSR exposure ownership',
             'FSR exposure=AUTO_EXPOSURE disabled; null exposure uses FidelityFX INTERNAL_DEFAULT_EXPOSURE; bridge DLL remains unchanged',
             'Initial backend=Off / raw native / sessionless',
@@ -193,25 +193,26 @@ jobs:
           Copy-Item .\_project\tools\m3k-nr\_work\feeder\src\dlss5-feed.cpp .\out-fsr-p9c2\generated-dlss5-feed.cpp -Force -ErrorAction SilentlyContinue
 
           @(
-            'P9C.1 AMD POST-SWITCH JITTER RE-ARM HARDWARE TEST',
+            'P9C.2 FSR FIXED-EXPOSURE A/B HARDWARE TEST',
             '',
-            'This package changes ONLY the feeder + test INI. d3d9.dll / b-bridge remains the proven production build.',
-            'Initial backend: Off. NVIDIA starts Quality. AMD starts at 77%.',
+            'Only FSR exposure ownership changed. Switch lifecycle, bridge DLL, camera contract and RCAS implementation are unchanged.',
+            'AUTO_EXPOSURE is OFF; a null exposure input uses FidelityFX internal default exposure.',
+            'Initial backend: Off. AMD starts at 10% with RCAS OFF.',
             '',
             '1. Run 1-APPLY-P9C2-FIXED-EXPOSURE.bat.',
-            '2. Launch GTA IV -> Home -> Add-ons -> DLSS 5 Feed -> GTA IV Reconstruction.',
-            '3. Off -> NVIDIA and wait until NVIDIA reconstruction READY.',
-            '4. Switch NVIDIA -> AMD directly. Wait at least 8 seconds after AMD becomes READY while moving the camera in normal gameplay.',
-            '5. At AMD 77%, verify FSR DIRECT frames. Preferred result: exact raster handoff active=1/reset=0.',
-            '6. If jitter initially stays inactive, P9C.1 should log reassert attempts and one logical WM_SIZE re-arm. Note whether it logs AMD jitter bridge RECOVERED.',
-            '7. Change AMD to 100%. Keep normal gameplay/camera movement for 8 seconds. Check whether exact raster handoff remains or recovers to active=1/reset=0.',
-            '8. Change AMD to 10%. Keep gameplay moving for 5 seconds; jitter should be active=1/reset=0.',
-            '9. Switch AMD -> NVIDIA -> AMD directly once more and wait 8 seconds at AMD 77%.',
-            '10. Do not judge menus/loading: the bridge is allowed to be inactive there. Evaluate during normal 3D gameplay.',
-            '11. Close GTA IV, run 2-RESTORE-BEFORE-P9C2.bat, and send FSR-P9C2-TEST-LOG.txt.',
+            '2. Launch GTA IV and enter normal 3D gameplay.',
+            '3. Switch Off -> AMD directly. Leave AMD at 10% for about 10 seconds while moving/rotating the camera.',
+            '4. Primary question: is the blinking/vignette pulse gone, clearly reduced, or unchanged versus P9C.1?',
+            '5. Change AMD to 66.7%. Wait through resize churn, then judge the same pulse for about 10 seconds.',
+            '6. Change AMD to 100%. Again judge the pulse only after resize settles.',
+            '7. RCAS starts OFF. You may briefly test RCAS, but return it OFF when judging the pulse.',
+            '8. Optional sanity check: AMD -> NVIDIA -> AMD. Switching should remain smooth.',
+            '9. Close GTA IV, run 2-RESTORE-BEFORE-P9C2.bat, and send FSR-P9C2-TEST-LOG.txt.',
             '',
-            'PASS-A: inactive bridge recovers after config reassert/resync and remains temporal in gameplay.',
-            'PASS-B/DIAGNOSTIC: if it does not recover, the log must show bridgeCfg/source/cfgMatch so the next patch can target the bridge eligibility gate without guessing.'
+            'Interpretation:',
+            '- Pulse gone at 10% (where P9C.1 already proved jitter active/reset=0) => FSR auto exposure was the visual defect.',
+            '- Pulse remains at 10% => exposure is not the cause; next target is the FSR input/history contract.',
+            '- 10% clean but higher scales pulse while reset=1 => bridge jitter eligibility/per-frame reset is responsible.'
           )|Set-Content .\out-fsr-p9c2\HOW-TO-TEST.txt -Encoding UTF8
 
       - uses: actions/upload-artifact@v4
