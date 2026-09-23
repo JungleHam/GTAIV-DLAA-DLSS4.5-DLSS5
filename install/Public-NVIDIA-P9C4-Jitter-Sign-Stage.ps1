@@ -70,7 +70,7 @@ $feed=Once $feed $uiOld $uiNew 'NVIDIA jitter compensation UI'
 
 $diagOld='ImGui::Text("Jitter: mode=%s effective=%u phases NGX=(+1.00,+1.00)",M3kJitterModeRequested()==0?"Auto":"Manual",M3kJitterEffectivePhases());'
 $diagNew='ImGui::Text("Jitter: mode=%s effective=%u phases NVIDIA=%s",M3kJitterModeRequested()==0?"Auto":"Manual",M3kJitterEffectivePhases(),M3kNvidiaJitterCompModeName(M3kNvidiaJitterCompModeRequested()));'
-$feed=Once $feed $diagOld $diagNew 'jitter diagnostics'
+if($feed.Contains($diagOld)){$feed=$feed.Replace($diagOld,$diagNew)}
 
 foreach($marker in @(
     'M3K-P9C4: NVIDIA jitter compensation changed live -> %s',
