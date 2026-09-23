@@ -107,7 +107,10 @@ static UINT g_m3kScalingTechnologyRequested=1;
 static bool g_m3kScalingTechnologyInitialized=false;
 static bool g_m3kScalingTransitionPending=false;
 static UINT g_m3kScalingTransitionTarget=1;
+static UINT g_m3kScalingTransitionPrevious=1;
 static bool g_m3kScalingTransitionNativeOverride=false;
+static bool g_m3kScalingTransitionAwaitingOpen=false;
+static bool g_m3kScalingTransitionLastFailed=false;
 static bool g_m3kScalingOffTransitionIssued=false;
 static const char *M3kScalingTechnologyName(UINT tech);
 static void M3kSetSessionBackendSelection(UINT tech);
@@ -231,6 +234,7 @@ if($selectorStart-lt 0 -or $selectorEnd-lt 0){throw 'FSR P9 selector API span mi
 $selectorNew=@'
 static bool M3kScalingTechnologyTransitionPending(){return g_m3kScalingTransitionPending;}
 static UINT M3kScalingTechnologyTransitionTarget(){return g_m3kScalingTransitionTarget;}
+static bool M3kScalingTechnologyLastSwitchFailed(){return g_m3kScalingTransitionLastFailed;}
 
 static void M3kInvalidateBackendResolutionPlan()
 {
@@ -258,7 +262,10 @@ static void M3kRequestScalingTechnologyLive(UINT tech)
         {
             g_m3kScalingTransitionPending=false;
             g_m3kScalingTransitionTarget=tech;
+            g_m3kScalingTransitionPrevious=tech;
             g_m3kScalingTransitionNativeOverride=false;
+            g_m3kScalingTransitionAwaitingOpen=false;
+            g_m3kScalingTransitionLastFailed=false;
             M3kSetSessionBackendSelection(g_m3kScalingTechnologyActive);
             M3kInvalidateBackendResolutionPlan();
             if(g_m3kScalingTechnologyActive!=0u&&
@@ -271,9 +278,12 @@ static void M3kRequestScalingTechnologyLive(UINT tech)
     }
 
     const bool wasPending=g_m3kScalingTransitionPending;
+    if(!wasPending)g_m3kScalingTransitionPrevious=g_m3kScalingTechnologyActive;
     g_m3kScalingTransitionPending=true;
     g_m3kScalingTransitionTarget=tech;
     g_m3kScalingTransitionNativeOverride=true;
+    g_m3kScalingTransitionAwaitingOpen=false;
+    g_m3kScalingTransitionLastFailed=false;
     M3kInvalidateBackendResolutionPlan();
 
     if(g_m3kScalingTechnologyActive!=0u)
@@ -287,7 +297,8 @@ static void M3kRequestScalingTechnologyLive(UINT tech)
 
 static bool M3kCommitScalingTechnologyTransition()
 {
-    if(!g_m3kScalingTransitionPending||!M3kMasterNativePassthroughReady())return false;
+    if(!g_m3kScalingTransitionPending||g_m3kScalingTransitionAwaitingOpen||
+       !M3kMasterNativePassthroughReady())return false;
 
     const UINT oldTech=g_m3kScalingTechnologyActive;
     const UINT newTech=g_m3kScalingTransitionTarget<=2?g_m3kScalingTransitionTarget:1u;
@@ -322,7 +333,6 @@ static bool M3kCommitScalingTechnologyTransition()
     g_m3kStartupPrimeStableFrames=0;
     g_m3kStartupPrimeEpoch=-1;
 
-    g_m3kScalingTransitionPending=false;
     g_m3kScalingTransitionTarget=newTech;
     g_m3kScalingTransitionNativeOverride=false;
     g_m3kScalingOffTransitionIssued=newTech==0u;
@@ -330,20 +340,25 @@ static bool M3kCommitScalingTechnologyTransition()
 
     if(newTech==0u)
     {
+        g_m3kScalingTransitionPending=false;
+        g_m3kScalingTransitionAwaitingOpen=false;
+        g_m3kScalingTransitionPrevious=0u;
         g_m3kMasterDisablePending=false;
         g_m3kMasterEnabled=false;
         g_m3kMasterNativeStableFrames=0;
         g_m3kMasterJitterOffTick=0;
         M3kWriteMasterIni(L"MasterEnabled",0);
         M3kWriteMasterIni(L"TemporalJitter",0);
+        Log("M3K-P9: LIVE switch COMMITTED %s -> Off (native raw, sessionless)",
+            M3kScalingTechnologyName(oldTech));
     }
     else
     {
+        g_m3kScalingTransitionAwaitingOpen=true;
         M3kRequestMasterEnabledLive(true);
+        Log("M3K-P9: target=%s selected; replacement session open is now REQUIRED before commit completes",
+            M3kScalingTechnologyName(newTech));
     }
-
-    Log("M3K-P9: COMMIT complete active=%s; replacement backend opens on a later frame%s",
-        M3kScalingTechnologyName(newTech),newTech==0u?" (Off stays sessionless/raw)":"");
     return true;
 }
 
@@ -363,7 +378,10 @@ $initNew=@'
             g_m3kScalingTechnologyRequested=m3kTech;
             g_m3kScalingTransitionPending=false;
             g_m3kScalingTransitionTarget=m3kTech;
+            g_m3kScalingTransitionPrevious=m3kTech;
             g_m3kScalingTransitionNativeOverride=false;
+            g_m3kScalingTransitionAwaitingOpen=false;
+            g_m3kScalingTransitionLastFailed=false;
             g_m3kScalingTechnologyInitialized=true;
             g_m3kScalingOffTransitionIssued=false;
             M3kSetSessionBackendSelection(m3kTech);
@@ -425,6 +443,131 @@ $rawNew=@'
 '@
 $feed=Once $feed $rawOld $rawNew 'allow serialized transition commit'
 
+
+$liveOpenMarker='static void FeedFrameVk(reshade::api::effect_runtime *rt, reshade::api::command_list *cl,'
+$liveOpenAt=$feed.IndexOf($liveOpenMarker,[StringComparison]::Ordinal)
+if($liveOpenAt-lt 0){throw 'FSR P9 FeedFrameVk marker missing for rollback helpers'}
+$liveOpenHelpers=@'
+static void M3kP9ClearRecoverableDisable()
+{
+    g.disabled=false;
+    g_disable_why[0]='\0';
+    g.consecutive_fails=0;
+}
+
+static void M3kP9SessionOpenSucceeded()
+{
+    if(!g_m3kScalingTransitionAwaitingOpen)return;
+    const UINT oldTech=g_m3kScalingTransitionPrevious;
+    const UINT newTech=g_m3kScalingTechnologyActive;
+    g_m3kScalingTransitionAwaitingOpen=false;
+    g_m3kScalingTransitionPending=false;
+    g_m3kScalingTransitionLastFailed=false;
+    g_m3kScalingTransitionPrevious=newTech;
+    M3kInvalidateBackendResolutionPlan();
+    Log("M3K-P9: LIVE switch COMMITTED %s -> %s; replacement session READY",
+        M3kScalingTechnologyName(oldTech),M3kScalingTechnologyName(newTech));
+}
+
+static UINT M3kP9BeginRollbackAfterTargetOpenFailure()
+{
+    const UINT failedTech=g_m3kScalingTechnologyActive;
+    const UINT oldTech=g_m3kScalingTransitionPrevious<=2u?g_m3kScalingTransitionPrevious:0u;
+    Log("M3K-P9: target session %s FAILED to open; rolling back to %s",
+        M3kScalingTechnologyName(failedTech),M3kScalingTechnologyName(oldTech));
+
+    if(g.session_ready)ShutdownSession();
+    M3kP9ClearRecoverableDisable();
+
+    g_m3kScalingTechnologyActive=oldTech;
+    g_m3kScalingTechnologyRequested=oldTech;
+    g_m3kScalingTransitionTarget=oldTech;
+    g_m3kScalingTransitionAwaitingOpen=false;
+    g_m3kScalingTransitionLastFailed=true;
+    M3kWritePublicUInt(L"ScalingTechnology",oldTech);
+    M3kSetSessionBackendSelection(oldTech);
+    M3kInvalidateBackendResolutionPlan();
+    return oldTech;
+}
+
+static void M3kP9RollbackSucceeded(UINT oldTech,UINT failedTech)
+{
+    g_m3kScalingTransitionPending=false;
+    g_m3kScalingTransitionAwaitingOpen=false;
+    g_m3kScalingTransitionTarget=oldTech;
+    g_m3kScalingTransitionPrevious=oldTech;
+    g_m3kScalingTransitionNativeOverride=false;
+    g_m3kScalingTransitionLastFailed=true;
+    if(oldTech!=0u)M3kRequestMasterEnabledLive(true);
+    M3kInvalidateBackendResolutionPlan();
+    Log("M3K-P9: ROLLBACK COMMITTED; %s restored after failed %s request",
+        M3kScalingTechnologyName(oldTech),M3kScalingTechnologyName(failedTech));
+}
+
+static void M3kP9ForceOffAfterRollbackFailure(UINT failedTech,UINT oldTech)
+{
+    if(g.session_ready)ShutdownSession();
+    M3kP9ClearRecoverableDisable();
+    g_m3kScalingTechnologyActive=0u;
+    g_m3kScalingTechnologyRequested=0u;
+    g_m3kScalingTransitionPending=false;
+    g_m3kScalingTransitionTarget=0u;
+    g_m3kScalingTransitionPrevious=0u;
+    g_m3kScalingTransitionNativeOverride=false;
+    g_m3kScalingTransitionAwaitingOpen=false;
+    g_m3kScalingTransitionLastFailed=true;
+    g_m3kScalingOffTransitionIssued=true;
+    M3kWritePublicUInt(L"ScalingTechnology",0u);
+    M3kSetSessionBackendSelection(0u);
+    g_m3kMasterDisablePending=false;
+    g_m3kMasterEnabled=false;
+    g_m3kMasterNativeStableFrames=0;
+    g_m3kMasterJitterOffTick=0;
+    M3kWriteMasterIni(L"MasterEnabled",0);
+    M3kWriteMasterIni(L"TemporalJitter",0);
+    M3kInvalidateBackendResolutionPlan();
+    Log("M3K-P9: ROLLBACK FAILED (%s after failed %s); forcing explicit Off/raw containment",
+        M3kScalingTechnologyName(oldTech),M3kScalingTechnologyName(failedTech));
+}
+
+'@
+$feed=$feed.Substring(0,$liveOpenAt)+$liveOpenHelpers+$feed.Substring($liveOpenAt)
+
+$sessionOpenOld='    if (!g.session_ready) ok = InitSessionVk(rt);'
+$sessionOpenNew=@'
+    if (!g.session_ready)
+    {
+        ok=InitSessionVk(rt);
+        if(g_m3kScalingTransitionAwaitingOpen)
+        {
+            const UINT failedTech=g_m3kScalingTechnologyActive;
+            if(ok)
+            {
+                M3kP9SessionOpenSucceeded();
+            }
+            else
+            {
+                const UINT oldTech=M3kP9BeginRollbackAfterTargetOpenFailure();
+                if(oldTech==0u)
+                {
+                    M3kP9RollbackSucceeded(oldTech,failedTech);
+                    return;
+                }
+
+                ok=InitSessionVk(rt);
+                if(ok)
+                    M3kP9RollbackSucceeded(oldTech,failedTech);
+                else
+                {
+                    M3kP9ForceOffAfterRollbackFailure(failedTech,oldTech);
+                    return;
+                }
+            }
+        }
+    }
+'@
+$feed=Once $feed $sessionOpenOld $sessionOpenNew 'target open verification and rollback'
+
 $frameAnchor=@'
     // Even a resource rebuild can flush the immediate list. Establish the game
 '@
@@ -461,6 +604,9 @@ $uiPendingNew=@'
             ImGui::TextColored(ImVec4(1.0f,0.78f,0.25f,1.0f),
                 "Switching to %s - returning GTA to native and draining temporal jitter...",
                 M3kScalingTechnologyName(M3kScalingTechnologyTransitionTarget()));
+        else if(M3kScalingTechnologyLastSwitchFailed())
+            ImGui::TextColored(ImVec4(1.0f,0.45f,0.35f,1.0f),
+                "Last switch failed; previous backend was restored (see log).");
 
         const UINT activeTech=M3kScalingTechnologyActive();
         const bool switching=M3kScalingTechnologyTransitionPending();
@@ -484,7 +630,9 @@ $feed=Once $feed $diagOld $diagNew2 'transition diagnostics'
 
 foreach($marker in @(
     'M3K-P9: COMMIT begin',
-    'M3K-P9: COMMIT complete',
+    'M3K-P9: LIVE switch COMMITTED',
+    'M3K-P9: ROLLBACK COMMITTED',
+    'M3K-P9: ROLLBACK FAILED',
     'M3K-P9: Off backend active - Vulkan frame passes untouched',
     'M3kSessionBackendSelectionAtOpen',
     'g_m3kScalingTransitionNativeOverride?1000u',
