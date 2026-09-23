@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - test/p9b1-live-nvidia-off
+      - test/p9b1-live-nvidia-off-w2025
     paths:
       - '.github/workflows/fsr-p9b1-live-nvidia-off.yml'
       - 'install/Public-Scaling-Technology-P9B1-Live-Nvidia-Off-Stage.ps1'
@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   build-fsr-p9:
-    runs-on: windows-2022
+    runs-on: windows-2025
     timeout-minutes: 75
 
     steps:
