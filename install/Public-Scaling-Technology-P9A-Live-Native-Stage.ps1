@@ -26,6 +26,7 @@ $stateNew=@'
 static bool g_m3kScalingTechnologyRestartPending=false;
 static bool g_m3kScalingOffTransitionIssued=false;
 static UINT g_m3kScalingTransitionTarget=0xFFFFFFFFu; // P9A: 0=Off, 2=AMD, none=0xffffffff
+static bool g_m3kP9ARetainedNativeOff=false; // true only after AMD-native live switch has committed to Off
 static UINT g_m3kFsrScaleBeforeOff=667;
 static UINT g_m3kFsrScalePermille=667; // independent AMD/FSR scale; NVIDIA settings remain separate
 '@
@@ -48,6 +49,15 @@ static void M3kInvalidateScalingPlan()
     g_m3kFsrLatchedFail=false;
     g_m3kFsrLastJitterEpoch=-1;
     g_m3k.ResetHistory();
+}
+static bool M3kP9ANativeRawReady()
+{
+    if(g_m3kMasterEnabled || g_m3kMasterDisablePending) return false;
+    if(!g_m3kSourceTapReady || !g.width || !g.height) return false;
+    return g_m3kPresentSource.width==g.width &&
+           g_m3kPresentSource.height==g.height &&
+           g_m3kPresentSource.presenterWidth==g.width &&
+           g_m3kPresentSource.presenterHeight==g.height;
 }
 static void M3kRequestScalingTechnologyLive(UINT tech)
 {
@@ -77,6 +87,7 @@ static void M3kRequestScalingTechnologyLive(UINT tech)
     if(g_m3kScalingTechnologyActive==2u&&tech==0u){
         if(g_m3kScalingTransitionTarget==0u)return;
         g_m3kFsrScaleBeforeOff=g_m3kFsrScalePermille;
+        g_m3kP9ARetainedNativeOff=false;
         g_m3kScalingTransitionTarget=0u;
         M3kInvalidateScalingPlan();
         M3kRequestMasterEnabledLive(false);
@@ -87,6 +98,7 @@ static void M3kRequestScalingTechnologyLive(UINT tech)
 
     if(g_m3kScalingTechnologyActive==0u&&tech==2u){
         g_m3kScalingTransitionTarget=2u;
+        g_m3kP9ARetainedNativeOff=false;
         g_m3kScalingTechnologyActive=2u;
         g_m3kFsrScalePermille=g_m3kFsrScaleBeforeOff<100?667u:g_m3kFsrScaleBeforeOff;
         g_m3kFsrProofRequested=true;
@@ -101,10 +113,13 @@ static void M3kRequestScalingTechnologyLive(UINT tech)
 static void M3kAdvanceScalingTechnologyTransition()
 {
     if(g_m3kScalingTransitionTarget!=0u)return;
-    if(!M3kMasterNativePassthroughReady())return;
+    // In an AMD-native session the legacy NVIDIA SRProfileApplied value can stay stale.
+    // The real commit gate is: Master-OFF finished and the DXVK source is truly native.
+    if(!M3kP9ANativeRawReady())return;
 
     g_m3kScalingTechnologyActive=0u;
     g_m3kFsrProofRequested=false;
+    g_m3kP9ARetainedNativeOff=true;
     g_m3kFsrScalePermille=g_m3kFsrScaleBeforeOff;
     g_m3kScalingTransitionTarget=0xFFFFFFFFu;
     M3kInvalidateScalingPlan();
@@ -159,6 +174,28 @@ $nativeReadyNew=@'
 '@
 $vk=Once $vk $nativeReadyOld $nativeReadyNew 'FSR-aware native readiness'
 
+# The legacy raw-passthrough helper also requires NVIDIA SRProfileApplied==Native.
+# That field is not authoritative in a retained AMD-native session and can remain stale.
+# Relax it only after P9A has positively committed AMD -> Off.
+$rawReadyOld=@'
+    if (g_m3kMasterEnabled || !g_m3kSourceTapReady || !g.width || !g.height) return false;
+    if (g_m3kSrProfileRequested != 0 || g_m3kSrProfileApplied != 0) return false;
+    return g_m3kPresentSource.width == g.width &&
+           g_m3kPresentSource.height == g.height &&
+           g_m3kPresentSource.presenterWidth == g.width &&
+           g_m3kPresentSource.presenterHeight == g.height;
+'@
+$rawReadyNew=@'
+    if (g_m3kMasterEnabled || !g_m3kSourceTapReady || !g.width || !g.height) return false;
+    if (!g_m3kP9ARetainedNativeOff &&
+        (g_m3kSrProfileRequested != 0 || g_m3kSrProfileApplied != 0)) return false;
+    return g_m3kPresentSource.width == g.width &&
+           g_m3kPresentSource.height == g.height &&
+           g_m3kPresentSource.presenterWidth == g.width &&
+           g_m3kPresentSource.presenterHeight == g.height;
+'@
+$vk=Once $vk $rawReadyOld $rawReadyNew 'retained AMD Off raw readiness'
+
 $advanceOld='        M3kAdvanceMasterDisable();'
 $advanceNew=@'
         M3kAdvanceMasterDisable();
@@ -206,6 +243,8 @@ foreach($marker in @(
     'M3K-P9A: AMD -> Off stage 1',
     'M3K-P9A: AMD -> Off LIVE COMMIT',
     'M3K-P9A: Off -> AMD LIVE committed',
+    'M3kP9ANativeRawReady()',
+    'g_m3kP9ARetainedNativeOff',
     'M3kAdvanceScalingTechnologyTransition();',
     'if(g_m3kScalingTransitionTarget==0u)fsrScalePermille=1000u;',
     '!g_m3kFsrNativeSession && g_cfg.mode >= 2',
