@@ -421,3 +421,22 @@ Remaining NVIDIA image-quality issue:
 - NVIDIA DLSS remains functionally stable but shows visible shimmer while bridge raster jitter is active.
 - Earlier P9C.1 testing showed NVIDIA becoming visibly stable when bridge jitter dropped inactive/zero.
 - P9C.3 isolates this by disabling raster jitter only for NVIDIA while AMD keeps exact raster jitter.
+
+
+## P9C.3 diagnostic hardware result
+
+P9C.3 disabled GTA raster jitter only for NVIDIA while leaving AMD jitter enabled.
+
+Observed on RTX 4070 Ti SUPER:
+- NVIDIA shimmer disappeared with raster jitter disabled.
+- NVIDIA aliasing became visibly worse, so zero jitter is rejected as a final AA solution.
+- NVIDIA DLSS continued reconstructing with reset=0 and zero jitter, proving the visual change is caused by the temporal sample path rather than backend/session instability.
+- AMD with full temporal jitter showed somewhat better AA but a small amount of shimmer.
+- The first AMD 66.7% interval had exact raster jitter active and reset=0.
+- A later AMD re-entry again exposed the known bridge-eligibility issue and could fall back to inactive jitter/reset=1.
+
+Conclusion:
+- anti-aliasing remains the product priority
+- P9C.3 is diagnostic only; do not promote NVIDIA jitter-off policy
+- P9C.4 tests all four NVIDIA NGX X/Y compensation signs while retaining full GTA raster jitter
+- only if all sign combinations still shimmer should amplitude reduction be explored
