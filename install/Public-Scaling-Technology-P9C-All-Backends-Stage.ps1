@@ -43,113 +43,31 @@ static bool g_m3kFsrNativeSession=false;
 static void M3kFsrNativeShutdownAfterQueueIdle();
 static UINT M3kSessionBackendSelectionAtOpen();
 static void M3kSetSessionBackendSelection(UINT tech);
-static bool M3kCommitScalingTechnologyTransition()
+static bool M3kCommitScalingTechnologyTransition();
+static void ShutdownSession();   // defined below; every InitSession* unwinds through it
+'@
+$feed=Once $feed $earlyOld $earlyNew 'early live-switch declarations'
+
+$sessionSelector=@'
+static volatile LONG g_m3kSessionBackendSelection=-1;
+
+static UINT M3kReadConfiguredScalingTechnologyAtSessionOpen()
 {
-    if(!g_m3kScalingTransitionPending||g_m3kScalingTransitionAwaitingOpen||
-       !M3kMasterNativePassthroughReady())return false;
+    wchar_t path[MAX_PATH]={};
+    if(!GetModuleFileNameW(g_self,path,MAX_PATH))return 1u;
+    wchar_t *slash=wcsrchr(path,L'\\');
+    if(!slash)return 1u;
+    *(slash+1)=0;
+    wcscat_s(path,L"m3k-nr.ini");
 
-    const UINT oldTech=g_m3kScalingTechnologyActive;
-    const UINT newTech=g_m3kScalingTransitionTarget<=2?g_m3kScalingTransitionTarget:1u;
-    const UINT hopFinal=g_m3kScalingVendorHopFinalTarget;
-    const bool retainFsrOnOff=
-        oldTech==2u&&newTech==0u&&g_m3kFsrNativeSession&&g.session_ready;
-    const bool reuseRetainedFsr=
-        oldTech==0u&&newTech==2u&&g_m3kFsrNativeSession&&g.session_ready;
-
-    Log("M3K-P9C: COMMIT begin %s -> %s at native %ux%u; queue-idle ownership handoff follows",
-        M3kScalingTechnologyName(oldTech),M3kScalingTechnologyName(newTech),g.width,g.height);
-
-    if(g.session_ready&&!retainFsrOnOff&&!reuseRetainedFsr)
-        ShutdownSession();
-    else if(retainFsrOnOff)
-        Log("M3K-P9C: AMD -> Off retains the proven dormant native Vulkan FSR session");
-    else if(reuseRetainedFsr)
-        Log("M3K-P9C: Off -> AMD reuses the retained native Vulkan FSR session");
-
-    g_m3kScalingTechnologyActive=newTech;
-    if(hopFinal==0xFFFFFFFFu)
-        g_m3kScalingTechnologyRequested=newTech;
-    M3kSetSessionBackendSelection(newTech);
-
-    g_m3kFsrProofRequested=newTech==2u;
-    g_m3kFsrLatchedFail=false;
-    g_m3kFsrNeedsReset=true;
-    g_m3kFsrLastJitterEpoch=-1;
-    g_m3kFsrLastJitterFrame=-1;
-    g_m3kFsrJitterStateKnown=false;
-    g_m3kFsrLastJitterActive=false;
-    g_m3kFsrLastQpc={};
-
-    const bool m3kNvidiaTarget=newTech==1u;
-    g_m3kSrRequested=m3kNvidiaTarget;
-    M3kWritePublicUInt(L"SRProof",m3kNvidiaTarget?1u:0u);
-    Log("M3K-P9C: SRProof=%u for target %s",
-        m3kNvidiaTarget?1u:0u,M3kScalingTechnologyName(newTech));
-    g_m3kSrFeatureActive=false;
-    g_m3kSrLatchedFail=false;
-    g_m3kSrNeedsReset=true;
-    g_m3kSrW=g_m3kSrH=g_m3kSrOutW=g_m3kSrOutH=0;
-    g_m3kSrProfileApplied=0xFFFFFFFFu;
-
-    g_m3kStartupPrimeActive=false;
-    g_m3kStartupPrimeCompleted=true;
-    g_m3kStartupPrimeConfigured=true;
-    g_m3kStartupPrimeStableFrames=0;
-    g_m3kStartupPrimeEpoch=-1;
-
-    g_m3kScalingTransitionTarget=newTech;
-    g_m3kScalingTransitionNativeOverride=false;
-    g_m3kScalingOffTransitionIssued=newTech==0u;
-    M3kInvalidateBackendResolutionPlan();
-
-    if(newTech==0u)
-    {
-        g_m3kScalingTransitionAwaitingOpen=false;
-        g_m3kMasterDisablePending=false;
-        g_m3kMasterEnabled=false;
-        g_m3kMasterNativeStableFrames=0;
-        g_m3kMasterJitterOffTick=0;
-        M3kWriteMasterIni(L"MasterEnabled",0);
-        M3kWriteMasterIni(L"TemporalJitter",0);
-
-        if(hopFinal<=2u&&hopFinal!=0u)
-        {
-            g_m3kScalingTransitionPending=true;
-            g_m3kScalingTransitionPrevious=0u;
-            g_m3kScalingTransitionTarget=hopFinal;
-            g_m3kScalingTransitionNativeOverride=true;
-            g_m3kScalingVendorHopFinalTarget=0xFFFFFFFFu;
-            Log("M3K-P9C: VENDOR MIDPOINT COMMITTED %s -> Off/raw; continuing Off -> %s on the next frame",
-                M3kScalingTechnologyName(oldTech),M3kScalingTechnologyName(hopFinal));
-        }
-        else
-        {
-            g_m3kScalingTransitionPending=false;
-            g_m3kScalingTransitionPrevious=0u;
-            g_m3kScalingVendorHopFinalTarget=0xFFFFFFFFu;
-            Log("M3K-P9C: LIVE switch COMMITTED %s -> Off (native raw; %s)",
-                M3kScalingTechnologyName(oldTech),
-                g_m3kFsrNativeSession?"dormant FSR Vulkan session retained":"sessionless");
-        }
+    wchar_t techText[16]={};
+    GetPrivateProfileStringW(L"M3K",L"ScalingTechnology",L"",techText,16,path);
+    if(techText[0]){
+        wchar_t *end=nullptr;
+        const unsigned long tech=wcstoul(techText,&end,10);
+        if(end!=techText&&tech<=2ul)return static_cast<UINT>(tech);
     }
-    else
-    {
-        g_m3kScalingVendorHopFinalTarget=0xFFFFFFFFu;
-        M3kRequestMasterEnabledLive(true);
-
-        if(newTech==2u&&reuseRetainedFsr)
-        {
-            g_m3kScalingTransitionAwaitingOpen=false;
-            Log("M3K-P9C: target=AMD - FSR selected in retained native Vulkan session; waiting for first successful FSR dispatch");
-        }
-        else
-        {
-            g_m3kScalingTransitionAwaitingOpen=true;
-            Log("M3K-P9C: target=%s selected; replacement session open is REQUIRED before reconstruction finalizes",
-                M3kScalingTechnologyName(newTech));
-        }
-    }
-    return true;
+    return GetPrivateProfileIntW(L"M3K",L"FSRProof",0,path)!=0?2u:1u;
 }
 
 static UINT M3kSessionBackendSelectionAtOpen()
@@ -400,13 +318,25 @@ static bool M3kCommitScalingTechnologyTransition()
 
     const UINT oldTech=g_m3kScalingTechnologyActive;
     const UINT newTech=g_m3kScalingTransitionTarget<=2?g_m3kScalingTransitionTarget:1u;
-    Log("M3K-P9C: COMMIT begin %s -> %s at native %ux%u; old session teardown follows queue-idle safety",
+    const UINT hopFinal=g_m3kScalingVendorHopFinalTarget;
+    const bool retainFsrOnOff=
+        oldTech==2u&&newTech==0u&&g_m3kFsrNativeSession&&g.session_ready;
+    const bool reuseRetainedFsr=
+        oldTech==0u&&newTech==2u&&g_m3kFsrNativeSession&&g.session_ready;
+
+    Log("M3K-P9C: COMMIT begin %s -> %s at native %ux%u; queue-idle ownership handoff follows",
         M3kScalingTechnologyName(oldTech),M3kScalingTechnologyName(newTech),g.width,g.height);
 
-    if(g.session_ready)ShutdownSession();
+    if(g.session_ready&&!retainFsrOnOff&&!reuseRetainedFsr)
+        ShutdownSession();
+    else if(retainFsrOnOff)
+        Log("M3K-P9C: AMD -> Off retains the proven dormant native Vulkan FSR session");
+    else if(reuseRetainedFsr)
+        Log("M3K-P9C: Off -> AMD reuses the retained native Vulkan FSR session");
 
     g_m3kScalingTechnologyActive=newTech;
-    g_m3kScalingTechnologyRequested=newTech;
+    if(hopFinal==0xFFFFFFFFu)
+        g_m3kScalingTechnologyRequested=newTech;
     M3kSetSessionBackendSelection(newTech);
 
     g_m3kFsrProofRequested=newTech==2u;
@@ -442,24 +372,50 @@ static bool M3kCommitScalingTechnologyTransition()
 
     if(newTech==0u)
     {
-        g_m3kScalingTransitionPending=false;
         g_m3kScalingTransitionAwaitingOpen=false;
-        g_m3kScalingTransitionPrevious=0u;
         g_m3kMasterDisablePending=false;
         g_m3kMasterEnabled=false;
         g_m3kMasterNativeStableFrames=0;
         g_m3kMasterJitterOffTick=0;
         M3kWriteMasterIni(L"MasterEnabled",0);
         M3kWriteMasterIni(L"TemporalJitter",0);
-        Log("M3K-P9C: LIVE switch COMMITTED %s -> Off (native raw, sessionless)",
-            M3kScalingTechnologyName(oldTech));
+
+        if(hopFinal<=2u&&hopFinal!=0u)
+        {
+            g_m3kScalingTransitionPending=true;
+            g_m3kScalingTransitionPrevious=0u;
+            g_m3kScalingTransitionTarget=hopFinal;
+            g_m3kScalingTransitionNativeOverride=true;
+            g_m3kScalingVendorHopFinalTarget=0xFFFFFFFFu;
+            Log("M3K-P9C: VENDOR MIDPOINT COMMITTED %s -> Off/raw; continuing Off -> %s on the next frame",
+                M3kScalingTechnologyName(oldTech),M3kScalingTechnologyName(hopFinal));
+        }
+        else
+        {
+            g_m3kScalingTransitionPending=false;
+            g_m3kScalingTransitionPrevious=0u;
+            g_m3kScalingVendorHopFinalTarget=0xFFFFFFFFu;
+            Log("M3K-P9C: LIVE switch COMMITTED %s -> Off (native raw; %s)",
+                M3kScalingTechnologyName(oldTech),
+                g_m3kFsrNativeSession?"dormant FSR Vulkan session retained":"sessionless");
+        }
     }
     else
     {
-        g_m3kScalingTransitionAwaitingOpen=true;
+        g_m3kScalingVendorHopFinalTarget=0xFFFFFFFFu;
         M3kRequestMasterEnabledLive(true);
-        Log("M3K-P9C: target=%s selected; replacement session open is now REQUIRED before commit completes",
-            M3kScalingTechnologyName(newTech));
+
+        if(newTech==2u&&reuseRetainedFsr)
+        {
+            g_m3kScalingTransitionAwaitingOpen=false;
+            Log("M3K-P9C: target=AMD - FSR selected in retained native Vulkan session; waiting for first successful FSR dispatch");
+        }
+        else
+        {
+            g_m3kScalingTransitionAwaitingOpen=true;
+            Log("M3K-P9C: target=%s selected; replacement session open is REQUIRED before reconstruction finalizes",
+                M3kScalingTechnologyName(newTech));
+        }
     }
     return true;
 }
