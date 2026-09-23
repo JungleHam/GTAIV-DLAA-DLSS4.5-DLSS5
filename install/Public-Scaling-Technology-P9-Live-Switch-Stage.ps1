@@ -567,7 +567,12 @@ $sessionOpenNew=@'
 
                 ok=InitSessionVk(rt);
                 if(ok)
+                {
                     M3kP9RollbackSucceeded(oldTech,failedTech);
+                    // This frame already crossed the failed target's present-order gate.
+                    // Stop here; the next frame re-enters through the restored backend's gate.
+                    return;
+                }
                 else
                 {
                     M3kP9ForceOffAfterRollbackFailure(failedTech,oldTech);
