@@ -324,3 +324,27 @@ Default FSR camera contract after P5C:
 - depth infinite = false
 
 INI overrides remain supported for diagnostics and unusual camera/projection cases.
+
+
+## P8 hardware validation — PASSED
+
+P8 validated the explicit scaling selector together with independent AMD RCAS on hardware.
+
+Observed:
+- launch backend captured as AMD - FSR
+- native Vulkan FSR session opened with no D3D12/NGX initialization
+- calibrated camera contract remained near=0.05, far=1500, vertical FOV=45 degrees
+- independent AMD RCAS started at 0.25 and accepted live UI changes through the full 0..1 range
+- FSR direct Vulkan reconstruction remained active during RCAS changes
+- live FSR scale changes succeeded at 33%, 100%, 77%, and 50%
+- exact raster-jitter handoff returned active after resize/runtime churn and matched FSR jitter exactly
+- temporary raw-nearest fallback occurred only while a requested render-size transition had not yet produced the new DXVK source
+- final session shut down the FidelityFX context after Vulkan queue idle and exited cleanly
+
+P8 is therefore the hardware baseline for the public AMD path.
+
+Next lifecycle target:
+- live Off <-> NVIDIA <-> AMD switching without process restart
+- must reuse queue-idle / runtime-churn quarantine
+- must never silently fall back across vendors
+- requested and active backend remain separate until a transition commits successfully
