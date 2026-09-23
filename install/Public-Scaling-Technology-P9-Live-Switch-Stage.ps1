@@ -100,6 +100,9 @@ static UINT g_m3kScalingTechnologyRequested=1;
 static bool g_m3kScalingTechnologyInitialized=false;
 static bool g_m3kScalingTechnologyRestartPending=false;
 static bool g_m3kScalingOffTransitionIssued=false;
+static const char *M3kScalingTechnologyName(UINT tech);
+static void M3kSetSessionBackendSelection(UINT tech);
+static void ShutdownSession();
 '@
 $stateNew=@'
 static UINT g_m3kScalingTechnologyActive=1;    // 0 Off, 1 NVIDIA, 2 AMD
