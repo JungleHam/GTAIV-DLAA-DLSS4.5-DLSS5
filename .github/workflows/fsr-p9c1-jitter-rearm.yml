@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - feature/fsr-3-1-5
+      - test/p9c1-jitter-rearm-w2025
     paths:
       - '.github/workflows/fsr-p9c1-all-backends.yml'
       - 'install/Public-Scaling-Technology-P9C-All-Backends-Stage.ps1'
@@ -26,7 +26,7 @@ permissions:
 
 jobs:
   build-fsr-p9:
-    runs-on: windows-2022
+    runs-on: windows-2025
     timeout-minutes: 75
 
     steps:
