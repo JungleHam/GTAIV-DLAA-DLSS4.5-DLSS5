@@ -164,7 +164,7 @@ jobs:
             'Composition=P9A.1 AMD<->Off retained Vulkan lifecycle + P9B.3 NVIDIA<->Off sessionless lifecycle',
             'Vendor switch=NVIDIA<->AMD is serialized through explicit Off/raw midpoint; never direct',
             'Initial backend=Off / raw native / sessionless',
-            'Live boundary enabled=Off <-> NVIDIA only',
+            'Live boundaries enabled=Off <-> NVIDIA and Off <-> AMD; direct vendor hops serialize through Off/raw',
             'AMD live boundary enabled; NVIDIA and AMD state remain independent',
             'NVIDIA -> Off path=target remains Off throughout drain; one-shot BLOCKED marker proves SR-ready finalizer ignored Off -> 30 stable native frames -> jitter off -> 400ms drain -> queue-idle ShutdownSession',
             'Off -> NVIDIA path=select NVIDIA -> SRProof=1 -> InitSessionVk -> build requested SR/DLAA -> finalize only after reconstruction READY',
