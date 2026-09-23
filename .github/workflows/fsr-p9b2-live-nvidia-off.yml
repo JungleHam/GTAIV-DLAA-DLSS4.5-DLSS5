@@ -137,7 +137,7 @@ jobs:
             'M3K-P9B2: ROLLBACK COMMITTED',
             'M3K-P9B2: ROLLBACK FAILED',
             'M3K-P9B2: Off backend READY - true native/raw passthrough',
-            'M3K-P9B2: SRProof=1 for target NVIDIA - DLAA / DLSS 4.5',
+            'M3K-P9B2: SRProof=%u for target %s',
             'M3K-P9B2: NVIDIA session READY',
             'M3K-P9B2: LIVE switch FINALIZED',
             'draining through native/raw midpoint',
