@@ -498,7 +498,18 @@ static void M3kP9RollbackSucceeded(UINT oldTech,UINT failedTech)
     g_m3kScalingTransitionPrevious=oldTech;
     g_m3kScalingTransitionNativeOverride=false;
     g_m3kScalingTransitionLastFailed=true;
-    if(oldTech!=0u)M3kRequestMasterEnabledLive(true);
+    if(oldTech!=0u)
+        M3kRequestMasterEnabledLive(true);
+    else
+    {
+        g_m3kMasterDisablePending=false;
+        g_m3kMasterEnabled=false;
+        g_m3kMasterNativeStableFrames=0;
+        g_m3kMasterJitterOffTick=0;
+        g_m3kScalingOffTransitionIssued=true;
+        M3kWriteMasterIni(L"MasterEnabled",0);
+        M3kWriteMasterIni(L"TemporalJitter",0);
+    }
     M3kInvalidateBackendResolutionPlan();
     Log("M3K-P9: ROLLBACK COMMITTED; %s restored after failed %s request",
         M3kScalingTechnologyName(oldTech),M3kScalingTechnologyName(failedTech));
