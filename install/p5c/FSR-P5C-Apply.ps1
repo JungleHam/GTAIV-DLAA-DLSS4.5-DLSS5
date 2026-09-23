@@ -45,7 +45,7 @@ $ServerLive=Join-Path $Trex 'NvRemixBridge.exe'
 $FeederLive=Join-Path $Trex 'dlss5-feed.addon64'
 $Ini=Join-Path $Trex 'm3k-nr.ini'
 $FeedLog=Join-Path $Trex 'dlss5-feed.log'
-$ServerLog=Join-Path $Trex 'NvRemixBridge.log'
+$ServerLog=Join-Path $Game 'rtx-remix\logs\bridge64.log'
 $State=Join-Path $Trex '_FSR_P5C_CAMERA_TEST_STATE'
 
 foreach($p in @($ServerCandidate,$FeederCandidate,$ClientLive,$ServerLive,$FeederLive,$Ini)){
