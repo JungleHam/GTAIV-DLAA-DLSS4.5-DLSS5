@@ -4,18 +4,11 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - feature/fsr-3-1-5
+      - test/p9b-live-nvidia-off
     paths:
       - '.github/workflows/fsr-p9b-live-nvidia-off.yml'
       - 'install/Public-Scaling-Technology-P9B-Live-Nvidia-Off-Stage.ps1'
       - 'install/p9b/**'
-  pull_request:
-    branches: [main]
-    paths:
-      - '.github/workflows/fsr-p9b-live-nvidia-off.yml'
-      - 'install/Public-Scaling-Technology-P9B-Live-Nvidia-Off-Stage.ps1'
-      - 'install/p9b/**'
-
 concurrency:
   group: fsr-p9-live-switch-${{ github.ref }}
   cancel-in-progress: true
