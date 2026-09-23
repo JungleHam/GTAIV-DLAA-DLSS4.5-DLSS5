@@ -1,4 +1,4 @@
-name: FSR P9BB live Off NVIDIA build
+name: FSR P9B live Off NVIDIA build
 
 on:
   workflow_dispatch:
