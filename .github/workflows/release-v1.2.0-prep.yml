@@ -6,6 +6,7 @@ on:
     branches:
       - release/v1.2.0-prep
     paths:
+      - '.github/workflows/release-v1.2.0-prep.yml'
       - '.github/workflows/fsr-p9c5-calibrated-aa-defaults.yml'
       - 'install/Public-Scaling-Technology-P9C-All-Backends-Stage.ps1'
       - 'install/Public-FSR-P9C1-Jitter-Rearm-Stage.ps1'
