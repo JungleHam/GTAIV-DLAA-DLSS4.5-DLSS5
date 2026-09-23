@@ -440,3 +440,28 @@ Conclusion:
 - P9C.3 is diagnostic only; do not promote NVIDIA jitter-off policy
 - P9C.4 tests all four NVIDIA NGX X/Y compensation signs while retaining full GTA raster jitter
 - only if all sign combinations still shimmer should amplitude reduction be explored
+
+
+## P9C.4 NVIDIA temporal calibration — PASSED
+
+P9C.4 retained full GTA raster jitter and tested all four NVIDIA NGX X/Y jitter-sign conventions live.
+
+Hardware result on RTX 4070 Ti SUPER:
+- best NVIDIA sequence: manual 8 phases
+- best NVIDIA NGX compensation: -X / -Y
+- DLSS Quality kept strong anti-aliasing; only slight low-scale temporal wobble remained, consistent with expected lower-resolution DLSS behavior
+- DLAA Native looked clean
+- zero-jitter P9C.3 is rejected because it removed shimmer by sacrificing too much AA
+- AMD FSR remained visually correct and did not need any image-quality change
+- AMD retained its independent FidelityFX phase planner; at 66.7% the planner selected 17 phases and exact raster jitter matched FSR with reset settled to 0
+
+P9C.4 is the frozen NVIDIA temporal-calibration checkpoint.
+
+## P9C.5 calibrated defaults
+
+Promote the P9C.4 hardware winner without changing reconstruction architecture:
+- NVIDIA default Jitter Sequence = 8 phases
+- NVIDIA default Jitter Compensation = -X / -Y
+- keep full raster jitter enabled
+- keep both settings exposed under Advanced for manual override
+- keep AMD FSR unchanged; its independent phase planner remains authoritative when AMD is active
