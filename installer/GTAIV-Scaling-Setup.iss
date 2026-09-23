@@ -295,7 +295,7 @@ end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  PowerShell, Args, ResultPath, Detail: string;
+  PowerShell, Args, ResultPath, Detail, ActionName: string;
   RawDetail: AnsiString;
   ResultCode: Integer;
 begin
