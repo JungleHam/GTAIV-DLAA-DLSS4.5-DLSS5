@@ -6,14 +6,14 @@ on:
     branches:
       - test/p9c1-jitter-rearm-w2025
     paths:
-      - '.github/workflows/fsr-p9c1-all-backends.yml'
+      - '.github/workflows/fsr-p9c1-jitter-rearm.yml'
       - 'install/Public-Scaling-Technology-P9C-All-Backends-Stage.ps1'
       - 'install/Public-FSR-P9C1-Jitter-Rearm-Stage.ps1'
       - 'install/p9c1/**'
   pull_request:
     branches: [main]
     paths:
-      - '.github/workflows/fsr-p9c1-all-backends.yml'
+      - '.github/workflows/fsr-p9c1-jitter-rearm.yml'
       - 'install/Public-Scaling-Technology-P9C-All-Backends-Stage.ps1'
       - 'install/p9c1/**'
 
