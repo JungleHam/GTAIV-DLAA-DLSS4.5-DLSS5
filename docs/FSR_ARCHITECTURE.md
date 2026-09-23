@@ -296,3 +296,31 @@ Lifecycle:
 ## Next implementation step
 
 Build a dedicated experimental FidelityFX Vulkan module/library from SDK v1.1.4, then add a **single public stage** that injects the smallest FSR backend hook into the frozen M3K Vulkan adapter. Package it only through a manually-triggered experimental workflow; do not modify production release workflows.
+
+
+## P5C hardware calibration — PASSED
+
+P5C moved projection telemetry to the x64 bridge server so the hardware-proven
+production `d3d9.dll` client remained untouched. The server read only the live D3D9
+viewport plus GTA IV world-shader constants c0-c15 immediately before sampled draws.
+
+Hardware results:
+- 425 valid perspective samples accepted.
+- 424/425 samples used the full 1708x960 gameplay viewport.
+- Vertical FOV was overwhelmingly 45.0 degrees.
+- Near plane clustered at 0.050000.
+- 422/424 full-size samples clustered at approximately 1500 far plane.
+- Two isolated full-size samples used approximately 24.7k far plane and are treated
+  as secondary/alternate projections rather than the main gameplay camera.
+- Depth projection was consistently normal (non-reversed candidate).
+- The main FSR depth contract remains finite, not infinite.
+- P4A exact raster jitter remained hardware-correct during the same run.
+
+Default FSR camera contract after P5C:
+- `cameraNear = 0.05`
+- `cameraFar = 1500.0`
+- `cameraFovAngleVertical = 45 degrees`
+- depth inverted = false
+- depth infinite = false
+
+INI overrides remain supported for diagnostics and unusual camera/projection cases.
