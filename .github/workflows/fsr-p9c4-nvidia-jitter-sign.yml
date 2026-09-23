@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - feature/fsr-3-1-5
+      - test/p9c4-nvidia-jitter-sign-w2022
     paths:
       - '.github/workflows/fsr-p9c4-nvidia-jitter-sign.yml'
       - 'install/Public-Scaling-Technology-P9C-All-Backends-Stage.ps1'
