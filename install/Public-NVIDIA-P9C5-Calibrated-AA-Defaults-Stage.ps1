@@ -42,10 +42,11 @@ static void M3kP9C5LogCalibratedDefaultsOnce()
 
 '@
 $vk=$vk.Substring(0,$at)+$marker+$vk.Substring($at)
-$body='static void M3kPrepareFrame()'
-$vk=Once $vk $body ($body+[Environment]::NewLine+'{'+[Environment]::NewLine+'    M3kP9C5LogCalibratedDefaultsOnce();') 'startup proof hook'
-$vk=$vk.Replace('static void M3kPrepareFrame()`r`n{`r`n{','static void M3kPrepareFrame()`r`n{')
-$vk=$vk.Replace('static void M3kPrepareFrame()`n{`n{','static void M3kPrepareFrame()`n{')
+$prepareStart=$vk.IndexOf('static void M3kPrepareFrame()',[StringComparison]::Ordinal)
+if($prepareStart-lt 0){throw 'P9C.5 prepare function missing after marker insertion'}
+$brace=$vk.IndexOf('{',$prepareStart)
+if($brace-lt 0){throw 'P9C.5 prepare opening brace missing'}
+$vk=$vk.Insert($brace+1,[Environment]::NewLine+'    M3kP9C5LogCalibratedDefaultsOnce();')
 
 foreach($m in @(
     'M3K-P9C5: calibrated NVIDIA temporal defaults = 8 phases, -X/-Y; AMD keeps independent FSR phase planning',
