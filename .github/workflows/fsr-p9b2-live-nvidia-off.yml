@@ -4,18 +4,11 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - feature/fsr-3-1-5
+      - test/p9b2-live-nvidia-off-w2025
     paths:
       - '.github/workflows/fsr-p9b2-live-nvidia-off.yml'
       - 'install/Public-Scaling-Technology-P9B2-Live-Nvidia-Off-Stage.ps1'
       - 'install/p9b2/**'
-  pull_request:
-    branches: [main]
-    paths:
-      - '.github/workflows/fsr-p9b2-live-nvidia-off.yml'
-      - 'install/Public-Scaling-Technology-P9B2-Live-Nvidia-Off-Stage.ps1'
-      - 'install/p9b2/**'
-
 concurrency:
   group: fsr-p9-live-switch-${{ github.ref }}
   cancel-in-progress: true
@@ -25,7 +18,7 @@ permissions:
 
 jobs:
   build-fsr-p9:
-    runs-on: windows-2022
+    runs-on: windows-2025
     timeout-minutes: 75
 
     steps:
@@ -99,7 +92,7 @@ jobs:
           git clone --filter=blob:none --branch v1.1.4 https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK.git _ffx
           $sha=(git -C _ffx rev-parse HEAD).Trim()
           if ($sha -ne 'c6efa6bf7f2027b3ec94f28578bb5965eabb9e55') { throw "Wrong FidelityFX SDK commit: $sha" }
-          cmake -S .\_ffx\sdk -B .\_ffx\sdk\build-gtaiv-fsr -G "Visual Studio 17 2022" -A x64 `
+          cmake -S .\_ffx\sdk -B .\_ffx\sdk\build-gtaiv-fsr -G "Visual Studio 18 2026" -A x64 `
             -DFFX_API_BACKEND=VK_X64 -DFFX_FSR3UPSCALER=ON -DFFX_AUTO_COMPILE_SHADERS=1
           if ($LASTEXITCODE -ne 0) { throw "FidelityFX configure failed: $LASTEXITCODE" }
           cmake --build .\_ffx\sdk\build-gtaiv-fsr --config Release --target ffx_fsr3upscaler_x64 ffx_backend_vk_x64 --parallel 4
