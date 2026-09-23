@@ -19,12 +19,16 @@ $ServerLive=Join-Path $Trex 'NvRemixBridge.exe'
 $FeederLive=Join-Path $Trex 'dlss5-feed.addon64'
 $Ini=Join-Path $Trex 'm3k-nr.ini'
 $FeedLog=Join-Path $Trex 'dlss5-feed.log'
-$ServerLog=Join-Path $Trex 'NvRemixBridge.log'
+$ServerLog=Join-Path $Game 'rtx-remix\logs\bridge64.log'
 $State=Join-Path $Trex '_FSR_P5C_CAMERA_TEST_STATE'
 if(-not(Test-Path $State)){throw "No saved FSR P5C state exists at $State"}
 
 if(Test-Path $FeedLog){Copy-Item $FeedLog (Join-Path $PackageDir 'FSR-P5C-FEEDER-LOG.txt') -Force}
-if(Test-Path $ServerLog){Copy-Item $ServerLog (Join-Path $PackageDir 'FSR-P5C-SERVER-LOG.txt') -Force}
+if(Test-Path $ServerLog){
+    Copy-Item $ServerLog (Join-Path $PackageDir 'FSR-P5C-SERVER-LOG.txt') -Force
+}else{
+    Write-Host "WARNING: bridge64.log was not found at: $ServerLog"
+}
 
 foreach($name in @('NvRemixBridge.exe','dlss5-feed.addon64','m3k-nr.ini')){
     if(-not(Test-Path (Join-Path $State $name))){throw "Saved $name missing; state left untouched."}
