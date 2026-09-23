@@ -147,7 +147,7 @@ function Invoke-Bat([string]$Path,[string]$Root,[switch]$NonInteractive){
     $p.StartInfo=$psi
     if(-not $p.Start()){Fail "Could not start $Path"}
     $p.WaitForExit();$code=$p.ExitCode;$p.Dispose()
-    if($code-ne 0){Fail "Installer component failed with exit code $code: $([IO.Path]::GetFileName($Path))"}
+    if($code-ne 0){Fail "Installer component failed with exit code ${code}: $([IO.Path]::GetFileName($Path))"}
 }
 function Set-Ini([string]$Path,[string]$Section,[string]$Key,[string]$Value){
     $list=New-Object 'System.Collections.Generic.List[string]'
