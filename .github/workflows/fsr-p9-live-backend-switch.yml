@@ -140,7 +140,9 @@ jobs:
           $ascii=[Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($addon))
           foreach($marker in @(
             'M3K-P9: COMMIT begin',
-            'M3K-P9: COMMIT complete',
+            'M3K-P9: LIVE switch COMMITTED',
+            'M3K-P9: ROLLBACK COMMITTED',
+            'M3K-P9: ROLLBACK FAILED',
             'M3K-P9: Off backend active - Vulkan frame passes untouched',
             'draining through native/raw midpoint',
             'RCAS=per-dispatch',
@@ -154,6 +156,8 @@ jobs:
             'Transitions=Off <-> NVIDIA DLAA/DLSS 4.5 <-> AMD FSR',
             'Switch path=native render size -> 30 stable frames -> jitter off -> 400ms drain -> queue-idle session teardown -> target backend',
             'Session backend is latched until transition commit; mutable INI cannot switch it early',
+            'Requested target must successfully open before the live switch is finalized',
+            'Failed target open automatically restores the previous backend; failed rollback forces explicit Off/raw',
             'Off is sessionless and opens neither D3D12/NGX nor FSR',
             'AMD native drain does not overwrite saved NVIDIA SRProfile/NR state',
             'AMD RCAS remains independent from NVIDIA sharpening',
@@ -186,7 +190,7 @@ jobs:
             '10. Close GTA IV and run 2-RESTORE-BEFORE-P9.bat.',
             '11. Send FSR-P9-TEST-LOG.txt.',
             '',
-            'PASS: every transition logs native drain + COMMIT begin/complete, Off opens no backend session, NVIDIA and AMD reopen their own sessions, exact raster jitter returns, and shutdown is clean.'
+            'PASS: every transition logs native drain + LIVE switch COMMITTED, Off opens no backend session, NVIDIA and AMD reopen their own sessions, exact raster jitter returns, and shutdown is clean. A failed target must log ROLLBACK COMMITTED rather than silently switching vendors.'
           )|Set-Content .\out-fsr-p9\HOW-TO-TEST.txt -Encoding UTF8
 
       - uses: actions/upload-artifact@v4
