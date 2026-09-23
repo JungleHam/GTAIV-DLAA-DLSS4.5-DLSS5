@@ -18,7 +18,7 @@ on:
       - 'install/p9c1/**'
 
 concurrency:
-  group: fsr-p9-live-switch-${{ github.ref }}
+  group: fsr-p9c1-jitter-rearm-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
