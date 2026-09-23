@@ -307,9 +307,11 @@ begin
     ResultPath := ExpandConstant('{tmp}\GTAIV-Scaling-action-result.txt');
     DeleteFile(ResultPath);
 
+    if SelectedAction = 0 then ActionName := 'INSTALL' else ActionName := 'REMOVE';
+
     Args := '-NoLogo -NoProfile -ExecutionPolicy Bypass -File ' +
       QuoteArg(ExpandConstant('{tmp}\Run-Scaling-Action.ps1')) +
-      ' -Action ' + (if SelectedAction = 0 then 'INSTALL' else 'REMOVE') +
+      ' -Action ' + ActionName +
       ' -Game ' + QuoteArg(GameDir) +
       ' -RuntimePackage ' + QuoteArg(ExpandConstant('{tmp}\GTAIV-Scaling-Runtime-v1.2.0.zip')) +
       ' -ReShadePatch ' + QuoteArg(ExpandConstant('{tmp}\ReShade64-bbridge.dll')) +
