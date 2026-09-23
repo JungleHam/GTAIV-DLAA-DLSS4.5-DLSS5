@@ -516,8 +516,24 @@ static bool M3kP9NvidiaReconstructionReady()
 
 static void M3kP9TryFinalizeNvidiaTransition()
 {
+    static bool m3kNonNvidiaTargetGuardReported=false;
     if(!g_m3kScalingTransitionPending||g_m3kScalingTransitionAwaitingOpen||
-       g_m3kScalingTechnologyActive!=1u||g_m3kScalingTransitionTarget!=1u)return;
+       g_m3kScalingTechnologyActive!=1u)
+    {
+        m3kNonNvidiaTargetGuardReported=false;
+        return;
+    }
+    if(g_m3kScalingTransitionTarget!=1u)
+    {
+        if(!m3kNonNvidiaTargetGuardReported)
+        {
+            m3kNonNvidiaTargetGuardReported=true;
+            Log("M3K-P9B3: NVIDIA reconstruction finalizer BLOCKED for pending target %s; Off transition remains authoritative",
+                M3kScalingTechnologyName(g_m3kScalingTransitionTarget));
+        }
+        return;
+    }
+    m3kNonNvidiaTargetGuardReported=false;
 
     if(g_m3kSrLatchedFail)
     {
@@ -760,7 +776,8 @@ foreach($marker in @(
     'NVIDIA session READY after %s; waiting for requested reconstruction to become active',
     'LIVE switch FINALIZED %s -> NVIDIA - DLAA / DLSS 4.5',
     'M3kP9TryFinalizeNvidiaTransition();',
-    'g_m3kScalingTransitionTarget!=1u'
+    'g_m3kScalingTransitionTarget!=1u',
+    'NVIDIA reconstruction finalizer BLOCKED for pending target %s'
 )){
     if($vk.IndexOf($marker,[StringComparison]::Ordinal)-lt 0 -and
        $feed.IndexOf($marker,[StringComparison]::Ordinal)-lt 0){throw "FSR P9 verification marker missing: $marker"}
