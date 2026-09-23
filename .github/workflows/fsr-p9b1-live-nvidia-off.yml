@@ -143,7 +143,7 @@ jobs:
             'M3K-P9B1: LIVE switch COMMITTED',
             'M3K-P9B1: ROLLBACK COMMITTED',
             'M3K-P9B1: ROLLBACK FAILED',
-            'M3K-P9B1: Off backend active - Vulkan frame passes untouched',
+            'M3K-P9B1: Off backend READY - true native/raw passthrough',
             'draining through native/raw midpoint',
             'RCAS=per-dispatch',
             'AMD RCAS Sharpening',
