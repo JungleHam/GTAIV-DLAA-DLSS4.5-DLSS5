@@ -129,8 +129,10 @@ public:
         description.backendInterface = backendInterface_;
         description.maxRenderSize = { maxRenderWidth_, maxRenderHeight_ };
         description.maxUpscaleSize = { maxOutputWidth_, maxOutputHeight_ };
-        description.flags = FFX_FSR3UPSCALER_ENABLE_AUTO_EXPOSURE |
-                            FFX_FSR3UPSCALER_ENABLE_DEBUG_CHECKING;
+        // P9C.2 exposure isolation: GTA IV input is already SDR/tonemapped.
+        // With AUTO_EXPOSURE disabled and dispatch.exposure left null, FidelityFX
+        // uses its INTERNAL_DEFAULT_EXPOSURE resource (fixed/default exposure).
+        description.flags = FFX_FSR3UPSCALER_ENABLE_DEBUG_CHECKING;
         if (depthInverted_)
             description.flags |= FFX_FSR3UPSCALER_ENABLE_DEPTH_INVERTED;
         if (depthInfinite_)
@@ -180,9 +182,9 @@ public:
         dispatch.motionVectors = MakeExternalResource(in.motionVectors, L"GTAIV_FSR_MotionVectors", false);
         dispatch.output = MakeExternalResource(in.output, L"GTAIV_FSR_Output", true);
 
-        // Auto exposure is enabled at context creation, so no external exposure texture
-        // is required for the first proof. Reactive/transparency masks are deliberately
-        // absent until the basic temporal reconstruction is validated on hardware.
+        // P9C.2: auto exposure is intentionally disabled. Leaving exposure null makes
+        // FSR use its internal default exposure. Reactive/transparency masks remain
+        // absent so this test changes exposure ownership only.
         dispatch.exposure = {};
         dispatch.reactive = {};
         dispatch.transparencyAndComposition = {};

@@ -400,3 +400,24 @@ Next lifecycle target:
 - when leaving retained-Off for NVIDIA, retire the retained FSR session at queue idle before NGX opens
 - sessionless Off -> AMD must open a native Vulkan FSR session and must not finalize until a real FSR dispatch succeeds
 - no cross-vendor silent fallback; a target-open failure contains to Off/raw
+
+
+## P9C.2 hardware validation — PASSED
+
+P9C.2 isolated the remaining AMD visual pulse by changing only FSR exposure ownership.
+
+Observed on RTX 4070 Ti SUPER:
+- backend switching remained smooth across Off, AMD FSR, and NVIDIA
+- FSR internal auto exposure was disabled and FidelityFX used its internal default exposure
+- the previously reported blinking/vignette-like brightness pulse disappeared; AMD FSR looked correct
+- FSR 10% reached exact raster jitter active with reset=0 after the initial history reset
+- FSR 66.7% reached 1708x960 -> 2560x1440 with exact raster jitter active and reset=0
+- FSR 100% reached 2560x1440 -> 2560x1440 with exact raster jitter active and reset=0
+- RCAS remained independent and the production bridge/D3D9 path was unchanged
+
+P9C.2 therefore promotes fixed/default FSR exposure to the AMD hardware baseline.
+
+Remaining NVIDIA image-quality issue:
+- NVIDIA DLSS remains functionally stable but shows visible shimmer while bridge raster jitter is active.
+- Earlier P9C.1 testing showed NVIDIA becoming visibly stable when bridge jitter dropped inactive/zero.
+- P9C.3 isolates this by disabling raster jitter only for NVIDIA while AMD keeps exact raster jitter.
