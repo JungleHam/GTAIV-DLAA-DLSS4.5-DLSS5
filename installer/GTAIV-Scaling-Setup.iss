@@ -162,7 +162,8 @@ begin
 
   ActionPage := CreateInputOptionPage(GamePage.ID, 'Install or remove', 'Choose an action', 'Normal users should use Install / Repair.', True, False);
   ActionPage.Add('Install / Repair GTA IV Scaling 1.2.1');
-  ActionPage.Add('Remove GTA IV Scaling');
+  ActionPage.Add('Remove GTA IV Scaling, keep FusionFix');
+  ActionPage.Add('Completely remove GTA IV Scaling and FusionFix');
   ActionPage.Values[0] := True;
 
   GpuPage := CreateOutputMsgPage(ActionPage.ID, 'GPU capability', 'Scaling backends that will be shown in-game', '');
@@ -214,9 +215,9 @@ function ShouldSkipPage(PageID: Integer): Boolean;
 begin
   Result := False;
   if PageID = GpuPage.ID then
-    Result := SelectedAction = 1
+    Result := SelectedAction <> 0
   else if PageID = ReShadePage.ID then
-    Result := (SelectedAction = 1) or FoundationPresent or (not FileExists(AddBackslash(GameDir) + 'dinput8.dll'));
+    Result := (SelectedAction <> 0) or FoundationPresent or (not FileExists(AddBackslash(GameDir) + 'dinput8.dll'));
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
@@ -236,7 +237,9 @@ begin
     FoundationPresent := DetectFoundation(GameDir);
   end
   else if CurPageID = ActionPage.ID then begin
-    if ActionPage.Values[0] then SelectedAction := 0 else SelectedAction := 1;
+    if ActionPage.Values[0] then SelectedAction := 0
+    else if ActionPage.Values[1] then SelectedAction := 1
+    else SelectedAction := 2;
     if SelectedAction = 0 then begin
       DetectedGpuSeries := DetectGpuSeries;
       GpuPage.MsgLabel.Caption := GpuSummary(DetectedGpuSeries);
@@ -279,8 +282,12 @@ begin
       Result := Result + '  GPU-matched Neural Rendering runtime (starts OFF)' + NewLine;
     Result := Result + NewLine + GpuSummary(DetectedGpuSeries);
   end
+  else if SelectedAction = 1 then
+    Result := Result + 'Action:' + NewLine + '  Remove GTA IV Scaling, keep FusionFix' + NewLine +
+      'This removes the scaling stack, .trex, ReShade project files, receipts, logs and backup folders, then restores the pre-scaling FusionFix state.' + NewLine
   else
-    Result := Result + 'Action:' + NewLine + '  Remove GTA IV Scaling' + NewLine;
+    Result := Result + 'Action:' + NewLine + '  Completely remove GTA IV Scaling and FusionFix' + NewLine +
+      'This performs the same scaling cleanup, then removes the pinned FusionFix package files too. Unrelated GTA IV mods are not intentionally removed.' + NewLine;
 end;
 
 procedure ExtractSetupFiles;
@@ -307,7 +314,9 @@ begin
     ResultPath := ExpandConstant('{tmp}\GTAIV-Scaling-action-result.txt');
     DeleteFile(ResultPath);
 
-    if SelectedAction = 0 then ActionName := 'INSTALL' else ActionName := 'REMOVE';
+    if SelectedAction = 0 then ActionName := 'INSTALL'
+    else if SelectedAction = 1 then ActionName := 'REMOVE_KEEP_FUSIONFIX'
+    else ActionName := 'REMOVE_ALL';
 
     Args := '-NoLogo -NoProfile -ExecutionPolicy Bypass -File ' +
       QuoteArg(ExpandConstant('{tmp}\Run-Scaling-Action.ps1')) +
@@ -350,7 +359,9 @@ begin
 
     if SelectedAction = 0 then
       WizardForm.FinishedLabel.Caption := 'GTA IV Scaling 1.2.1 is installed. Launch GTA IV, press Home, open Add-ons → GTA IV Scaling, and choose the scaling technology you want.'
+    else if SelectedAction = 1 then
+      WizardForm.FinishedLabel.Caption := 'GTA IV Scaling was removed. FusionFix was kept and restored to its pre-scaling state.'
     else
-      WizardForm.FinishedLabel.Caption := 'GTA IV Scaling was removed. FusionFix and the official ReShade installation are preserved where possible.';
+      WizardForm.FinishedLabel.Caption := 'GTA IV Scaling and FusionFix were removed. Unrelated GTA IV files/mods were left alone where possible.';
   end;
 end;
