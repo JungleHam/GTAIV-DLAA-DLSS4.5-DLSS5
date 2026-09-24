@@ -17,14 +17,16 @@ param(
 
 $ErrorActionPreference='Stop'
 $ProgressPreference='SilentlyContinue'
-$Version='1.2.0'
+$Version='1.2.1'
 $RuntimeHash='__SCALING_RUNTIME_SHA256__'
 $FeederHash='__SCALING_FEEDER_SHA256__'
 $ReShadePatchHash='D5BD8CB2B6E935506888EA71711361B9AFCD72ED7C70926C0F52E8F8E47C7510'
 $Nr40DllHash='4B8D19BC3EFF58A084F5ECA7489C921501C203450169FB82FF4F649A4482BA05'
 $Nr50DllHash='E16BCF15E16E13F527491CDF7845B2FE6521A738D8F7C9C721866A8496E1FC8E'
+$NrSfDllHash='6EB209E764F39872625DEBD6ABAF45E2BB6322F6F270F781F70C059AE30B3927'
 $Nr40ZipHash='46124CFAEF532AD5F6DA07494772EA8C1B3E719F934E254385697F38D1289E3F'
 $Nr50ZipHash='388C0A7912E15EC911B9C9E11A692142B11FE387DDF2B637D8C358138FFFB3AC'
+$NrSfZipHash='1DA35941894994EB087E017577829E492454E9BAE3A6A9397027069CEB74955C'
 $LumeniteHash='572FEFB20D466AFE50998E16996B4833BEC675264485C99FE768A2337636E756'
 $script:Temp=$null
 
@@ -62,7 +64,7 @@ function Download-GitHubReleaseAsset([string]$Repo,[string]$Tag,[string]$Asset,[
 }
 function Get-AutoTemp{
     if(-not $script:Temp){
-        $script:Temp=Join-Path $env:TEMP ('GTAIV_SCALING_120_'+[Guid]::NewGuid().ToString('N'))
+        $script:Temp=Join-Path $env:TEMP ('GTAIV_SCALING_121_'+[Guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $script:Temp -Force|Out-Null
     }
     return $script:Temp
@@ -203,11 +205,12 @@ function Ensure-Technique([string]$Path,[string]$Technique){
     [IO.File]::WriteAllText($Path,$text,[Text.UTF8Encoding]::new($false))
 }
 function Resolve-NrDll([object]$Gpu,[string]$OwnPath){
-    if($Gpu.Series -notin @(40,50)){return $null}
+    if($Gpu.Series -notin @(20,30,40,50)){return $null}
     if($OwnPath){
         $dll=(Resolve-Path -LiteralPath $OwnPath).Path
     }else{
-        if($Gpu.Series-eq40){$tag='dlssnr-310.8.0-RTX40';$asset='nvngx_dlssnr_310.8.0-RTX40.zip';$expectedZip=$Nr40ZipHash}
+        if($Gpu.Series-in@(20,30)){$tag='dlssnr-310.8.SF-v2';$asset='nvngx_dlssnr_310.8.SF-v2.zip';$expectedZip=$NrSfZipHash}
+        elseif($Gpu.Series-eq40){$tag='dlssnr-310.8.0-RTX40';$asset='nvngx_dlssnr_310.8.0-RTX40.zip';$expectedZip=$Nr40ZipHash}
         else{$tag='dlssnr-310.8.0';$asset='nvngx_dlssnr_310.8.0.zip';$expectedZip=$Nr50ZipHash}
         $zip=Join-Path (Get-AutoTemp) $asset
         Download-GitHubReleaseAsset 'RankFTW/rhi-repo' $tag $asset $zip 'DLSS Neural Rendering'
@@ -218,7 +221,7 @@ function Resolve-NrDll([object]$Gpu,[string]$OwnPath){
         if($found.Count-ne1){Fail "Expected one nvngx_dlssnr.dll, found $($found.Count)."}
         $dll=$found[0].FullName
     }
-    $expected=if($Gpu.Series-eq40){$Nr40DllHash}else{$Nr50DllHash}
+    $expected=if($Gpu.Series-in@(20,30)){$NrSfDllHash}elseif($Gpu.Series-eq40){$Nr40DllHash}else{$Nr50DllHash}
     Assert-SHA256 $dll $expected 'Neural Rendering DLL'
     if($Gpu.Series-eq50){
         $sig=Get-AuthenticodeSignature -LiteralPath $dll
@@ -228,7 +231,7 @@ function Resolve-NrDll([object]$Gpu,[string]$OwnPath){
 }
 function Backup-ScalingFiles([string]$Root){
     $stamp=Get-Date -Format 'yyyyMMdd_HHmmss'
-    $dest=Join-Path $Root ("_GTAIV_SCALING_PRE120_BACKUP_"+$stamp)
+    $dest=Join-Path $Root ("_GTAIV_SCALING_PRE121_BACKUP_"+$stamp)
     New-Item -ItemType Directory -Path $dest -Force|Out-Null
     foreach($rel in @('d3d9.dll','dxvk.conf','.trex\NvRemixBridge.exe','.trex\d3d9vk_x64.dll','.trex\bridge.conf','.trex\dlss5-feed.addon64','.trex\dlss5-feed.cfg','.trex\m3k-nr.ini','.trex\nvngx_dlss.dll','.trex\m3k\m3k-nvngx.dll','.trex\m3k\nvngx_dlssnr.dll')){
         $src=Join-Path $Root $rel
@@ -299,7 +302,7 @@ function Install-Scaling([string]$Root){
     Ensure-Technique (Join-Path $trex 'ReShadePreset.ini') 'M3K_Sharpen@M3K_Sharpen.fx'
 
     $nrDest=Join-Path $trex 'm3k\nvngx_dlssnr.dll'
-    if($gpu.Series-in@(40,50)){
+    if($gpu.Series-in@(20,30,40,50)){
         $nr=Resolve-NrDll $gpu $NrPackage
         Copy-Item -LiteralPath $nr -Destination $nrDest -Force
     }elseif(Test-Path -LiteralPath $nrDest){
@@ -335,12 +338,12 @@ function Install-Scaling([string]$Root){
         "GPU=$($gpu.Name)",
         "NvidiaRtxAvailable=$(if($gpu.IsRtx){1}else{0})",
         "DefaultScalingTechnology=$tech",
-        "NeuralRendering=$(if($gpu.Series-in@(40,50)){'installed-off-by-default'}else{'not-applicable'})",
-        "Pre120Backup=$backup"
+        "NeuralRendering=$(if($gpu.Series-in@(20,30,40,50)){'installed-off-by-default'}else{'not-applicable'})",
+        "Pre121Backup=$backup"
     )
     [IO.File]::WriteAllLines((Join-Path $Root 'GTAIV_SCALING_INSTALLED.txt'),$receipt,[Text.UTF8Encoding]::new($false))
     Write-Host ''
-    Write-Host 'GTA IV Scaling 1.2.0 installed / repaired successfully.' -ForegroundColor Green
+    Write-Host 'GTA IV Scaling 1.2.1 installed / repaired successfully.' -ForegroundColor Green
 }
 function Remove-Scaling([string]$Root){
     $uninstall=Join-Path $PSScriptRoot 'Uninstall-DLAA.bat'
