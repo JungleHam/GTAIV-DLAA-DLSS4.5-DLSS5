@@ -1,0 +1,90 @@
+name: Publish v1.2.0
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/publish-v1.2.0.yml'
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate v1.2.0 documentation
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $readme=[IO.File]::ReadAllText('.\README.md')
+          foreach($marker in @(
+            '# GTA IV Scaling',
+            'GTAIV-Scaling-Setup-v1.2.0.exe',
+            'AMD FidelityFX FSR 3.1.4',
+            '8 phases',
+            '-X / -Y',
+            'RTX 20 Series',
+            'RTX 50 Series'
+          )){
+            if(-not $readme.Contains($marker)){throw "README v1.2.0 marker missing: $marker"}
+          }
+          if(-not(Test-Path '.\RELEASE-v1.2.0.md')){throw 'RELEASE-v1.2.0.md missing'}
+
+      - name: Download exact hardware-approved release-prep artifact
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          New-Item -ItemType Directory -Path .\_candidate -Force | Out-Null
+          gh run download 35973895390 --repo "$env:GITHUB_REPOSITORY" --name 'GTAIV-Scaling-v1.2.0-release-prep' --dir .\_candidate
+          if($LASTEXITCODE-ne 0){throw 'Could not download the approved v1.2.0 release-prep artifact.'}
+
+          $exe=Get-ChildItem .\_candidate -Recurse -File -Filter 'GTAIV-Scaling-Setup-v1.2.0.exe' | Select-Object -First 1
+          $runtime=Get-ChildItem .\_candidate -Recurse -File -Filter 'GTAIV-Scaling-Runtime-v1.2.0.zip' | Select-Object -First 1
+          $patch=Get-ChildItem .\_candidate -Recurse -File -Filter 'ReShade64-bbridge.dll' | Select-Object -First 1
+          if(-not $exe -or -not $runtime -or -not $patch){throw 'Approved artifact is missing one or more release files.'}
+
+          $exeHash=(Get-FileHash -Algorithm SHA256 $exe.FullName).Hash.ToUpperInvariant()
+          $runtimeHash=(Get-FileHash -Algorithm SHA256 $runtime.FullName).Hash.ToUpperInvariant()
+          $patchHash=(Get-FileHash -Algorithm SHA256 $patch.FullName).Hash.ToUpperInvariant()
+          if($exeHash-ne'882FB425D9ABE8CFEA25583049B00A252AE730E4480EB3C78867691FEA446F85'){throw "Installer hash mismatch: $exeHash"}
+          if($runtimeHash-ne'7AE9FC16FF6AF6A49EF605B18B2606A8986F1E962E3A519C4DB6A5053834969B'){throw "Runtime hash mismatch: $runtimeHash"}
+          if($patchHash-ne'D5BD8CB2B6E935506888EA71711361B9AFCD72ED7C70926C0F52E8F8E47C7510'){throw "ReShade patch hash mismatch: $patchHash"}
+
+          $feederHashFile=Get-ChildItem .\_candidate -Recurse -File -Filter 'dlss5-feed-v1.2.0.sha256' | Select-Object -First 1
+          if(-not $feederHashFile){throw 'Feeder hash file missing.'}
+          $feederHash=(Get-Content $feederHashFile.FullName -Raw).Trim().ToUpperInvariant()
+          if($feederHash-ne'AF35011DC5914DF2DB6B1C49B2EDDE751831F4F8AF53B80A26D7C079CA26BDFF'){throw "Feeder hash mismatch: $feederHash"}
+
+          New-Item -ItemType Directory -Path .\release-assets -Force | Out-Null
+          Copy-Item $exe.FullName .\release-assets\GTAIV-Scaling-Setup-v1.2.0.exe -Force
+          Copy-Item $runtime.FullName .\release-assets\GTAIV-Scaling-Runtime-v1.2.0.zip -Force
+          Copy-Item $patch.FullName .\release-assets\ReShade64-bbridge.dll -Force
+          $exeHash | Set-Content .\release-assets\GTAIV-Scaling-Setup-v1.2.0.sha256 -Encoding ASCII
+          $runtimeHash | Set-Content .\release-assets\GTAIV-Scaling-Runtime-v1.2.0.sha256 -Encoding ASCII
+          $feederHash | Set-Content .\release-assets\dlss5-feed-v1.2.0.sha256 -Encoding ASCII
+
+      - name: Publish immutable v1.2.0
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          gh release view v1.2.0 --repo "$env:GITHUB_REPOSITORY" *> $null
+          if($LASTEXITCODE-eq0){throw 'v1.2.0 already exists; refusing to overwrite it.'}
+
+          $files=@(
+            '.\release-assets\GTAIV-Scaling-Setup-v1.2.0.exe',
+            '.\release-assets\GTAIV-Scaling-Setup-v1.2.0.sha256',
+            '.\release-assets\GTAIV-Scaling-Runtime-v1.2.0.zip',
+            '.\release-assets\GTAIV-Scaling-Runtime-v1.2.0.sha256',
+            '.\release-assets\dlss5-feed-v1.2.0.sha256',
+            '.\release-assets\ReShade64-bbridge.dll'
+          )
+
+          gh release create v1.2.0 $files --repo "$env:GITHUB_REPOSITORY" --target "$env:GITHUB_SHA" --title "v1.2.0 — GTA IV Scaling: NVIDIA DLAA/DLSS + AMD FidelityFX FSR" --notes-file .\RELEASE-v1.2.0.md --latest
+          if($LASTEXITCODE-ne0){throw 'GitHub release creation failed.'}
