@@ -17,6 +17,7 @@ Everything else required by the project is handled by the installer.
 
 ### Clean installation
 
+0. Install the latest, clean GTA IV (Steam version tested, Rockstar Game Launcher version wasn't but probably fine) 
 1. Download **`GTAIV-Scaling-Setup-v1.2.0.exe`** from the [Releases](https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5-FSR/releases) page.
 2. Run it as **Administrator**.
 3. Select the folder containing **`GTAIV.exe`**.
@@ -43,7 +44,7 @@ The project uninstaller removes the scaling integration while preserving externa
 ### Open the in-game controls
 
 ```text
-Home -> Add-ons -> GTA IV Scaling 1.2.0
+Home key -> Add-ons -> GTA IV Scaling 1.2.0
 ```
 
 ## Features
@@ -63,6 +64,11 @@ Home -> Add-ons -> GTA IV Scaling 1.2.0
 - **Unified installer** — Install / Repair / Remove from one EXE, with FusionFix/dependency handling and automatic RTX 40/50 NR setup.
 - **Diagnostics** — backend state, resolution, jitter, FSR and NR information available in the Advanced panel.
 
+**Upcoming**
+- DLSS 5 NR Support for FSR scaling (reearching the possibility rn)
+- DLSS and FSR Frame Gen
+- FSR 1.0 support for older GPUs
+
 ## Current release
 
 **v1.2.0**
@@ -79,8 +85,8 @@ Installer: **`GTAIV-Scaling-Setup-v1.2.0.exe`**
 | --- | --- | --- | --- | --- |
 | RTX 20 Series | Yes | Yes | Yes | No |
 | RTX 30 Series | Yes | Yes | Yes | No |
-| RTX 40 Series | Yes | Yes | Yes | Yes, installed OFF by default |
-| RTX 50 Series | Yes | Yes | Yes | Yes, installed OFF by default |
+| RTX 40 Series | Yes | Yes | Yes | Yes, set to OFF by default |
+| RTX 50 Series | Yes | Yes | Yes | Yes, set to OFF by default |
 | GTX / AMD / Intel / other non-RTX | Yes | Yes | Hidden | No |
 
 The installer detects NVIDIA RTX capability and writes it into the runtime configuration.
@@ -94,7 +100,7 @@ NR is deliberately restricted to the tested RTX 40/50 paths. RTX 20/30 still get
 Open:
 
 ```text
-Home -> Add-ons -> GTA IV Scaling 1.2.0
+Home key -> Add-ons -> GTA IV Scaling 1.2.0
 ```
 
 The main panel is **GTA IV Scaling**.
