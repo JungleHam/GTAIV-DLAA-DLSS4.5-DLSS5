@@ -60,3 +60,5 @@ jobs:
             --notes-file .\RELEASE-v1.2.1.md `
             --latest
           if($LASTEXITCODE-ne0){throw 'GitHub v1.2.1 release creation failed.'}
+
+# Final v1.2.1 release trigger after confirmed RC2 hardware test.
