@@ -171,7 +171,7 @@ jobs:
             'M3K-FSR-P9C2: FSR 3.1.4 Vulkan context READY max=%ux%u depthInverted=%d RCAS=per-dispatch autoExposure=OFF(default exposure)',
             'M3K-P9C4: NVIDIA jitter compensation changed live -> %s (mode=%u); full raster jitter retained',
             'M3K-P9C5: calibrated NVIDIA temporal defaults = 8 phases, -X/-Y; AMD keeps independent FSR phase planning',
-            'GTA IV Scaling 1.2.0',
+            'GTA IV Scaling 1.2.1',
             'NVIDIA RTX capability: %s',
             'AMD FidelityFX FSR',
             'RCAS=per-dispatch',
@@ -228,23 +228,23 @@ jobs:
           gh release download v1.1.0 --repo JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5-FSR --pattern 'GTAIV-DLSS-Full-Runtime.zip' --pattern 'ReShade64-bbridge.dll' --dir .\_v110 --clobber
           if($LASTEXITCODE-ne 0){throw "v1.1.0 base payload download failed: $LASTEXITCODE"}
 
-          Expand-Archive -LiteralPath .\_v110\GTAIV-DLSS-Full-Runtime.zip -DestinationPath .\_runtime120 -Force
+          Expand-Archive -LiteralPath .\_v110\GTAIV-DLSS-Full-Runtime.zip -DestinationPath .\_runtime121 -Force
           $candidate='.\_project\tools\m3k-nr\out-m3k-a3-s5\dlss5-feed.addon64'
           if(-not(Test-Path $candidate)){throw 'v1.2.1 feeder candidate missing'}
-          Copy-Item $candidate .\_runtime120\dlss5-feed.addon64 -Force
+          Copy-Item $candidate .\_runtime121\dlss5-feed.addon64 -Force
 
-          'GTA IV Scaling runtime 1.2.0' | Set-Content .\_runtime120\GTAIV-SCALING-VERSION.txt -Encoding UTF8
-          Get-ChildItem .\_runtime120 -Recurse -File | Where-Object {$_.Name -ne 'SHA256SUMS.txt'} | ForEach-Object {
+          'GTA IV Scaling runtime 1.2.1' | Set-Content .\_runtime121\GTAIV-SCALING-VERSION.txt -Encoding UTF8
+          Get-ChildItem .\_runtime121 -Recurse -File | Where-Object {$_.Name -ne 'SHA256SUMS.txt'} | ForEach-Object {
             $h=Get-FileHash -Algorithm SHA256 $_.FullName
-            '{0}  {1}' -f $h.Hash,$_.FullName.Substring((Resolve-Path .\_runtime120).Path.Length+1)
-          } | Set-Content .\_runtime120\SHA256SUMS.txt -Encoding ASCII
+            '{0}  {1}' -f $h.Hash,$_.FullName.Substring((Resolve-Path .\_runtime121).Path.Length+1)
+          } | Set-Content .\_runtime121\SHA256SUMS.txt -Encoding ASCII
 
           New-Item -ItemType Directory -Path .\installer\payload -Force | Out-Null
-          Compress-Archive -Path .\_runtime120\* -DestinationPath .\installer\payload\GTAIV-Scaling-Runtime-v1.2.1.zip -CompressionLevel Optimal -Force
+          Compress-Archive -Path .\_runtime121\* -DestinationPath .\installer\payload\GTAIV-Scaling-Runtime-v1.2.1.zip -CompressionLevel Optimal -Force
           Copy-Item .\_v110\ReShade64-bbridge.dll .\installer\payload\ReShade64-bbridge.dll -Force
 
           $runtimeHash=(Get-FileHash -Algorithm SHA256 .\installer\payload\GTAIV-Scaling-Runtime-v1.2.1.zip).Hash.ToUpperInvariant()
-          $feederHash=(Get-FileHash -Algorithm SHA256 .\_runtime120\dlss5-feed.addon64).Hash.ToUpperInvariant()
+          $feederHash=(Get-FileHash -Algorithm SHA256 .\_runtime121\dlss5-feed.addon64).Hash.ToUpperInvariant()
           $patchHash=(Get-FileHash -Algorithm SHA256 .\installer\payload\ReShade64-bbridge.dll).Hash.ToUpperInvariant()
           if($patchHash-ne'D5BD8CB2B6E935506888EA71711361B9AFCD72ED7C70926C0F52E8F8E47C7510'){throw "Unexpected ReShade patch hash: $patchHash"}
 
@@ -283,7 +283,7 @@ jobs:
         shell: pwsh
         run: choco install innosetup --no-progress -y
 
-      - name: Compile GTA IV Scaling 1.2.0 installer
+      - name: Compile GTA IV Scaling 1.2.1 installer
         shell: pwsh
         run: |
           $ErrorActionPreference='Stop'
