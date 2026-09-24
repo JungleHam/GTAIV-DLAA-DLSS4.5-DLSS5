@@ -1,0 +1,65 @@
+name: Publish v1.2.1 RC1 tester build
+
+on:
+  push:
+    branches:
+      - release/v1.2.1-prep
+    paths:
+      - '.github/workflows/publish-v1.2.1-rc1.yml'
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download exact CI-green v1.2.1 candidate
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          New-Item -ItemType Directory -Path .\_candidate -Force | Out-Null
+          gh run download 35991606512 --repo "$env:GITHUB_REPOSITORY" --name 'GTAIV-Scaling-v1.2.1-release-prep' --dir .\_candidate
+          if($LASTEXITCODE-ne0){throw 'Could not download the approved v1.2.1 release-prep artifact.'}
+
+          $exe=Get-ChildItem .\_candidate -Recurse -File -Filter 'GTAIV-Scaling-Setup-v1.2.1.exe' | Select-Object -First 1
+          $exeHashFile=Get-ChildItem .\_candidate -Recurse -File -Filter 'GTAIV-Scaling-Setup-v1.2.1.sha256' | Select-Object -First 1
+          if(-not $exe -or -not $exeHashFile){throw 'Candidate artifact is missing the v1.2.1 installer or its SHA256 file.'}
+
+          $expected=(Get-Content $exeHashFile.FullName -Raw).Trim().ToUpperInvariant()
+          $actual=(Get-FileHash -Algorithm SHA256 $exe.FullName).Hash.ToUpperInvariant()
+          if($actual-ne$expected){throw "Installer SHA256 mismatch. Expected: $expected Actual: $actual"}
+
+          New-Item -ItemType Directory -Path .\release-assets -Force | Out-Null
+          Copy-Item $exe.FullName .\release-assets\GTAIV-Scaling-Setup-v1.2.1.exe -Force
+          $actual | Set-Content .\release-assets\GTAIV-Scaling-Setup-v1.2.1.sha256 -Encoding ASCII
+
+      - name: Publish v1.2.1-rc1 pre-release
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          gh release view v1.2.1-rc1 --repo "$env:GITHUB_REPOSITORY" *> $null
+          if($LASTEXITCODE-eq0){throw 'v1.2.1-rc1 already exists; refusing to overwrite it.'}
+
+          @'
+          # GTA IV Scaling v1.2.1 RC1 — tester build
+
+          This pre-release is intended for testing the new RTX 20/30 Neural Rendering support.
+
+          - RTX 20/30: DLSS 5 NR via ShortFuse 310.8.SF-v2
+          - RTX 40: existing project-tested compatibility NR runtime
+          - RTX 50: existing NVIDIA-signed NR runtime
+          - NR starts OFF by default
+          - Existing DLAA/DLSS, FSR 3.1.4, RCAS and live backend switching are unchanged
+
+          For testing: download and run **GTAIV-Scaling-Setup-v1.2.1.exe** directly.
+          '@ | Set-Content .\RC-NOTES.md -Encoding UTF8
+
+          gh release create v1.2.1-rc1 .\release-assets\GTAIV-Scaling-Setup-v1.2.1.exe .\release-assets\GTAIV-Scaling-Setup-v1.2.1.sha256 --repo "$env:GITHUB_REPOSITORY" --target 5818a84eb642f55c12ef8cbe9d4f7c70dc66bfee --title "v1.2.1 RC1 — RTX 20/30 Neural Rendering tester build" --notes-file .\RC-NOTES.md --prerelease
+          if($LASTEXITCODE-ne0){throw 'GitHub pre-release creation failed.'}
