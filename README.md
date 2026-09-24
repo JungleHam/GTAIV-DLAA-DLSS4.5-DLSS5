@@ -18,7 +18,7 @@ Everything else required by the project is handled by the installer.
 ### Clean installation
 
 0. Install the latest, clean GTA IV (Steam version tested, Rockstar Game Launcher version wasn't but probably fine) 
-1. Download **`GTAIV-Scaling-Setup-v1.2.1.exe`** from the [Releases](https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5-FSR/releases) page.
+1. Download **`GTAIV-Scaling-Setup-v1.2.2.exe`** from the [Releases](https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5-FSR/releases) page.
 2. Run it as **Administrator**.
 3. Select the folder containing **`GTAIV.exe`**.
 4. Choose **Install / Repair GTA IV Scaling 1.2.1**.
@@ -47,7 +47,7 @@ The shared official ReShade installation is restored away from the project input
 ### Open the in-game controls
 
 ```text
-Home key -> Add-ons -> GTA IV Scaling 1.2.1
+Home key -> Add-ons -> GTA IV Scaling 1.2.2
 ```
 
 ## Features
@@ -74,9 +74,12 @@ Home key -> Add-ons -> GTA IV Scaling 1.2.1
 
 ## Current release
 
-**v1.2.1**
+**v1.2.2**
 
-Installer: **`GTAIV-Scaling-Setup-v1.2.1.exe`**
+Installer: **`GTAIV-Scaling-Setup-v1.2.2.exe`**
+
+
+> **v1.2.2 hotfix:** fixes fresh/install-repair failures where FusionFix had completed its first run but stored `GTAIV.EFLC.FusionFix.cfg` outside the game `plugins` folder. The foundation installer now checks the same supported FusionFix config locations as the main setup.
 
 ## Screenshots
 
@@ -103,7 +106,7 @@ v1.2.1 enables Neural Rendering on RTX 20/30 using the ShortFuse 310.8.SF-v2 com
 Open:
 
 ```text
-Home key -> Add-ons -> GTA IV Scaling 1.2.1
+Home key -> Add-ons -> GTA IV Scaling 1.2.2
 ```
 
 The main panel is **GTA IV Scaling**.
