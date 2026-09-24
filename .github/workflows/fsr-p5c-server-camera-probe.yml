@@ -1,0 +1,210 @@
+name: FSR P5C server-only camera projection probe build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/fsr-3-1-5
+    paths:
+      - '.github/workflows/fsr-p5c-server-camera-probe.yml'
+      - 'install/Public-BBridge-Server-Camera-Probe.py'
+      - 'install/p5c/**'
+      - 'install/Public-FSR-Vulkan-Proof-Stage.ps1'
+      - 'install/Public-FSR-Vulkan-P2-Standalone-Stage.ps1'
+      - 'install/Public-FSR-Vulkan-P3-Native-Session-Stage.ps1'
+      - 'install/Public-FSR-Vulkan-P4A-Exact-Raster-Jitter-Stage.ps1'
+      - 'tools/fsr-vulkan/m3k_fsr_backend.h'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/fsr-p5c-server-camera-probe.yml'
+      - 'install/Public-BBridge-Server-Camera-Probe.py'
+      - 'install/p5c/**'
+
+permissions:
+  contents: read
+
+jobs:
+  build-fsr-p5c:
+    runs-on: windows-2022
+    timeout-minutes: 75
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Vulkan SDK
+        uses: humbletim/install-vulkan-sdk@v1.2
+        with:
+          version: 1.3.290.0
+          cache: true
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Checkout frozen GTA IV rendering core
+        shell: pwsh
+        run: |
+          git clone --filter=blob:none https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5.git _project
+          git -C _project checkout 57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f
+          $sha=(git -C _project rev-parse HEAD).Trim()
+          if ($sha -ne '57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f') { throw "Wrong frozen core: $sha" }
+
+      - name: Attach production stages and validated P4A FSR
+        shell: pwsh
+        run: |
+          $tool='.\_project\tools\m3k-nr'
+          Copy-Item .\install\Public-ReShade-Controls-Stage.ps1 "$tool\public-reshade-controls-stage.ps1" -Force
+          Copy-Item .\install\Public-Startup-Prime-Fix-Stage.ps1 "$tool\public-startup-prime-fix-stage.ps1" -Force
+          Copy-Item .\install\Public-ReShade-UX-Master-Stage.ps1 "$tool\public-reshade-ux-master-stage.ps1" -Force
+          Copy-Item .\install\Public-ReShade-UX-Master-Fixup.ps1 "$tool\public-reshade-ux-master-fixup.ps1" -Force
+          Copy-Item .\install\Public-ReShade-UX-Master-V2-Fixup.ps1 "$tool\public-reshade-ux-master-v2-fixup.ps1" -Force
+          Copy-Item .\install\Public-DLSS-CustomScale-NR-Tuning-Stage.ps1 "$tool\public-dlss-customscale-nr-tuning-stage.ps1" -Force
+          Copy-Item .\install\Public-FSR-Vulkan-Proof-Stage.ps1 "$tool\public-fsr-vulkan-proof-stage.ps1" -Force
+          Copy-Item .\install\Public-FSR-Vulkan-P2-Standalone-Stage.ps1 "$tool\public-fsr-vulkan-p2-standalone-stage.ps1" -Force
+          Copy-Item .\install\Public-FSR-Vulkan-P3-Native-Session-Stage.ps1 "$tool\public-fsr-vulkan-p3-native-session-stage.ps1" -Force
+          Copy-Item .\install\Public-FSR-Vulkan-P4A-Exact-Raster-Jitter-Stage.ps1 "$tool\public-fsr-vulkan-p4a-exact-raster-jitter-stage.ps1" -Force
+          Copy-Item .\tools\fsr-vulkan\m3k_fsr_backend.h "$tool\m3k_fsr_backend.h" -Force
+
+          $build="$tool\build-a3-s5.ps1"
+          $text=[IO.File]::ReadAllText($build)
+          $anchor="& (Join-Path `$toolRoot 'a3-s5-startup-prime-stage.ps1') -GeneratedRoot `$generated"
+          $replacement=@(
+            $anchor,
+            "& (Join-Path `$toolRoot 'public-reshade-controls-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-startup-prime-fix-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-reshade-ux-master-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-reshade-ux-master-fixup.ps1') -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-reshade-ux-master-v2-fixup.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-dlss-customscale-nr-tuning-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-fsr-vulkan-proof-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-fsr-vulkan-p2-standalone-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-fsr-vulkan-p3-native-session-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-fsr-vulkan-p4a-exact-raster-jitter-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')"
+          ) -join "`r`n"
+          if (($text.Split($anchor).Count - 1) -ne 1) { throw 'Could not attach P4A stage chain exactly once' }
+          [IO.File]::WriteAllText($build,$text.Replace($anchor,$replacement),[Text.UTF8Encoding]::new($false))
+
+      - name: Build pinned FidelityFX FSR 3.1.4 Vulkan
+        shell: pwsh
+        run: |
+          git clone --filter=blob:none --branch v1.1.4 https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK.git _ffx
+          $sha=(git -C _ffx rev-parse HEAD).Trim()
+          if ($sha -ne 'c6efa6bf7f2027b3ec94f28578bb5965eabb9e55') { throw "Wrong FidelityFX SDK commit: $sha" }
+          cmake -S .\_ffx\sdk -B .\_ffx\sdk\build-gtaiv-fsr -G "Visual Studio 17 2022" -A x64 `
+            -DFFX_API_BACKEND=VK_X64 -DFFX_FSR3UPSCALER=ON -DFFX_AUTO_COMPILE_SHADERS=1
+          if ($LASTEXITCODE -ne 0) { throw "FidelityFX configure failed: $LASTEXITCODE" }
+          cmake --build .\_ffx\sdk\build-gtaiv-fsr --config Release --target ffx_fsr3upscaler_x64 ffx_backend_vk_x64 --parallel 4
+          if ($LASTEXITCODE -ne 0) { throw "FidelityFX build failed: $LASTEXITCODE" }
+
+          $libs=Get-ChildItem .\_ffx\sdk\bin\ffx_sdk -File -Filter '*.lib'
+          $fsr=$libs|Where-Object{$_.BaseName -like 'ffx_fsr3upscaler_x64*'}|Select-Object -First 1
+          $vk =$libs|Where-Object{$_.BaseName -like 'ffx_backend_vk_x64*'}|Select-Object -First 1
+          if(-not $fsr -or -not $vk){throw 'FidelityFX libraries missing'}
+          "FFX_INCLUDE=$((Resolve-Path .\_ffx\sdk\include).Path)"|Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "FFX_FSR_LIB=$($fsr.FullName)"|Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "FFX_VK_LIB=$($vk.FullName)"|Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "VULKAN_LIB=$env:VULKAN_SDK\Lib\vulkan-1.lib"|Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Link FidelityFX into frozen Feeder compiler
+        shell: pwsh
+        run: |
+          $compile='.\_project\tools\m3k-nr\compile-s2.bat'
+          $text=[IO.File]::ReadAllText($compile)
+          $inc='/I"%VULKAN%\include"'
+          if(($text.Split($inc).Count-1)-ne 1){throw 'Vulkan include anchor not unique'}
+          $text=$text.Replace($inc,$inc+' /I"%FFX_INCLUDE%"')
+          $link='"%NGX%\lib\Windows_x86_64\x64\nvsdk_ngx_d.lib" version.lib'
+          if(($text.Split($link).Count-1)-ne 1){throw 'Feeder link anchor not unique'}
+          $text=$text.Replace($link,'"%NGX%\lib\Windows_x86_64\x64\nvsdk_ngx_d.lib" "%FFX_FSR_LIB%" "%FFX_VK_LIB%" "%VULKAN_LIB%" version.lib')
+          [IO.File]::WriteAllText($compile,$text,[Text.UTF8Encoding]::new($false))
+
+      - name: Build validated P4A feeder
+        shell: pwsh
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\_project\tools\m3k-nr\build-a3-s5.ps1
+          if($LASTEXITCODE-ne 0){throw "P5C Feeder build failed: $LASTEXITCODE"}
+          $addon='.\_project\tools\m3k-nr\out-m3k-a3-s5\dlss5-feed.addon64'
+          if(-not(Test-Path $addon)){throw 'P5C feeder missing'}
+          New-Item -ItemType Directory .\out-fsr-p5c -Force|Out-Null
+          Copy-Item $addon .\out-fsr-p5c\dlss5-feed-fsr-p5c.addon64 -Force
+
+          $ascii=[Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($addon))
+          foreach($marker in @(
+            'M3K-FSR-P4A: exact raster handoff active=',
+            'NATIVE VULKAN SESSION READY; D3D12 NOT CREATED; NGX NOT INITIALIZED'
+          )){if(-not $ascii.Contains($marker)){throw "P5C feeder marker missing: $marker"}}
+
+      - name: Build server-only read-only camera probe
+        shell: pwsh
+        run: |
+          git clone --filter=blob:none https://github.com/gutbash/b-bridge.git _bbridge
+          git -C _bbridge checkout 1dad5e6d4dcf8647e354aa9a87f611256fb61142
+          git -C _bbridge submodule update --init --recursive
+
+          python .\install\Public-BBridge-Server-Camera-Probe.py .\_bbridge
+          if($LASTEXITCODE-ne 0){throw "P5C server telemetry patch failed: $LASTEXITCODE"}
+          git -C _bbridge diff --check
+          if($LASTEXITCODE-ne 0){throw "P5C b-bridge diff check failed: $LASTEXITCODE"}
+
+          python -m pip install --disable-pip-version-check meson==0.64.1 ninja==1.11.1.1
+          if($LASTEXITCODE-ne 0){throw "Meson/Ninja setup failed: $LASTEXITCODE"}
+          Push-Location _bbridge
+          . .\build_common.ps1
+          SetupVS -Platform x64
+          meson setup --buildtype release --backend ninja _p5c64 --debug
+          if($LASTEXITCODE-ne 0){throw "P5C x64 bridge configure failed: $LASTEXITCODE"}
+          Copy-Item .\Directory.Build.Props .\_p5c64 -Force
+          meson compile -C _p5c64 NvRemixBridge
+          if($LASTEXITCODE-ne 0){throw "P5C x64 bridge build failed: $LASTEXITCODE"}
+          $server=(Resolve-Path '.\_p5c64\src\server\NvRemixBridge.exe').Path
+          Pop-Location
+
+          if(-not(Test-Path $server)){throw 'P5C NvRemixBridge.exe missing'}
+          Copy-Item $server .\out-fsr-p5c\NvRemixBridge-fsr-p5c.exe -Force
+          Copy-Item .\_bbridge\src\server\main.cpp .\out-fsr-p5c\generated-server-main.cpp -Force
+
+      - name: Verify and package P5C
+        shell: pwsh
+        run: |
+          $addon='.\out-fsr-p5c\dlss5-feed-fsr-p5c.addon64'
+          $server='.\out-fsr-p5c\NvRemixBridge-fsr-p5c.exe'
+          $serverAscii=[Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($server))
+          foreach($marker in @('M3K-CAMERA-P5C','remix-main+1dad5e6d')){
+            if(-not $serverAscii.Contains($marker)){throw "P5C server marker missing: $marker"}
+          }
+
+          Copy-Item .\install\p5c\FSR-P5C-Apply.ps1 .\out-fsr-p5c\FSR-P5C-Apply.ps1 -Force
+          Copy-Item .\install\p5c\FSR-P5C-Restore.ps1 .\out-fsr-p5c\FSR-P5C-Restore.ps1 -Force
+          Copy-Item .\install\p5c\1-APPLY-FSR-P5C-CAMERA-PROBE.bat .\out-fsr-p5c\1-APPLY-FSR-P5C-CAMERA-PROBE.bat -Force
+          Copy-Item .\install\p5c\2-RESTORE-BEFORE-FSR-P5C.bat .\out-fsr-p5c\2-RESTORE-BEFORE-FSR-P5C.bat -Force
+
+          $fh=(Get-FileHash -Algorithm SHA256 $addon).Hash.ToUpperInvariant()
+          $sh=(Get-FileHash -Algorithm SHA256 $server).Hash.ToUpperInvariant()
+          @(
+            'FSR P5C SERVER-ONLY CAMERA PROJECTION PROBE',
+            '',
+            'IMPORTANT: d3d9.dll is NEVER replaced by this test.',
+            'It keeps the exact installed production client that passed P4A HUD/menu + raster jitter testing.',
+            'Only NvRemixBridge.exe receives read-only camera telemetry; the validated P4A feeder is included.',
+            'The server queries c0-c15 and the current viewport immediately before sampled draws.',
+            'It derives Projection = ViewInverse * inverse(World) * WVP and logs M3K-CAMERA-P5C samples.',
+            'P5C explicitly forces the known-good P4A runtime state: UI virtualization ON, auto-resize ON, NR OFF, automatic jitter.',
+            '',
+            '1. Run 1-APPLY-FSR-P5C-CAMERA-PROBE.bat.',
+            '2. First confirm the menu and HUD look normal.',
+            '3. Reach outdoor gameplay, pan/drive for 20-30 seconds.',
+            '4. Close GTA IV.',
+            '5. Run 2-RESTORE-BEFORE-FSR-P5C.bat.',
+            '6. Send FSR-P5C-SERVER-LOG.txt and FSR-P5C-FEEDER-LOG.txt.',
+            '',
+            "FeederSHA256=$fh",
+            "ServerSHA256=$sh"
+          )|Set-Content .\out-fsr-p5c\HOW-TO-TEST.txt -Encoding UTF8
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fsr-p5c-server-camera-probe
+          path: out-fsr-p5c/*
+          if-no-files-found: error

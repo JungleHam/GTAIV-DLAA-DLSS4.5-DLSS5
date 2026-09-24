@@ -1,0 +1,200 @@
+name: FSR P9 live backend switch build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/fsr-3-1-5
+    paths:
+      - '.github/workflows/fsr-p9-live-backend-switch.yml'
+      - 'install/Public-Scaling-Technology-P9-Live-Switch-Stage.ps1'
+      - 'install/p9/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/fsr-p9-live-backend-switch.yml'
+      - 'install/Public-Scaling-Technology-P9-Live-Switch-Stage.ps1'
+      - 'install/p9/**'
+
+concurrency:
+  group: fsr-p9-live-switch-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-fsr-p9:
+    runs-on: windows-2022
+    timeout-minutes: 75
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Vulkan SDK
+        uses: humbletim/install-vulkan-sdk@v1.2
+        with:
+          version: 1.3.290.0
+          cache: true
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Checkout frozen GTA IV rendering core
+        shell: pwsh
+        run: |
+          git clone --filter=blob:none https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5.git _project
+          git -C _project checkout 57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f
+          $sha=(git -C _project rev-parse HEAD).Trim()
+          if ($sha -ne '57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f') { throw "Wrong frozen core: $sha" }
+
+      - name: Attach production stages and FSR P9
+        shell: pwsh
+        run: |
+          $tool='.\_project\tools\m3k-nr'
+          Copy-Item .\install\Public-ReShade-Controls-Stage.ps1 "$tool\public-reshade-controls-stage.ps1" -Force
+          Copy-Item .\install\Public-Startup-Prime-Fix-Stage.ps1 "$tool\public-startup-prime-fix-stage.ps1" -Force
+          Copy-Item .\install\Public-ReShade-UX-Master-Stage.ps1 "$tool\public-reshade-ux-master-stage.ps1" -Force
+          Copy-Item .\install\Public-ReShade-UX-Master-Fixup.ps1 "$tool\public-reshade-ux-master-fixup.ps1" -Force
+          Copy-Item .\install\Public-ReShade-UX-Master-V2-Fixup.ps1 "$tool\public-reshade-ux-master-v2-fixup.ps1" -Force
+          Copy-Item .\install\Public-DLSS-CustomScale-NR-Tuning-Stage.ps1 "$tool\public-dlss-customscale-nr-tuning-stage.ps1" -Force
+          Copy-Item .\install\Public-FSR-Vulkan-Proof-Stage.ps1 "$tool\public-fsr-vulkan-proof-stage.ps1" -Force
+          Copy-Item .\install\Public-FSR-Vulkan-P2-Standalone-Stage.ps1 "$tool\public-fsr-vulkan-p2-standalone-stage.ps1" -Force
+          Copy-Item .\install\Public-FSR-Vulkan-P3-Native-Session-Stage.ps1 "$tool\public-fsr-vulkan-p3-native-session-stage.ps1" -Force
+          Copy-Item .\install\Public-FSR-Vulkan-P4A-Exact-Raster-Jitter-Stage.ps1 "$tool\public-fsr-vulkan-p4a-exact-raster-jitter-stage.ps1" -Force
+          Copy-Item .\install\Public-FSR-Vulkan-P6-Camera-Calibration-Stage.ps1 "$tool\public-fsr-vulkan-p6-camera-calibration-stage.ps1" -Force
+          Copy-Item .\install\Public-Scaling-Technology-P7-Stage.ps1 "$tool\public-scaling-technology-p7-stage.ps1" -Force
+          Copy-Item .\install\Public-FSR-Vulkan-P8-RCAS-Stage.ps1 "$tool\public-fsr-vulkan-p8-rcas-stage.ps1" -Force
+          Copy-Item .\install\Public-Scaling-Technology-P9-Live-Switch-Stage.ps1 "$tool\public-scaling-technology-p9-live-switch-stage.ps1" -Force
+          Copy-Item .\tools\fsr-vulkan\m3k_fsr_backend.h "$tool\m3k_fsr_backend.h" -Force
+
+          $build="$tool\build-a3-s5.ps1"
+          $text=[IO.File]::ReadAllText($build)
+          $anchor="& (Join-Path `$toolRoot 'a3-s5-startup-prime-stage.ps1') -GeneratedRoot `$generated"
+          $replacement=@(
+            $anchor,
+            "& (Join-Path `$toolRoot 'public-reshade-controls-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-startup-prime-fix-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-reshade-ux-master-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-reshade-ux-master-fixup.ps1') -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-reshade-ux-master-v2-fixup.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-dlss-customscale-nr-tuning-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-fsr-vulkan-proof-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-fsr-vulkan-p2-standalone-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-fsr-vulkan-p3-native-session-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-fsr-vulkan-p4a-exact-raster-jitter-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-fsr-vulkan-p6-camera-calibration-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-scaling-technology-p7-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-fsr-vulkan-p8-rcas-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-scaling-technology-p9-live-switch-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')"
+          ) -join "`r`n"
+          if (($text.Split($anchor).Count - 1) -ne 1) { throw 'Could not attach P9 stage chain exactly once' }
+          [IO.File]::WriteAllText($build,$text.Replace($anchor,$replacement),[Text.UTF8Encoding]::new($false))
+
+      - name: Build pinned FidelityFX FSR 3.1.4 Vulkan
+        shell: pwsh
+        run: |
+          git clone --filter=blob:none --branch v1.1.4 https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK.git _ffx
+          $sha=(git -C _ffx rev-parse HEAD).Trim()
+          if ($sha -ne 'c6efa6bf7f2027b3ec94f28578bb5965eabb9e55') { throw "Wrong FidelityFX SDK commit: $sha" }
+          cmake -S .\_ffx\sdk -B .\_ffx\sdk\build-gtaiv-fsr -G "Visual Studio 17 2022" -A x64 `
+            -DFFX_API_BACKEND=VK_X64 -DFFX_FSR3UPSCALER=ON -DFFX_AUTO_COMPILE_SHADERS=1
+          if ($LASTEXITCODE -ne 0) { throw "FidelityFX configure failed: $LASTEXITCODE" }
+          cmake --build .\_ffx\sdk\build-gtaiv-fsr --config Release --target ffx_fsr3upscaler_x64 ffx_backend_vk_x64 --parallel 4
+          if ($LASTEXITCODE -ne 0) { throw "FidelityFX build failed: $LASTEXITCODE" }
+
+          $libs=Get-ChildItem .\_ffx\sdk\bin\ffx_sdk -File -Filter '*.lib'
+          $fsr=$libs|Where-Object{$_.BaseName -like 'ffx_fsr3upscaler_x64*'}|Select-Object -First 1
+          $vk =$libs|Where-Object{$_.BaseName -like 'ffx_backend_vk_x64*'}|Select-Object -First 1
+          if(-not $fsr -or -not $vk){throw 'FidelityFX libraries missing'}
+          "FFX_INCLUDE=$((Resolve-Path .\_ffx\sdk\include).Path)"|Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "FFX_FSR_LIB=$($fsr.FullName)"|Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "FFX_VK_LIB=$($vk.FullName)"|Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "VULKAN_LIB=$env:VULKAN_SDK\Lib\vulkan-1.lib"|Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Link FidelityFX into frozen Feeder compiler
+        shell: pwsh
+        run: |
+          $compile='.\_project\tools\m3k-nr\compile-s2.bat'
+          $text=[IO.File]::ReadAllText($compile)
+          $inc='/I"%VULKAN%\include"'
+          if(($text.Split($inc).Count-1)-ne 1){throw 'Vulkan include anchor not unique'}
+          $text=$text.Replace($inc,$inc+' /I"%FFX_INCLUDE%"')
+          $link='"%NGX%\lib\Windows_x86_64\x64\nvsdk_ngx_d.lib" version.lib'
+          if(($text.Split($link).Count-1)-ne 1){throw 'Feeder link anchor not unique'}
+          $text=$text.Replace($link,'"%NGX%\lib\Windows_x86_64\x64\nvsdk_ngx_d.lib" "%FFX_FSR_LIB%" "%FFX_VK_LIB%" "%VULKAN_LIB%" version.lib')
+          [IO.File]::WriteAllText($compile,$text,[Text.UTF8Encoding]::new($false))
+
+      - name: Build FSR P9 live-switch candidate
+        shell: pwsh
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\_project\tools\m3k-nr\build-a3-s5.ps1
+          if($LASTEXITCODE-ne 0){throw "P9 Feeder build failed: $LASTEXITCODE"}
+          $addon='.\_project\tools\m3k-nr\out-m3k-a3-s5\dlss5-feed.addon64'
+          if(-not(Test-Path $addon)){throw 'P9 addon missing'}
+          New-Item -ItemType Directory .\out-fsr-p9 -Force|Out-Null
+          Copy-Item $addon .\out-fsr-p9\dlss5-feed-fsr-p9.addon64 -Force
+
+          $ascii=[Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($addon))
+          foreach($marker in @(
+            'M3K-P9: COMMIT begin',
+            'M3K-P9: LIVE switch COMMITTED',
+            'M3K-P9: ROLLBACK COMMITTED',
+            'M3K-P9: ROLLBACK FAILED',
+            'M3K-P9: Off backend active - Vulkan frame passes untouched',
+            'draining through native/raw midpoint',
+            'RCAS=per-dispatch',
+            'AMD RCAS Sharpening',
+            'NATIVE VULKAN SESSION READY; D3D12 NOT CREATED; NGX NOT INITIALIZED'
+          )){if(-not $ascii.Contains($marker)){throw "P9 feeder marker missing: $marker"}}
+
+          $hash=(Get-FileHash -Algorithm SHA256 $addon).Hash.ToUpperInvariant()
+          @(
+            'P9 transactional live backend switching candidate',
+            'Transitions=Off <-> NVIDIA DLAA/DLSS 4.5 <-> AMD FSR',
+            'Switch path=native render size -> 30 stable frames -> jitter off -> 400ms drain -> queue-idle session teardown -> target backend',
+            'Session backend is latched until transition commit; mutable INI cannot switch it early',
+            'Requested target must successfully open before the live switch is finalized',
+            'Failed target open automatically restores the previous backend; failed rollback forces explicit Off/raw',
+            'Off is sessionless and opens neither D3D12/NGX nor FSR',
+            'AMD native drain does not overwrite saved NVIDIA SRProfile/NR state',
+            'AMD RCAS remains independent from NVIDIA sharpening',
+            'Camera=near 0.05 / far 1500 / vertical FOV 45deg',
+            "FeederSHA256=$hash"
+          )|Set-Content .\out-fsr-p9\TEST-NOTES.txt -Encoding UTF8
+
+          Copy-Item .\install\p9\FSR-P9-Apply.ps1 .\out-fsr-p9\FSR-P9-Apply.ps1 -Force
+          Copy-Item .\install\p9\FSR-P9-Restore.ps1 .\out-fsr-p9\FSR-P9-Restore.ps1 -Force
+          Copy-Item .\install\p9\1-APPLY-P9-LIVE-SWITCH.bat .\out-fsr-p9\1-APPLY-P9-LIVE-SWITCH.bat -Force
+          Copy-Item .\install\p9\2-RESTORE-BEFORE-P9.bat .\out-fsr-p9\2-RESTORE-BEFORE-P9.bat -Force
+          Copy-Item .\_project\tools\m3k-nr\_work\m3k-src-a3-s5\m3k_vk.h .\out-fsr-p9\generated-m3k_vk.h -Force -ErrorAction SilentlyContinue
+          Copy-Item .\_project\tools\m3k-nr\_work\feeder\src\dlss5-feed.cpp .\out-fsr-p9\generated-dlss5-feed.cpp -Force -ErrorAction SilentlyContinue
+
+          @(
+            'P9 LIVE BACKEND SWITCH HARDWARE TEST',
+            '',
+            'This package changes ONLY the feeder. d3d9.dll and NvRemixBridge.exe are untouched.',
+            'Initial backend: AMD - FSR, 66.7%, RCAS 0.25.',
+            '',
+            '1. Run 1-APPLY-P9-LIVE-SWITCH.bat.',
+            '2. Launch GTA IV and open Home -> Add-ons -> DLSS 5 Feed -> GTA IV Reconstruction.',
+            '3. Wait for normal AMD gameplay.',
+            '4. Switch AMD -> Off. Wait until the yellow switching message disappears; verify native raw image, HUD and menus.',
+            '5. Switch Off -> AMD. Verify FSR returns and gameplay remains stable.',
+            '6. Switch AMD -> NVIDIA. Verify the NVIDIA controls appear and DLAA/DLSS starts.',
+            '7. Switch NVIDIA -> Off, then Off -> NVIDIA.',
+            '8. Switch NVIDIA -> AMD.',
+            '9. Wait a few seconds between every switch. If anything looks wrong or GTA crashes, stop immediately.',
+            '10. Close GTA IV and run 2-RESTORE-BEFORE-P9.bat.',
+            '11. Send FSR-P9-TEST-LOG.txt.',
+            '',
+            'PASS: every transition logs native drain + LIVE switch COMMITTED, Off opens no backend session, NVIDIA and AMD reopen their own sessions, exact raster jitter returns, and shutdown is clean. A failed target must log ROLLBACK COMMITTED rather than silently switching vendors.'
+          )|Set-Content .\out-fsr-p9\HOW-TO-TEST.txt -Encoding UTF8
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fsr-p9-live-backend-switch
+          path: out-fsr-p9/*
+          if-no-files-found: error

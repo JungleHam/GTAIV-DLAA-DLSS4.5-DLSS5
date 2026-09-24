@@ -1,0 +1,193 @@
+name: FSR P9A live AMD Off build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/fsr-3-1-5
+    paths:
+      - '.github/workflows/fsr-p9a-live-amd-off.yml'
+      - 'install/Public-Scaling-Technology-P9A-Live-Native-Stage.ps1'
+      - 'install/p9a/**'
+      - 'tools/fsr-vulkan/m3k_fsr_backend.h'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/fsr-p9a-live-amd-off.yml'
+      - 'install/Public-Scaling-Technology-P9A-Live-Native-Stage.ps1'
+      - 'install/p9a/**'
+      - 'tools/fsr-vulkan/m3k_fsr_backend.h'
+
+concurrency:
+  group: fsr-p9a-live-native-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-fsr-p9a:
+    runs-on: windows-2022
+    timeout-minutes: 75
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Vulkan SDK
+        uses: humbletim/install-vulkan-sdk@v1.2
+        with:
+          version: 1.3.290.0
+          cache: true
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Checkout frozen GTA IV rendering core
+        shell: pwsh
+        run: |
+          git clone --filter=blob:none https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5.git _project
+          git -C _project checkout 57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f
+          $sha=(git -C _project rev-parse HEAD).Trim()
+          if ($sha -ne '57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f') { throw "Wrong frozen core: $sha" }
+
+      - name: Attach production stages and FSR P9A
+        shell: pwsh
+        run: |
+          $tool='.\_project\tools\m3k-nr'
+          Copy-Item .\install\Public-ReShade-Controls-Stage.ps1 "$tool\public-reshade-controls-stage.ps1" -Force
+          Copy-Item .\install\Public-Startup-Prime-Fix-Stage.ps1 "$tool\public-startup-prime-fix-stage.ps1" -Force
+          Copy-Item .\install\Public-ReShade-UX-Master-Stage.ps1 "$tool\public-reshade-ux-master-stage.ps1" -Force
+          Copy-Item .\install\Public-ReShade-UX-Master-Fixup.ps1 "$tool\public-reshade-ux-master-fixup.ps1" -Force
+          Copy-Item .\install\Public-ReShade-UX-Master-V2-Fixup.ps1 "$tool\public-reshade-ux-master-v2-fixup.ps1" -Force
+          Copy-Item .\install\Public-DLSS-CustomScale-NR-Tuning-Stage.ps1 "$tool\public-dlss-customscale-nr-tuning-stage.ps1" -Force
+          Copy-Item .\install\Public-FSR-Vulkan-Proof-Stage.ps1 "$tool\public-fsr-vulkan-proof-stage.ps1" -Force
+          Copy-Item .\install\Public-FSR-Vulkan-P2-Standalone-Stage.ps1 "$tool\public-fsr-vulkan-p2-standalone-stage.ps1" -Force
+          Copy-Item .\install\Public-FSR-Vulkan-P3-Native-Session-Stage.ps1 "$tool\public-fsr-vulkan-p3-native-session-stage.ps1" -Force
+          Copy-Item .\install\Public-FSR-Vulkan-P4A-Exact-Raster-Jitter-Stage.ps1 "$tool\public-fsr-vulkan-p4a-exact-raster-jitter-stage.ps1" -Force
+          Copy-Item .\install\Public-FSR-Vulkan-P6-Camera-Calibration-Stage.ps1 "$tool\public-fsr-vulkan-p6-camera-calibration-stage.ps1" -Force
+          Copy-Item .\install\Public-Scaling-Technology-P7-Stage.ps1 "$tool\public-scaling-technology-p7-stage.ps1" -Force
+          Copy-Item .\install\Public-FSR-Vulkan-P8-RCAS-Stage.ps1 "$tool\public-fsr-vulkan-p8-rcas-stage.ps1" -Force
+          Copy-Item .\install\Public-Scaling-Technology-P9A-Live-Native-Stage.ps1 "$tool\public-scaling-technology-p9a-live-native-stage.ps1" -Force
+          Copy-Item .\tools\fsr-vulkan\m3k_fsr_backend.h "$tool\m3k_fsr_backend.h" -Force
+
+          $build="$tool\build-a3-s5.ps1"
+          $text=[IO.File]::ReadAllText($build)
+          $anchor="& (Join-Path `$toolRoot 'a3-s5-startup-prime-stage.ps1') -GeneratedRoot `$generated"
+          $replacement=@(
+            $anchor,
+            "& (Join-Path `$toolRoot 'public-reshade-controls-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-startup-prime-fix-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-reshade-ux-master-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-reshade-ux-master-fixup.ps1') -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-reshade-ux-master-v2-fixup.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-dlss-customscale-nr-tuning-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-fsr-vulkan-proof-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-fsr-vulkan-p2-standalone-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-fsr-vulkan-p3-native-session-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-fsr-vulkan-p4a-exact-raster-jitter-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-fsr-vulkan-p6-camera-calibration-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-scaling-technology-p7-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-fsr-vulkan-p8-rcas-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-scaling-technology-p9a-live-native-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')"
+          ) -join "`r`n"
+          if (($text.Split($anchor).Count - 1) -ne 1) { throw 'Could not attach P9A stage chain exactly once' }
+          [IO.File]::WriteAllText($build,$text.Replace($anchor,$replacement),[Text.UTF8Encoding]::new($false))
+
+      - name: Build pinned FidelityFX FSR 3.1.4 Vulkan
+        shell: pwsh
+        run: |
+          git clone --filter=blob:none --branch v1.1.4 https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK.git _ffx
+          $sha=(git -C _ffx rev-parse HEAD).Trim()
+          if ($sha -ne 'c6efa6bf7f2027b3ec94f28578bb5965eabb9e55') { throw "Wrong FidelityFX SDK commit: $sha" }
+          cmake -S .\_ffx\sdk -B .\_ffx\sdk\build-gtaiv-fsr -G "Visual Studio 17 2022" -A x64 `
+            -DFFX_API_BACKEND=VK_X64 -DFFX_FSR3UPSCALER=ON -DFFX_AUTO_COMPILE_SHADERS=1
+          if ($LASTEXITCODE -ne 0) { throw "FidelityFX configure failed: $LASTEXITCODE" }
+          cmake --build .\_ffx\sdk\build-gtaiv-fsr --config Release --target ffx_fsr3upscaler_x64 ffx_backend_vk_x64 --parallel 4
+          if ($LASTEXITCODE -ne 0) { throw "FidelityFX build failed: $LASTEXITCODE" }
+
+          $libs=Get-ChildItem .\_ffx\sdk\bin\ffx_sdk -File -Filter '*.lib'
+          $fsr=$libs|Where-Object{$_.BaseName -like 'ffx_fsr3upscaler_x64*'}|Select-Object -First 1
+          $vk =$libs|Where-Object{$_.BaseName -like 'ffx_backend_vk_x64*'}|Select-Object -First 1
+          if(-not $fsr -or -not $vk){throw 'FidelityFX libraries missing'}
+          "FFX_INCLUDE=$((Resolve-Path .\_ffx\sdk\include).Path)"|Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "FFX_FSR_LIB=$($fsr.FullName)"|Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "FFX_VK_LIB=$($vk.FullName)"|Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "VULKAN_LIB=$env:VULKAN_SDK\Lib\vulkan-1.lib"|Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Link FidelityFX into frozen Feeder compiler
+        shell: pwsh
+        run: |
+          $compile='.\_project\tools\m3k-nr\compile-s2.bat'
+          $text=[IO.File]::ReadAllText($compile)
+          $inc='/I"%VULKAN%\include"'
+          if(($text.Split($inc).Count-1)-ne 1){throw 'Vulkan include anchor not unique'}
+          $text=$text.Replace($inc,$inc+' /I"%FFX_INCLUDE%"')
+          $link='"%NGX%\lib\Windows_x86_64\x64\nvsdk_ngx_d.lib" version.lib'
+          if(($text.Split($link).Count-1)-ne 1){throw 'Feeder link anchor not unique'}
+          $text=$text.Replace($link,'"%NGX%\lib\Windows_x86_64\x64\nvsdk_ngx_d.lib" "%FFX_FSR_LIB%" "%FFX_VK_LIB%" "%VULKAN_LIB%" version.lib')
+          [IO.File]::WriteAllText($compile,$text,[Text.UTF8Encoding]::new($false))
+
+      - name: Build FSR P9A live native candidate
+        shell: pwsh
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\_project\tools\m3k-nr\build-a3-s5.ps1
+          if($LASTEXITCODE-ne 0){throw "P9A Feeder build failed: $LASTEXITCODE"}
+          $addon='.\_project\tools\m3k-nr\out-m3k-a3-s5\dlss5-feed.addon64'
+          if(-not(Test-Path $addon)){throw 'P9A addon missing'}
+          New-Item -ItemType Directory .\out-fsr-p9a -Force|Out-Null
+          Copy-Item $addon .\out-fsr-p9a\dlss5-feed-fsr-p9a.addon64 -Force
+
+          $ascii=[Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes($addon))
+          foreach($marker in @(
+            'M3K-P9A: AMD -> Off stage 1',
+            'M3K-P9A: AMD -> Off LIVE COMMIT',
+            'M3K-P9A: Off -> AMD LIVE committed',
+            'Restart GTA IV to cross the NVIDIA backend boundary in P9A.',
+            'M3K-FSR-P9A: FSR 3.1.4 Vulkan context READY',
+            'M3K-FSR-P6: camera inputs CALIBRATED from GTA IV projection telemetry',
+            'NATIVE VULKAN SESSION READY; D3D12 NOT CREATED; NGX NOT INITIALIZED'
+          )){if(-not $ascii.Contains($marker)){throw "P9A feeder marker missing: $marker"}}
+
+          $hash=(Get-FileHash -Algorithm SHA256 $addon).Hash.ToUpperInvariant()
+          @(
+            'P9A live AMD FSR <-> Off candidate',
+            'AMD->Off keeps FSR active while temporary FSR scale returns GTA to 100% native',
+            'Existing Master-OFF 30-frame + 400ms jitter-drain state machine performs the safe handoff',
+            'Off commits only after native raw passthrough is proven ready',
+            'Off->AMD reuses the existing native Vulkan session and restores the saved FSR scale',
+            'NVIDIA boundary remains restart-gated in P9A',
+            'RCAS remains independent AMD state',
+            "FeederSHA256=$hash"
+          )|Set-Content .\out-fsr-p9a\TEST-NOTES.txt -Encoding UTF8
+
+          Copy-Item .\install\p9a\FSR-P9A-Apply.ps1 .\out-fsr-p9a\FSR-P9A-Apply.ps1 -Force
+          Copy-Item .\install\p9a\FSR-P9A-Restore.ps1 .\out-fsr-p9a\FSR-P9A-Restore.ps1 -Force
+          Copy-Item .\install\p9a\1-APPLY-P9A-LIVE-AMD-OFF.bat .\out-fsr-p9a\1-APPLY-P9A-LIVE-AMD-OFF.bat -Force
+          Copy-Item .\install\p9a\2-RESTORE-BEFORE-P9A.bat .\out-fsr-p9a\2-RESTORE-BEFORE-P9A.bat -Force
+          Copy-Item .\_project\tools\m3k-nr\_work\m3k-src-a3-s5\m3k_vk.h .\out-fsr-p9a\generated-m3k_vk.h -Force -ErrorAction SilentlyContinue
+
+          @(
+            'P9A LIVE AMD FSR <-> OFF TEST',
+            '',
+            'This package changes ONLY the feeder + test INI. d3d9.dll and NvRemixBridge.exe are untouched.',
+            '',
+            '1. Run 1-APPLY-P9A-LIVE-AMD-OFF.bat.',
+            '2. Launch GTA IV; confirm AMD FSR gameplay is normal.',
+            '3. Change Scaling Technology to Off.',
+            '4. Wait until the panel reports raw/native Off. Watch HUD/menu/gameplay during the transition.',
+            '5. Change Scaling Technology back to AMD - FSR. Confirm reconstruction returns without restart.',
+            '6. Repeat AMD -> Off -> AMD once more if clean.',
+            '7. Do NOT test NVIDIA in P9A; that boundary remains restart-gated.',
+            '8. Close GTA IV and run 2-RESTORE-BEFORE-P9A.bat.',
+            '9. Send FSR-P9A-TEST-LOG.txt.',
+            '',
+            'PASS: both directions commit live, no crash/zoom/jitter regression, raw Off is truly native, exact raster jitter returns after AMD resume, clean shutdown.'
+          )|Set-Content .\out-fsr-p9a\HOW-TO-TEST.txt -Encoding UTF8
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fsr-p9a-live-amd-off
+          path: out-fsr-p9a/*
+          if-no-files-found: error

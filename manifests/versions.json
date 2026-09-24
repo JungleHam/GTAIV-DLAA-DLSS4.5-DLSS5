@@ -1,5 +1,46 @@
 {
-  "project_status": "working-installer-clean-repository",
+  "project_status": "v1.2.0-release-ready",
+  "current_release": {
+    "version": "1.2.0",
+    "product_name": "GTA IV Scaling",
+    "approved_workflow_run": 35973895390,
+    "approved_workflow_head": "4427af23e06cecde571edf968fdef3e2cd3add8d",
+    "installer": {
+      "asset": "GTAIV-Scaling-Setup-v1.2.0.exe",
+      "sha256": "882fb425d9abe8cfea25583049b00a252ae730e4480eb3c78867691fea446f85"
+    },
+    "runtime": {
+      "asset": "GTAIV-Scaling-Runtime-v1.2.0.zip",
+      "sha256": "7ae9fc16ff6af6a49ef605b18b2606a8986f1e962e3a519c4db6a5053834969b",
+      "feeder_sha256": "af35011dc5914df2db6b1c49b2edde751831f4f8af53b80a26d7c079ca26bdff"
+    },
+    "public_backends": [
+      "Off - Native",
+      "NVIDIA DLAA / DLSS",
+      "AMD FidelityFX FSR"
+    ],
+    "non_rtx_backends": [
+      "Off - Native",
+      "AMD FidelityFX FSR"
+    ],
+    "nvidia_temporal_default": {
+      "jitter_phases": 8,
+      "jitter_compensation": "-X / -Y"
+    },
+    "fsr": {
+      "version": "3.1.4",
+      "api": "Vulkan",
+      "exposure": "fixed/default",
+      "rcas": true
+    },
+    "nr": {
+      "rtx20": false,
+      "rtx30": false,
+      "rtx40": true,
+      "rtx50": true,
+      "default_enabled": false
+    }
+  },
   "components": {
     "fusionfix": {
       "version": "5.0.1",
@@ -66,7 +107,7 @@
       "public_reshade_ux_fixup_blob": "f8b3a05b24ab912d643ec3661aa060b4257da7ee",
       "public_reshade_ux_v2_fixup_blob": "9a079d97391ca70b1ab0a115e3c04288720e9d48",
       "public_reshade_ux_reference_feeder_sha256": "e22dd7eaf6d1c6a876af486c939e3dcb980d6ae03a247b2c5772d0502224fccd",
-      "settings_surface": "Home -> Add-ons -> DLSS 5 Feed -> GTA IV DLSS",
+      "settings_surface": "Home -> Add-ons -> GTA IV Scaling 1.2.0",
       "default_dlss_quality": "Quality",
       "startup_stabilization_resolution": "1485x835",
       "startup_stabilization_synchronized_frames": 180,
@@ -77,12 +118,13 @@
       "nr_enabled_mode": 2,
       "nr_passes_public_default": 1,
       "public_modes": [
-        "DLAA Native",
+        "DLAA Native (100%)",
         "Custom Ultra Quality (77%)",
-        "Quality",
-        "Balanced",
-        "Performance",
-        "Ultra Performance"
+        "Quality (67%)",
+        "Balanced (58%)",
+        "Performance (50%)",
+        "Ultra Performance (33%)",
+        "Custom Render Scale (10-100%)"
       ],
       "hardware_validation": "RTX 4070 Ti SUPER at 2560x1440. Live DLAA/DLSS mode switching, Neural Rendering, staged master OFF/ON, and 1485x835 startup stabilization were hardware-tested. Steam FPS overlay is visible in DLAA Native / processing OFF and is a known display limitation in Super Resolution profiles.",
       "release_installers": {

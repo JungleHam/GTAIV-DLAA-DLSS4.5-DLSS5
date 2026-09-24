@@ -1,0 +1,157 @@
+name: FSR production Feeder compile probe
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/fsr-3-1-5
+    paths:
+      - '.github/workflows/fsr-feeder-compile-probe.yml'
+      - 'tools/fsr-vulkan/**'
+      - 'install/Public-FSR-Vulkan-Compile-Stage.ps1'
+      - 'install/Public-DLSS-CustomScale-NR-Tuning-Stage.ps1'
+      - 'install/Public-ReShade-Controls-Stage.ps1'
+      - 'install/Public-Startup-Prime-Fix-Stage.ps1'
+      - 'install/Public-ReShade-UX-Master-Stage.ps1'
+      - 'install/Public-ReShade-UX-Master-Fixup.ps1'
+      - 'install/Public-ReShade-UX-Master-V2-Fixup.ps1'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/fsr-feeder-compile-probe.yml'
+      - 'tools/fsr-vulkan/**'
+      - 'install/Public-FSR-Vulkan-Compile-Stage.ps1'
+      - 'install/Public-DLSS-CustomScale-NR-Tuning-Stage.ps1'
+      - 'install/Public-ReShade-Controls-Stage.ps1'
+      - 'install/Public-Startup-Prime-Fix-Stage.ps1'
+      - 'install/Public-ReShade-UX-Master-Stage.ps1'
+      - 'install/Public-ReShade-UX-Master-Fixup.ps1'
+      - 'install/Public-ReShade-UX-Master-V2-Fixup.ps1'
+
+permissions:
+  contents: read
+
+jobs:
+  compile-production-feeder-with-fsr:
+    runs-on: windows-2022
+    timeout-minutes: 75
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Vulkan SDK
+        uses: humbletim/install-vulkan-sdk@v1.2
+        with:
+          version: 1.3.290.0
+          cache: true
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Checkout frozen GTA IV rendering core
+        shell: pwsh
+        run: |
+          git clone --filter=blob:none https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5.git _project
+          git -C _project checkout 57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f
+          $sha=(git -C _project rev-parse HEAD).Trim()
+          if ($sha -ne '57a8bd2ede8d7b4b721b1981bc0e8a7e6cbe084f') { throw "Wrong frozen rendering core: $sha" }
+
+      - name: Attach current production stages plus inert FSR backend
+        shell: pwsh
+        run: |
+          $tool = '.\_project\tools\m3k-nr'
+          Copy-Item .\install\Public-ReShade-Controls-Stage.ps1 "$tool\public-reshade-controls-stage.ps1" -Force
+          Copy-Item .\install\Public-Startup-Prime-Fix-Stage.ps1 "$tool\public-startup-prime-fix-stage.ps1" -Force
+          Copy-Item .\install\Public-ReShade-UX-Master-Stage.ps1 "$tool\public-reshade-ux-master-stage.ps1" -Force
+          Copy-Item .\install\Public-ReShade-UX-Master-Fixup.ps1 "$tool\public-reshade-ux-master-fixup.ps1" -Force
+          Copy-Item .\install\Public-ReShade-UX-Master-V2-Fixup.ps1 "$tool\public-reshade-ux-master-v2-fixup.ps1" -Force
+          Copy-Item .\install\Public-DLSS-CustomScale-NR-Tuning-Stage.ps1 "$tool\public-dlss-customscale-nr-tuning-stage.ps1" -Force
+          Copy-Item .\install\Public-FSR-Vulkan-Compile-Stage.ps1 "$tool\public-fsr-vulkan-compile-stage.ps1" -Force
+          Copy-Item .\tools\fsr-vulkan\m3k_fsr_backend.h "$tool\m3k_fsr_backend.h" -Force
+
+          $build = "$tool\build-a3-s5.ps1"
+          $text = [IO.File]::ReadAllText($build)
+          $anchor = "& (Join-Path `$toolRoot 'a3-s5-startup-prime-stage.ps1') -GeneratedRoot `$generated"
+          $replacement = @(
+            $anchor,
+            "& (Join-Path `$toolRoot 'public-reshade-controls-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-startup-prime-fix-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-reshade-ux-master-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-reshade-ux-master-fixup.ps1') -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-reshade-ux-master-v2-fixup.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-dlss-customscale-nr-tuning-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')",
+            "& (Join-Path `$toolRoot 'public-fsr-vulkan-compile-stage.ps1') -GeneratedRoot `$generated -FeederSource (Join-Path `$feeder 'src\dlss5-feed.cpp')"
+          ) -join "`r`n"
+          if (($text.Split($anchor).Count - 1) -ne 1) { throw 'Could not attach stage chain exactly once' }
+          [IO.File]::WriteAllText($build,$text.Replace($anchor,$replacement),[Text.UTF8Encoding]::new($false))
+
+      - name: Build pinned FidelityFX FSR 3.1.4 Vulkan libraries
+        shell: pwsh
+        run: |
+          git clone --filter=blob:none --branch v1.1.4 https://github.com/GPUOpen-LibrariesAndSDKs/FidelityFX-SDK.git _ffx
+          $sha=(git -C _ffx rev-parse HEAD).Trim()
+          if ($sha -ne 'c6efa6bf7f2027b3ec94f28578bb5965eabb9e55') { throw "Wrong FidelityFX SDK commit: $sha" }
+
+          cmake -S .\_ffx\sdk -B .\_ffx\sdk\build-gtaiv-fsr -G "Visual Studio 17 2022" -A x64 `
+            -DFFX_API_BACKEND=VK_X64 `
+            -DFFX_FSR3UPSCALER=ON `
+            -DFFX_AUTO_COMPILE_SHADERS=1
+          if ($LASTEXITCODE -ne 0) { throw "FidelityFX configure failed: $LASTEXITCODE" }
+
+          cmake --build .\_ffx\sdk\build-gtaiv-fsr --config Release --target ffx_fsr3upscaler_x64 ffx_backend_vk_x64 --parallel 4
+          if ($LASTEXITCODE -ne 0) { throw "FidelityFX build failed: $LASTEXITCODE" }
+
+          $libs=Get-ChildItem .\_ffx\sdk\bin\ffx_sdk -File -Filter '*.lib'
+          $fsr=$libs | Where-Object { $_.BaseName -like 'ffx_fsr3upscaler_x64*' } | Select-Object -First 1
+          $vk =$libs | Where-Object { $_.BaseName -like 'ffx_backend_vk_x64*' } | Select-Object -First 1
+          if (-not $fsr -or -not $vk) { throw 'FidelityFX libraries missing after build' }
+
+          "FFX_INCLUDE=$((Resolve-Path .\_ffx\sdk\include).Path)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "FFX_FSR_LIB=$($fsr.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "FFX_VK_LIB=$($vk.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "VULKAN_LIB=$env:VULKAN_SDK\Lib\vulkan-1.lib" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Teach frozen Feeder compiler about FidelityFX
+        shell: pwsh
+        run: |
+          $compile='.\_project\tools\m3k-nr\compile-s2.bat'
+          $text=[IO.File]::ReadAllText($compile)
+          $inc='/I"%VULKAN%\include"'
+          if (($text.Split($inc).Count - 1) -ne 1) { throw 'Vulkan include anchor is not unique' }
+          $text=$text.Replace($inc, $inc + ' /I"%FFX_INCLUDE%"')
+
+          $link='"%NGX%\lib\Windows_x86_64\x64\nvsdk_ngx_d.lib" version.lib'
+          if (($text.Split($link).Count - 1) -ne 1) { throw 'Feeder link anchor is not unique' }
+          $text=$text.Replace($link, '"%NGX%\lib\Windows_x86_64\x64\nvsdk_ngx_d.lib" "%FFX_FSR_LIB%" "%FFX_VK_LIB%" "%VULKAN_LIB%" version.lib')
+          [IO.File]::WriteAllText($compile,$text,[Text.UTF8Encoding]::new($false))
+
+      - name: Compile exact production Feeder with inert FSR backend
+        shell: pwsh
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\_project\tools\m3k-nr\build-a3-s5.ps1
+          if ($LASTEXITCODE -ne 0) { throw "Feeder build failed: $LASTEXITCODE" }
+
+          $addon='.\_project\tools\m3k-nr\out-m3k-a3-s5\dlss5-feed.addon64'
+          if (-not (Test-Path -LiteralPath $addon)) { throw 'Feeder output missing' }
+          $hash=(Get-FileHash -Algorithm SHA256 -LiteralPath $addon).Hash.ToUpperInvariant()
+          Write-Host "FSR-B0 production Feeder compile passed: $hash"
+
+          New-Item -ItemType Directory -Path .\out-fsr-feeder-compile -Force | Out-Null
+          Copy-Item $addon .\out-fsr-feeder-compile\dlss5-feed-fsr-b0.addon64 -Force
+          @(
+            'FSR-B0 compile-only artifact',
+            'Production GTA IV stage chain + inert M3kFsrBackend',
+            'FidelityFX SDK=v1.1.4',
+            'FSR3 Upscaler=3.1.4 Vulkan',
+            'Runtime FSR dispatch=DISABLED',
+            "SHA256=$hash"
+          ) | Set-Content .\out-fsr-feeder-compile\BUILD-INFO.txt -Encoding UTF8
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fsr-b0-production-feeder-compile
+          path: out-fsr-feeder-compile/*
+          if-no-files-found: error
