@@ -80,7 +80,22 @@ try{
  if(Test-Path -LiteralPath $Trex){Fail '.trex already exists after recovery; baseline is not clean.'};if(Test-Path -LiteralPath (Join-Path $Game 'd3d9Hooked.dll')){Fail 'd3d9Hooked.dll already exists after recovery; baseline is not clean.'}
  if(-not $ReshadeSetup -or -not(Test-Path -LiteralPath $ReshadeSetup)){Fail 'Official ReShade installer was not supplied.'};Assert-SHA256 $ReshadeSetup $ReShadeSetupHash
  if(-not $LumenitePackage -or -not(Test-Path -LiteralPath $LumenitePackage)){Fail 'LumeniteFX ZIP was not supplied.'};Assert-SHA256 $LumenitePackage $LumenitePackageHash
- $ffCfg=Join-Path $Game 'plugins\GTAIV.EFLC.FusionFix.cfg';if(-not(Test-Path -LiteralPath $ffCfg)){$o=Get-ChildItem -LiteralPath (Join-Path $Game 'plugins') -Filter '*FusionFix*.cfg' -File -ErrorAction SilentlyContinue|Select-Object -First 1;if(-not $o){Fail 'FusionFix CFG not found.'};$ffCfg=$o.FullName}
+ $ffCfg=$null;$cfgName='GTAIV.EFLC.FusionFix.cfg'
+ foreach($candidate in @(
+   (Join-Path $Game "plugins\$cfgName"),
+   (Join-Path $Game $cfgName),
+   (Join-Path $env:LOCALAPPDATA "Rockstar Games\GTA IV\$cfgName"),
+   (Join-Path $env:LOCALAPPDATA "GTAIV.EFLC.FusionFix\$cfgName"),
+   (Join-Path ([Environment]::GetFolderPath('MyDocuments')) "GTAIV.EFLC.FusionFix\$cfgName")
+ )){if(Test-Path -LiteralPath $candidate -PathType Leaf){$ffCfg=$candidate;break}}
+ if(-not $ffCfg){
+   $pluginDir=Join-Path $Game 'plugins'
+   if(Test-Path -LiteralPath $pluginDir -PathType Container){
+     $o=Get-ChildItem -LiteralPath $pluginDir -Filter '*FusionFix*.cfg' -File -ErrorAction SilentlyContinue|Select-Object -First 1
+     if($o){$ffCfg=$o.FullName}
+   }
+ }
+ if(-not $ffCfg){Fail 'FusionFix CFG not found in any supported first-run location.'}
  $stamp=Get-Date -Format 'yyyyMMdd_HHmmss';$Backup=Join-Path $Game ("_DLAA_PREINSTALL_BACKUP_"+$stamp);New-Item -ItemType Directory -Path (Join-Path $Backup 'plugins') -Force|Out-Null
  foreach($n in @('d3d9.dll','vulkan.dll','dxvk.conf','commandline.txt')){Copy-IfExists (Join-Path $Game $n) (Join-Path $Backup $n)};Copy-IfExists $ffCfg (Join-Path $Backup ('plugins\'+[IO.Path]::GetFileName($ffCfg)));$ffIni=Join-Path (Split-Path -Parent $ffCfg) 'GTAIV.EFLC.FusionFix.ini';Copy-IfExists $ffIni (Join-Path $Backup 'plugins\GTAIV.EFLC.FusionFix.ini')
  Cleanup;New-Item -ItemType Directory -Path $Temp -Force|Out-Null;$runtimeZip=Join-Path $Temp 'runtime.zip';$runtime=Join-Path $Temp 'runtime';$lum=Join-Path $Temp 'lumenite'
