@@ -1,18 +1,19 @@
 {
-  "project_status": "v1.2.1-release-candidate",
+  "project_status": "v1.2.1-released",
   "current_release": {
-    "version": "1.2.0",
+    "version": "1.2.1",
     "product_name": "GTA IV Scaling",
-    "approved_workflow_run": 35973895390,
-    "approved_workflow_head": "4427af23e06cecde571edf968fdef3e2cd3add8d",
+    "approved_workflow_run": 35994811164,
+    "approved_workflow_head": "a15736bed8757e6900026bb3a6312b15af6b7502",
+    "hardware_validation": "RTX 20/30 Neural Rendering path confirmed working by external tester; RTX 40/50 behavior preserved from v1.2.0 baseline.",
     "installer": {
-      "asset": "GTAIV-Scaling-Setup-v1.2.0.exe",
-      "sha256": "882fb425d9abe8cfea25583049b00a252ae730e4480eb3c78867691fea446f85"
+      "asset": "GTAIV-Scaling-Setup-v1.2.1.exe",
+      "sha256": "d3d0917eb69b063fae74681b83a0b77cf2ab23e148fd41e0c2ca85ef9679c11f"
     },
     "runtime": {
-      "asset": "GTAIV-Scaling-Runtime-v1.2.0.zip",
-      "sha256": "7ae9fc16ff6af6a49ef605b18b2606a8986f1e962e3a519c4db6a5053834969b",
-      "feeder_sha256": "af35011dc5914df2db6b1c49b2edde751831f4f8af53b80a26d7c079ca26bdff"
+      "asset": "GTAIV-Scaling-Runtime-v1.2.1.zip",
+      "sha256": "ccc6852cd11489ea21228b2e1b5b98b07e2ffc58be44d36712643f7112dec026",
+      "feeder_sha256": "9e147f4c0eb8003a79224eff3d9060e80fe0c5182b6d1c9d2224aaca64d92e8a"
     },
     "public_backends": [
       "Off - Native",
@@ -34,12 +35,19 @@
       "rcas": true
     },
     "nr": {
-      "rtx20": false,
-      "rtx30": false,
+      "rtx20": true,
+      "rtx30": true,
       "rtx40": true,
       "rtx50": true,
+      "rtx20_30_runtime": "310.8.SF-v2",
+      "rtx40_runtime": "310.8.0-RTX40",
+      "rtx50_runtime": "310.8.0 NVIDIA-signed",
       "default_enabled": false
-    }
+    },
+    "uninstall_modes": [
+      "Remove GTA IV Scaling, keep FusionFix",
+      "Completely remove GTA IV Scaling and FusionFix"
+    ]
   },
   "components": {
     "fusionfix": {
@@ -230,18 +238,6 @@
       "installed_path": ".trex/d3d9vk_x64.dll",
       "installed_automatically": true,
       "release_page": "https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/tag/v1.0.0"
-    }
-  },
-  "next_release": {
-    "version": "1.2.1",
-    "product_name": "GTA IV Scaling",
-    "change": "Enable DLSS 5 Neural Rendering on RTX 20/30 with ShortFuse 310.8.SF-v2; preserve existing RTX 40 and RTX 50 NR runtimes.",
-    "nr": {
-      "rtx20": "310.8.SF-v2",
-      "rtx30": "310.8.SF-v2",
-      "rtx40": "310.8.0-RTX40",
-      "rtx50": "310.8.0 NVIDIA-signed",
-      "default_enabled": false
     }
   }
 }
