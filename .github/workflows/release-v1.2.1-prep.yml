@@ -291,7 +291,7 @@ jobs:
             'function Remove-ScalingLeftovers',
             'function Remove-FusionFix',
             "'_GTAIV_SCALING_PRE*_BACKUP_*'",
-            "elseif($Action-eq'REMOVE_KEEP_FUSIONFIX')",
+            'REMOVE_KEEP_FUSIONFIX',
             'Remove-Scaling $Game $false'
           )){if(-not $runner.Contains($marker)){throw "Uninstall runner marker missing: $marker"}}
 
