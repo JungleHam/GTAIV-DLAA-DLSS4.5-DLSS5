@@ -1,0 +1,49 @@
+name: Test v1.2.1 uninstall modes
+
+on:
+  push:
+    branches:
+      - release/v1.2.1-prep
+    paths:
+      - 'installer/Run-Scaling-Action.ps1'
+      - 'installer/GTAIV-Scaling-Setup.iss'
+      - 'install/Uninstall-DLAA.bat'
+      - '.github/workflows/test-v1.2.1-uninstall-modes.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell and validate uninstall contract
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $runner=[IO.File]::ReadAllText('.\installer\Run-Scaling-Action.ps1')
+          [void][ScriptBlock]::Create($runner)
+          foreach($marker in @(
+            "ValidateSet('INSTALL','REMOVE_KEEP_FUSIONFIX','REMOVE_ALL')",
+            'function Remove-ScalingLeftovers',
+            'function Remove-FusionFix',
+            "'_GTAIV_SCALING_PRE*_BACKUP_*'",
+            "elseif($Action-eq'REMOVE_KEEP_FUSIONFIX')",
+            'Remove-Scaling $Game $false',
+            "'plugins\GTAIV.EFLC.FusionFix.cfg'"
+          )){if(-not $runner.Contains($marker)){throw "Runner marker missing: $marker"}}
+
+          $bat=[IO.File]::ReadAllText('.\install\Uninstall-DLAA.bat')
+          $m='#==POWERSHELL==#';$i=$bat.IndexOf($m)
+          if($i-lt0){throw 'PowerShell marker missing from Uninstall-DLAA.bat'}
+          [void][ScriptBlock]::Create($bat.Substring($i+$m.Length))
+          if(-not $bat.Contains("'_GTAIV_SCALING_PRE*_BACKUP_*'")){throw 'Scaling backup cleanup pattern missing'}
+
+          $iss=[IO.File]::ReadAllText('.\installer\GTAIV-Scaling-Setup.iss')
+          foreach($marker in @(
+            'Remove GTA IV Scaling, keep FusionFix',
+            'Completely remove GTA IV Scaling and FusionFix',
+            "ActionName := 'REMOVE_KEEP_FUSIONFIX'",
+            "ActionName := 'REMOVE_ALL'"
+          )){if(-not $iss.Contains($marker)){throw "Installer marker missing: $marker"}}
