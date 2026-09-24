@@ -149,7 +149,7 @@ function Validate-RestoredState([string]$Game,[string]$Backup) {
     if (Test-Path -LiteralPath $GlobalReShadeBackup) { Fail 'The ReShade input-patch backup file still exists.' }
 }
 function Remove-ProjectBackups([string]$Game) {
-    foreach ($pattern in @('_DLAA_PREINSTALL_BACKUP_*','_DLSS_FULL_PREINSTALL_BACKUP_*','_DLSS_FULL_UNINSTALL_SAFETY_*','_DLAA_UNINSTALL_SAFETY_*')) {
+    foreach ($pattern in @('_DLAA_PREINSTALL_BACKUP_*','_DLSS_FULL_PREINSTALL_BACKUP_*','_DLSS_FULL_UNINSTALL_SAFETY_*','_DLAA_UNINSTALL_SAFETY_*','_GTAIV_SCALING_PRE*_BACKUP_*')) {
         Get-ChildItem -LiteralPath $Game -Directory -Filter $pattern -ErrorAction SilentlyContinue | ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force }
     }
     $canonical = Join-Path $Game '_DLSS_FULL_DLAA_BASELINE'
