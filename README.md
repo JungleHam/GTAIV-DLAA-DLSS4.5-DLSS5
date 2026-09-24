@@ -18,10 +18,10 @@ Everything else required by the project is handled by the installer.
 ### Clean installation
 
 0. Install the latest, clean GTA IV (Steam version tested, Rockstar Game Launcher version wasn't but probably fine) 
-1. Download **`GTAIV-Scaling-Setup-v1.2.0.exe`** from the [Releases](https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5-FSR/releases) page.
+1. Download **`GTAIV-Scaling-Setup-v1.2.1.exe`** from the [Releases](https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5-FSR/releases) page.
 2. Run it as **Administrator**.
 3. Select the folder containing **`GTAIV.exe`**.
-4. Choose **Install / Repair GTA IV Scaling 1.2.0**.
+4. Choose **Install / Repair GTA IV Scaling 1.2.1**.
 5. If FusionFix is missing, the installer downloads and installs pinned **FusionFix 5.0.1**.
 6. Launch GTA IV once to the main menu, close the game, and run the installer again so FusionFix can create its first-run state.
 7. If the scaling foundation is not already installed, select the official **ReShade 6.8.0 Full Add-On Support** setup EXE when asked.
@@ -44,7 +44,7 @@ The project uninstaller removes the scaling integration while preserving externa
 ### Open the in-game controls
 
 ```text
-Home key -> Add-ons -> GTA IV Scaling 1.2.0
+Home key -> Add-ons -> GTA IV Scaling 1.2.1
 ```
 
 ## Features
@@ -52,7 +52,7 @@ Home key -> Add-ons -> GTA IV Scaling 1.2.0
 - **DLAA** — native-resolution NVIDIA temporal anti-aliasing.
 - **DLSS Super Resolution** — Ultra Quality 77%, Quality 67%, Balanced 58%, Performance 50%, Ultra Performance 33%.
 - **DLSS Custom Quality** — adjustable 10–100% render scale with an Apply button.
-- **DLSS 5 Neural Rendering** — optional toggle on RTX 40/50, up to 5 passes, styles and granular tuning controls.
+- **DLSS 5 Neural Rendering** — optional toggle on RTX 20/30/40/50, up to 5 passes, styles and granular tuning controls.
 - **NVIDIA sharpening** — independent 0.00–1.50 sharpening control.
 - **NVIDIA temporal AA controls** — Auto / 8 / 16 / 32 jitter phases plus X/Y compensation; calibrated default is 8 phases + -X/-Y.
 - **FSR Native AA** — 100% FidelityFX FSR 3.1.4 Vulkan.
@@ -61,7 +61,7 @@ Home key -> Add-ons -> GTA IV Scaling 1.2.0
 - **Live backend switching** — Off / NVIDIA / AMD without restarting; vendor switches use a safe native midpoint.
 - **GPU-aware UI** — RTX shows NVIDIA + FSR; non-RTX hides NVIDIA and keeps FSR.
 - **Independent backend settings** — NVIDIA and AMD keep their own scale, sharpening and temporal state.
-- **Unified installer** — Install / Repair / Remove from one EXE, with FusionFix/dependency handling and automatic RTX 40/50 NR setup.
+- **Unified installer** — Install / Repair / Remove from one EXE, with FusionFix/dependency handling and automatic RTX 20/30/40/50 NR setup.
 - **Diagnostics** — backend state, resolution, jitter, FSR and NR information available in the Advanced panel.
 
 **Upcoming**
@@ -71,9 +71,9 @@ Home key -> Add-ons -> GTA IV Scaling 1.2.0
 
 ## Current release
 
-**v1.2.0**
+**v1.2.1**
 
-Installer: **`GTAIV-Scaling-Setup-v1.2.0.exe`**
+Installer: **`GTAIV-Scaling-Setup-v1.2.1.exe`**
 
 ## Screenshots
 
@@ -83,8 +83,8 @@ Installer: **`GTAIV-Scaling-Setup-v1.2.0.exe`**
 
 | GPU | Off / Native | AMD FidelityFX FSR | NVIDIA DLAA / DLSS | DLSS Neural Rendering |
 | --- | --- | --- | --- | --- |
-| RTX 20 Series | Yes | Yes | Yes | No |
-| RTX 30 Series | Yes | Yes | Yes | No |
+| RTX 20 Series | Yes | Yes | Yes | Yes, SF-v2, set to OFF by default |
+| RTX 30 Series | Yes | Yes | Yes | Yes, SF-v2, set to OFF by default |
 | RTX 40 Series | Yes | Yes | Yes | Yes, set to OFF by default |
 | RTX 50 Series | Yes | Yes | Yes | Yes, set to OFF by default |
 | GTX / AMD / Intel / other non-RTX | Yes | Yes | Hidden | No |
@@ -93,14 +93,14 @@ The installer detects NVIDIA RTX capability and writes it into the runtime confi
 
 On non-RTX systems the NVIDIA choice is hidden, and an old saved NVIDIA selection is automatically moved to AMD FSR instead of trying to open an unavailable backend.
 
-NR is deliberately restricted to the tested RTX 40/50 paths. RTX 20/30 still get the normal NVIDIA DLAA/DLSS path plus FSR.
+v1.2.1 enables Neural Rendering on RTX 20/30 using the ShortFuse 310.8.SF-v2 compatibility runtime. RTX 40 keeps the existing project-tested 310.8.0 compatibility runtime, while RTX 50 keeps the NVIDIA-signed 310.8.0 runtime. NR remains OFF by default on every supported RTX generation.
 
 ## In-game controls
 
 Open:
 
 ```text
-Home key -> Add-ons -> GTA IV Scaling 1.2.0
+Home key -> Add-ons -> GTA IV Scaling 1.2.1
 ```
 
 The main panel is **GTA IV Scaling**.
