@@ -17,6 +17,7 @@ on:
       - 'install/Public-GTAIV-Scaling-V121-Stage.ps1'
       - 'installer/GTAIV-Scaling-Setup.iss'
       - 'installer/Run-Scaling-Action.ps1'
+      - 'install/Uninstall-DLAA.bat'
       - 'install/p9c5/**'
 concurrency:
   group: gtaiv-scaling-v121-release-prep-${{ github.ref }}
@@ -279,6 +280,34 @@ jobs:
             if($i-ge 0){[void][ScriptBlock]::Create($text.Substring($i+$marker.Length))}
           }
 
+      - name: Validate v1.2.1 uninstall modes
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $runner=[IO.File]::ReadAllText('.\installer\Run-Scaling-Action.ps1')
+          [void][ScriptBlock]::Create($runner)
+          foreach($marker in @(
+            "ValidateSet('INSTALL','REMOVE_KEEP_FUSIONFIX','REMOVE_ALL')",
+            'function Remove-ScalingLeftovers',
+            'function Remove-FusionFix',
+            "'_GTAIV_SCALING_PRE*_BACKUP_*'",
+            "elseif($Action-eq'REMOVE_KEEP_FUSIONFIX')",
+            'Remove-Scaling $Game $false'
+          )){if(-not $runner.Contains($marker)){throw "Uninstall runner marker missing: $marker"}}
+
+          $iss=[IO.File]::ReadAllText('.\installer\GTAIV-Scaling-Setup.iss')
+          foreach($marker in @(
+            'Remove GTA IV Scaling, keep FusionFix',
+            'Completely remove GTA IV Scaling and FusionFix',
+            "ActionName := 'REMOVE_KEEP_FUSIONFIX'",
+            "ActionName := 'REMOVE_ALL'"
+          )){if(-not $iss.Contains($marker)){throw "Installer uninstall-choice marker missing: $marker"}}
+
+          $bat=[IO.File]::ReadAllText('.\install\Uninstall-DLAA.bat')
+          $m='#==POWERSHELL==#';$i=$bat.IndexOf($m)
+          if($i-lt0){throw 'Uninstall-DLAA.bat PowerShell marker missing'}
+          [void][ScriptBlock]::Create($bat.Substring($i+$m.Length))
+          if(-not $bat.Contains("'_GTAIV_SCALING_PRE*_BACKUP_*'")){throw 'Scaling backup cleanup marker missing'}
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup --no-progress -y
