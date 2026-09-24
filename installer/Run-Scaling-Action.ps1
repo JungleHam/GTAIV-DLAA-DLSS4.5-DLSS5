@@ -17,7 +17,7 @@ param(
 
 $ErrorActionPreference='Stop'
 $ProgressPreference='SilentlyContinue'
-$Version='1.2.1'
+$Version='1.2.2'
 $RuntimeHash='__SCALING_RUNTIME_SHA256__'
 $FeederHash='__SCALING_FEEDER_SHA256__'
 $ReShadePatchHash='D5BD8CB2B6E935506888EA71711361B9AFCD72ED7C70926C0F52E8F8E47C7510'
@@ -64,7 +64,7 @@ function Download-GitHubReleaseAsset([string]$Repo,[string]$Tag,[string]$Asset,[
 }
 function Get-AutoTemp{
     if(-not $script:Temp){
-        $script:Temp=Join-Path $env:TEMP ('GTAIV_SCALING_121_'+[Guid]::NewGuid().ToString('N'))
+        $script:Temp=Join-Path $env:TEMP ('GTAIV_SCALING_122_'+[Guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $script:Temp -Force|Out-Null
     }
     return $script:Temp
@@ -231,7 +231,7 @@ function Resolve-NrDll([object]$Gpu,[string]$OwnPath){
 }
 function Backup-ScalingFiles([string]$Root){
     $stamp=Get-Date -Format 'yyyyMMdd_HHmmss'
-    $dest=Join-Path $Root ("_GTAIV_SCALING_PRE121_BACKUP_"+$stamp)
+    $dest=Join-Path $Root ("_GTAIV_SCALING_PRE122_BACKUP_"+$stamp)
     New-Item -ItemType Directory -Path $dest -Force|Out-Null
     foreach($rel in @('d3d9.dll','dxvk.conf','.trex\NvRemixBridge.exe','.trex\d3d9vk_x64.dll','.trex\bridge.conf','.trex\dlss5-feed.addon64','.trex\dlss5-feed.cfg','.trex\m3k-nr.ini','.trex\nvngx_dlss.dll','.trex\m3k\m3k-nvngx.dll','.trex\m3k\nvngx_dlssnr.dll')){
         $src=Join-Path $Root $rel
@@ -339,11 +339,11 @@ function Install-Scaling([string]$Root){
         "NvidiaRtxAvailable=$(if($gpu.IsRtx){1}else{0})",
         "DefaultScalingTechnology=$tech",
         "NeuralRendering=$(if($gpu.Series-in@(20,30,40,50)){'installed-off-by-default'}else{'not-applicable'})",
-        "Pre121Backup=$backup"
+        "Pre122Backup=$backup"
     )
     [IO.File]::WriteAllLines((Join-Path $Root 'GTAIV_SCALING_INSTALLED.txt'),$receipt,[Text.UTF8Encoding]::new($false))
     Write-Host ''
-    Write-Host 'GTA IV Scaling 1.2.1 installed / repaired successfully.' -ForegroundColor Green
+    Write-Host 'GTA IV Scaling 1.2.2 installed / repaired successfully.' -ForegroundColor Green
 }
 function Remove-ScalingLeftovers([string]$Root){
     foreach($name in @(
