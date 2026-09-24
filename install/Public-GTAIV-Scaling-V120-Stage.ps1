@@ -121,14 +121,14 @@ $uiNew=@'
         if(M3kNvidiaRtxAvailable())
         {
             int technology=static_cast<int>(M3kScalingTechnologyRequested());
-            const char *technologyItems="Off \xE2\x80\x94 Native\0NVIDIA DLAA / DLSS\0AMD FidelityFX FSR\0\0";
+            const char *technologyItems="Off - Native\0NVIDIA DLAA / DLSS\0AMD FidelityFX FSR\0\0";
             if(ImGui::Combo("Technology##M3KScalingTechnology",&technology,technologyItems))
                 M3kRequestScalingTechnologyLive(static_cast<UINT>(technology));
         }
         else
         {
             int technology=M3kScalingTechnologyRequested()==2u?1:0;
-            const char *technologyItems="Off \xE2\x80\x94 Native\0AMD FidelityFX FSR\0\0";
+            const char *technologyItems="Off - Native\0AMD FidelityFX FSR\0\0";
             if(ImGui::Combo("Technology##M3KScalingTechnology",&technology,technologyItems))
                 M3kRequestScalingTechnologyLive(technology==1?2u:0u);
         }
