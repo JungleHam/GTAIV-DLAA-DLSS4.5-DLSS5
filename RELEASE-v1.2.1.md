@@ -10,6 +10,8 @@ v1.2.1 extends DLSS 5 Neural Rendering support to RTX 20 and RTX 30 Series GPUs 
 - RTX 40 keeps the existing project-tested **310.8.0 RTX40 compatibility** runtime.
 - RTX 50 keeps the existing **NVIDIA-signed 310.8.0** runtime and signature validation.
 - Neural Rendering still starts **OFF by default** on every supported RTX generation.
+- Uninstall now offers **keep FusionFix** and **complete cleanup including FusionFix** modes.
+- Both uninstall modes remove GTA IV Scaling receipts/logs and `_GTAIV_SCALING_PRE*_BACKUP_*` rollback folders.
 - Existing Off / NVIDIA / AMD switching, FSR 3.1.4, RCAS, DLSS/DLAA profiles, sharpening and temporal calibration are unchanged.
 
 ## Runtime integrity
