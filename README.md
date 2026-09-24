@@ -2,25 +2,112 @@
 
 GTA IV Scaling is a unified reconstruction and anti-aliasing layer for **GTA IV: Complete Edition** on Windows.
 
-It adds a live in-game choice between:
+It adds live switching between **native rendering**, **NVIDIA DLAA / DLSS**, and **AMD FidelityFX FSR** from one runtime and one installer.
 
-- **Off - Native**
-- **NVIDIA DLAA / DLSS**
-- **AMD FidelityFX FSR**
+## Installation
 
-The project keeps the existing 32-bit GTA IV / 64-bit bridge architecture, but v1.2.0 turns it into one product with one installer and one runtime.
+### What you need
+
+- **GTA IV: Complete Edition**
+- **Windows 10/11 64-bit**
+- Administrator access for the ReShade/Vulkan setup
+- The official **ReShade 6.8.0 Full Add-On Support** installer when setting up from a clean game
+
+Everything else required by the project is handled by the installer.
+
+### Clean installation
+
+1. Download **`GTAIV-Scaling-Setup-v1.2.0.exe`** from the [Releases](https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5-FSR/releases) page.
+2. Run it as **Administrator**.
+3. Select the folder containing **`GTAIV.exe`**.
+4. Choose **Install / Repair GTA IV Scaling 1.2.0**.
+5. If FusionFix is missing, the installer downloads and installs pinned **FusionFix 5.0.1**.
+6. Launch GTA IV once to the main menu, close the game, and run the installer again so FusionFix can create its first-run state.
+7. If the scaling foundation is not already installed, select the official **ReShade 6.8.0 Full Add-On Support** setup EXE when asked.
+8. Finish installation and launch GTA IV.
+
+There is **no DLSS-vs-FSR installer choice**. The full shared runtime is installed once and the game only shows the scaling technologies supported by the detected GPU.
+
+### Repair / upgrade
+
+Run the same installer again and choose **Install / Repair**.
+
+The installer backs up the project-owned scaling files before replacing the stack.
+
+### Removal
+
+Run the same installer and choose **Remove GTA IV Scaling**.
+
+The project uninstaller removes the scaling integration while preserving external components where possible.
+
+### Open the in-game controls
+
+```text
+Home -> Add-ons -> GTA IV Scaling 1.2.0
+```
+
+## Functions
+
+- **Off - Native** — true reconstruction-off / native rendering path.
+- **NVIDIA DLAA** — native-resolution temporal anti-aliasing.
+- **NVIDIA DLSS Super Resolution** — lower internal render resolution reconstructed to output resolution.
+- **AMD FidelityFX FSR 3.1.4 Vulkan** — independent non-NGX reconstruction backend.
+- **Live backend switching** — switch between Off, NVIDIA and AMD without restarting the game.
+- **Safe NVIDIA <-> AMD handoff** — vendor switches pass through an explicit native/raw midpoint.
+- **No silent vendor fallback** — a failed NVIDIA or AMD open does not silently substitute the other backend.
+- **RTX capability filtering** — NVIDIA scaling is hidden on non-RTX systems.
+- **RTX 20/30 support** — DLAA/DLSS + FSR, without DLSS Neural Rendering.
+- **RTX 40/50 support** — DLAA/DLSS + FSR + optional DLSS Neural Rendering.
+- **Automatic NR package selection** — matched RTX 40/50 NR runtime is installed automatically and starts OFF.
+- **DLAA Native preset** — 100% render scale.
+- **DLSS Custom Ultra Quality preset** — 77% render scale.
+- **DLSS Quality preset** — 67% render scale.
+- **DLSS Balanced preset** — 58% render scale.
+- **DLSS Performance preset** — 50% render scale.
+- **DLSS Ultra Performance preset** — 33% render scale.
+- **DLSS custom render scale** — 10–100%.
+- **Staged DLSS scale Apply button** — moving the slider does not constantly resize the game.
+- **NVIDIA sharpening** — independent 0.00–1.50 post-DLSS sharpening.
+- **NVIDIA jitter sequence control** — Auto / 8 / 16 / 32 phases.
+- **NVIDIA jitter compensation control** — +X/+Y, -X/-Y, +X/-Y, -X/+Y.
+- **Calibrated NVIDIA defaults** — 8 phases + -X/-Y.
+- **FSR Native AA preset** — 100% render scale.
+- **FSR Ultra Quality preset** — 77% render scale.
+- **FSR Quality preset** — 66.7% render scale.
+- **FSR Balanced preset** — 59% render scale.
+- **FSR Performance preset** — 50% render scale.
+- **FSR Ultra Performance preset** — 33% render scale.
+- **FSR custom render scale** — 10–100%.
+- **AMD RCAS sharpening** — independent 0.00–1.00 control.
+- **Independent AMD phase planning** — FSR manages its own temporal phase count.
+- **Exact GTA IV raster-jitter handoff** — temporal offsets are passed into reconstruction.
+- **Fixed/default FSR exposure** — removes the earlier brightness/vignette pulse.
+- **Calibrated FSR camera/depth contract** — GTA IV near/far/FOV/depth configuration is supplied to FSR.
+- **Independent NVIDIA and AMD settings** — switching backends does not overwrite the other backend's scale or sharpening.
+- **DLSS Neural Rendering toggle** — installed on supported RTX 40/50 systems and OFF by default.
+- **NR styles** — Default / Natural / Cinematic.
+- **NR Intensity** — 0.00–2.00.
+- **NR Local Tone** — 0.00–2.00.
+- **NR Local Structure** — 0.00–2.00.
+- **NR Skin Structure** — 0.00–2.00.
+- **NR Auto Mask** — on/off.
+- **NR UI Correction** — on/off.
+- **NR passes** — 1–5 passes.
+- **Reset NR Advanced** — restores the project NR defaults.
+- **Diagnostics panel** — requested/active backend, transition state, render sizes, jitter, FSR and NR state.
+- **Persistent settings** — saved backend-specific choices survive normal restarts.
+- **Unified Install / Repair** — one installer handles the complete scaling stack.
+- **Automatic FusionFix install** — pinned FusionFix 5.0.1 is installed when missing.
+- **Automatic project dependency handling** — bridge/presenter, LumeniteFX, runtime files and input patch are handled by setup.
+- **Project-file backup before repair/upgrade** — existing scaling files are preserved before replacement.
+- **Integrated removal** — the same installer can remove GTA IV Scaling.
+- **ReShade input relay patch** — keeps keyboard/mouse control of the overlay across the 32-bit/64-bit bridge.
 
 ## Current release
 
 **v1.2.0**
 
 Installer: **`GTAIV-Scaling-Setup-v1.2.0.exe`**
-
-Open the in-game controls with:
-
-```text
-Home -> Add-ons -> GTA IV Scaling 1.2.0
-```
 
 ## Screenshots
 
