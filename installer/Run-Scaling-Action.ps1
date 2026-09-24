@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory=$true)]
-    [ValidateSet('INSTALL','REMOVE')]
+    [ValidateSet('INSTALL','REMOVE_KEEP_FUSIONFIX','REMOVE_ALL')]
     [string]$Action,
 
     [Parameter(Mandatory=$true)]
@@ -345,10 +345,85 @@ function Install-Scaling([string]$Root){
     Write-Host ''
     Write-Host 'GTA IV Scaling 1.2.1 installed / repaired successfully.' -ForegroundColor Green
 }
-function Remove-Scaling([string]$Root){
+function Remove-ScalingLeftovers([string]$Root){
+    foreach($name in @(
+        'GTAIV_SCALING_INSTALLED.txt',
+        'DLAA_INSTALL_MANIFEST.txt',
+        'DLAA_AIO_install.log',
+        'DLSS_FULL_INSTALLED.txt',
+        'DLSS_FULL_install.log',
+        'DLSS_FULL_uninstall.log',
+        'DLSS-Full-Control.bat',
+        'Uninstall-DLSS-Full.bat',
+        '_GTAIV_DLSS_Install-DLAA-Core.bat',
+        '_GTAIV_DLSS_Install-DLSS-Full-Core.bat'
+    )){
+        Remove-Item -LiteralPath (Join-Path $Root $name) -Force -ErrorAction SilentlyContinue
+    }
+    foreach($pattern in @(
+        '_GTAIV_SCALING_PRE*_BACKUP_*',
+        '_DLAA_PREINSTALL_BACKUP_*',
+        '_DLSS_FULL_PREINSTALL_BACKUP_*',
+        '_DLSS_FULL_UNINSTALL_SAFETY_*',
+        '_DLAA_UNINSTALL_SAFETY_*'
+    )){
+        Get-ChildItem -LiteralPath $Root -Directory -Filter $pattern -ErrorAction SilentlyContinue |
+            ForEach-Object{Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue}
+    }
+    foreach($name in @('_DLSS_FULL_DLAA_BASELINE')){
+        Remove-Item -LiteralPath (Join-Path $Root $name) -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+function Remove-FusionFix([string]$Root){
+    Write-Host 'Removing pinned FusionFix 5.0.1 files...' -ForegroundColor Cyan
+    $zip=Resolve-FusionFixPackage
+    Assert-SHA256 $zip '3C202398C133392BE985854654F169514E055812CC302EF24E6AA97495975B41' 'FusionFix package'
+    $out=Join-Path (Get-AutoTemp) 'fusionfix-remove'
+    Expand-Archive -LiteralPath $zip -DestinationPath $out -Force
+    $dinput=Get-ChildItem -LiteralPath $out -Recurse -File -Filter 'dinput8.dll'|Select-Object -First 1
+    if(-not $dinput){Fail 'FusionFix package did not contain dinput8.dll; refusing full cleanup.'}
+    $packageRoot=$dinput.Directory.FullName
+    $files=@(Get-ChildItem -LiteralPath $packageRoot -Recurse -File -Force)
+    foreach($file in $files){
+        $rel=$file.FullName.Substring($packageRoot.Length).TrimStart('\','/')
+        if(-not $rel){continue}
+        $target=Join-Path $Root $rel
+        if(Test-Path -LiteralPath $target -PathType Leaf){
+            Remove-Item -LiteralPath $target -Force
+        }
+    }
+    foreach($extra in @(
+        'plugins\GTAIV.EFLC.FusionFix.cfg',
+        'plugins\GTAIV.EFLC.FusionFix.ini',
+        'GTAIV.EFLC.FusionFix.cfg',
+        'GTAIV.EFLC.FusionFix.ini'
+    )){
+        Remove-Item -LiteralPath (Join-Path $Root $extra) -Force -ErrorAction SilentlyContinue
+    }
+    $dirs=@(Get-ChildItem -LiteralPath $packageRoot -Recurse -Directory -Force | Sort-Object FullName -Descending)
+    foreach($dir in $dirs){
+        $rel=$dir.FullName.Substring($packageRoot.Length).TrimStart('\','/')
+        if(-not $rel){continue}
+        $target=Join-Path $Root $rel
+        if(Test-Path -LiteralPath $target -PathType Container){
+            if(-not @(Get-ChildItem -LiteralPath $target -Force -ErrorAction SilentlyContinue).Count){
+                Remove-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+    foreach($dir in @('plugins','update')){
+        $target=Join-Path $Root $dir
+        if((Test-Path -LiteralPath $target -PathType Container)-and(-not @(Get-ChildItem -LiteralPath $target -Force -ErrorAction SilentlyContinue).Count)){
+            Remove-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue
+        }
+    }
+    if(Test-Path -LiteralPath (Join-Path $Root 'dinput8.dll')){Fail 'FusionFix dinput8.dll still exists after full cleanup.'}
+}
+function Remove-Scaling([string]$Root,[bool]$KeepFusionFix){
     $uninstall=Join-Path $PSScriptRoot 'Uninstall-DLAA.bat'
     Invoke-Bat $uninstall $Root -NonInteractive
-    Remove-Item -LiteralPath (Join-Path $Root 'GTAIV_SCALING_INSTALLED.txt') -Force -ErrorAction SilentlyContinue
+    Remove-ScalingLeftovers $Root
+    if(-not $KeepFusionFix){Remove-FusionFix $Root}
 }
 
 trap{
@@ -361,7 +436,9 @@ trap{
 }
 
 $Game=Normalize-GamePath $Game
-if($Action-eq'INSTALL'){Install-Scaling $Game}else{Remove-Scaling $Game}
+if($Action-eq'INSTALL'){Install-Scaling $Game}
+elseif($Action-eq'REMOVE_KEEP_FUSIONFIX'){Remove-Scaling $Game $true}
+else{Remove-Scaling $Game $false}
 Write-Result 'OK'
 if($script:Temp -and (Test-Path -LiteralPath $script:Temp)){Remove-Item $script:Temp -Recurse -Force -ErrorAction SilentlyContinue}
 exit 0
