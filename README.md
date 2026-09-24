@@ -37,9 +37,12 @@ The installer backs up the project-owned scaling files before replacing the stac
 
 ### Removal
 
-Run the same installer and choose **Remove GTA IV Scaling**.
+Run the same installer and choose one of two uninstall modes:
 
-The project uninstaller removes the scaling integration while preserving external components where possible.
+- **Remove GTA IV Scaling, keep FusionFix** — removes the scaling runtime, .trex, project ReShade files, receipts, logs and project backup folders, then restores the pre-scaling FusionFix state.
+- **Completely remove GTA IV Scaling and FusionFix** — performs the same project cleanup, then removes the pinned FusionFix package files too. It does not intentionally delete unrelated GTA IV mods.
+
+The shared official ReShade installation is restored away from the project input patch rather than blindly deleted, because it may be used by other games.
 
 ### Open the in-game controls
 
