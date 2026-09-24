@@ -1,5 +1,5 @@
 {
-  "project_status": "v1.2.0-release-ready",
+  "project_status": "v1.2.1-release-candidate",
   "current_release": {
     "version": "1.2.0",
     "product_name": "GTA IV Scaling",
@@ -200,11 +200,21 @@
           "release_search": "dlssnr-310.8.0-RTX40",
           "archive_name": "nvngx_dlssnr_310.8.0-RTX40.zip",
           "archive_sha256": "46124cfaef532ad5f6da07494772ea8c1b3e719f934e254385697f38d1289e3f"
+        },
+        "rtx20_30_shortfuse": {
+          "gpu": "RTX 20 / RTX 30 Series",
+          "version": "310.8.SF-v2",
+          "search_instruction": "Automatically resolved from GitHub tag dlssnr-310.8.SF-v2 unless I brought my own is selected.",
+          "dll_sha256": "6eb209e764f39872625debd6abaf45e2bb6322f6f270f781f70c059ae30b3927",
+          "archive_name": "nvngx_dlssnr_310.8.SF-v2.zip",
+          "archive_sha256": "1da35941894994eb087e017577829e492454e9bae3a6a9397027069ceb74955c",
+          "release_search": "dlssnr-310.8.SF-v2",
+          "authenticode": "Modified compatibility runtime; NVIDIA signature is not required on this path."
         }
       },
       "catalog_release_page": "https://github.com/RankFTW/rhi-repo",
       "installer_accepts": "Automatic GPU-matched GitHub package by default; optional I brought my own nvngx_dlssnr.dll path.",
-      "navigation_instruction": "Normal flow is automatic. The installer shows detected RTX 40/50 and lets advanced users select a local validated DLL instead.",
+      "navigation_instruction": "Normal flow is automatic. The installer shows detected RTX 20/30/40/50 and lets advanced users select a local hash-matched DLL instead.",
       "automatic_download": true,
       "optional_user_supplied_dll": true
     },
@@ -220,6 +230,18 @@
       "installed_path": ".trex/d3d9vk_x64.dll",
       "installed_automatically": true,
       "release_page": "https://github.com/JungleHam/GTAIV-DLAA-DLSS4.5-DLSS5/releases/tag/v1.0.0"
+    }
+  },
+  "next_release": {
+    "version": "1.2.1",
+    "product_name": "GTA IV Scaling",
+    "change": "Enable DLSS 5 Neural Rendering on RTX 20/30 with ShortFuse 310.8.SF-v2; preserve existing RTX 40 and RTX 50 NR runtimes.",
+    "nr": {
+      "rtx20": "310.8.SF-v2",
+      "rtx30": "310.8.SF-v2",
+      "rtx40": "310.8.0-RTX40",
+      "rtx50": "310.8.0 NVIDIA-signed",
+      "default_enabled": false
     }
   }
 }
