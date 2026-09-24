@@ -1,39 +1,28 @@
 {
-  "project_status": "v1.2.1-released",
+  "project_status": "v1.2.2-released",
   "current_release": {
-    "version": "1.2.1",
+    "version": "1.2.2",
     "product_name": "GTA IV Scaling",
-    "approved_workflow_run": 35994811164,
-    "approved_workflow_head": "a15736bed8757e6900026bb3a6312b15af6b7502",
-    "hardware_validation": "RTX 20/30 Neural Rendering path confirmed working by external tester; RTX 40/50 behavior preserved from v1.2.0 baseline.",
+    "approved_workflow_run": 36055513972,
+    "approved_workflow_head": "44de6d7f39b66b1b2012fe0cd2b5ea4e497c9087",
+    "release_scope": "Installer hotfix for FusionFix CFG discovery.",
     "installer": {
-      "asset": "GTAIV-Scaling-Setup-v1.2.1.exe",
-      "sha256": "d3d0917eb69b063fae74681b83a0b77cf2ab23e148fd41e0c2ca85ef9679c11f"
+      "asset": "GTAIV-Scaling-Setup-v1.2.2.exe",
+      "sha256": "b272ae4782575d33fcad2a1dbc932442929b8ae4ea5910708b1a0110e0ea723f"
     },
     "runtime": {
-      "asset": "GTAIV-Scaling-Runtime-v1.2.1.zip",
-      "sha256": "ccc6852cd11489ea21228b2e1b5b98b07e2ffc58be44d36712643f7112dec026",
-      "feeder_sha256": "9e147f4c0eb8003a79224eff3d9060e80fe0c5182b6d1c9d2224aaca64d92e8a"
+      "asset": "GTAIV-Scaling-Runtime-v1.2.2.zip",
+      "sha256": "dedc0bcc7d1608b5c5016e9dced73ffa97c3e7676b587defc7a1d1c2ff2867e2",
+      "feeder_sha256": "ceb478cc9409f1c284e4a702efe5fff9e3b2e4eb070315934d308c82f964da50"
     },
-    "public_backends": [
-      "Off - Native",
-      "NVIDIA DLAA / DLSS",
-      "AMD FidelityFX FSR"
+    "fusionfix_cfg_search": [
+      "GTAIV/plugins/GTAIV.EFLC.FusionFix.cfg",
+      "GTAIV/GTAIV.EFLC.FusionFix.cfg",
+      "%LOCALAPPDATA%/Rockstar Games/GTA IV/GTAIV.EFLC.FusionFix.cfg",
+      "%LOCALAPPDATA%/GTAIV.EFLC.FusionFix/GTAIV.EFLC.FusionFix.cfg",
+      "Documents/GTAIV.EFLC.FusionFix/GTAIV.EFLC.FusionFix.cfg",
+      "plugins/*FusionFix*.cfg fallback"
     ],
-    "non_rtx_backends": [
-      "Off - Native",
-      "AMD FidelityFX FSR"
-    ],
-    "nvidia_temporal_default": {
-      "jitter_phases": 8,
-      "jitter_compensation": "-X / -Y"
-    },
-    "fsr": {
-      "version": "3.1.4",
-      "api": "Vulkan",
-      "exposure": "fixed/default",
-      "rcas": true
-    },
     "nr": {
       "rtx20": true,
       "rtx30": true,
